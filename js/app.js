@@ -10,6 +10,9 @@ window.App = (() => {
   // 确认弹窗回调
   let confirmCallback = null;
 
+  // 已关闭的标签 ID 集合（文件仍在，只是标签页隐藏）
+  let closedTabIds = new Set();
+
   function init() {
     // 1. 初始化文件管理器
     FileManager.init();
@@ -26,6 +29,8 @@ window.App = (() => {
     // 4. 监听文件变化，更新 UI
     FileManager.onChange((files, activeId) => {
       renderFileList(files, activeId);
+      // 当前激活的文件如果被关闭了标签，自动重新打开
+      if (activeId) closedTabIds.delete(activeId);
       renderEditorTabs(files, activeId);
       const activeFile = FileManager.getActiveFile();
       if (activeFile) {
@@ -81,8 +86,9 @@ window.App = (() => {
     listElem.innerHTML = "";
     files.forEach(file => {
       const isExample = FileManager.isExampleFile(file.id);
+      const isClosed = closedTabIds.has(file.id);
       const item = document.createElement("div");
-      item.className = `file-item ${file.id === activeId ? "active" : ""}`;
+      item.className = `file-item ${file.id === activeId ? "active" : ""} ${isClosed ? "closed-tab" : ""}`;
 
       // 文件图标与名称
       const info = document.createElement("div");
@@ -90,6 +96,8 @@ window.App = (() => {
       info.title = file.name;
       info.innerHTML = `<span class="file-icon">${isExample ? '🎁' : '🐍'}</span><span class="file-name">${escapeHtml(file.name)}</span>`;
       info.addEventListener("click", () => {
+        // 从文件树点击文件时，重新打开标签（如果之前关闭了）
+        closedTabIds.delete(file.id);
         FileManager.setActiveFile(file.id);
         SoundEffects.playPop();
       });
@@ -127,13 +135,16 @@ window.App = (() => {
     });
   }
 
-  // 渲染编辑器上方标签页
+  // 渲染编辑器上方标签页（过滤已关闭的标签）
   function renderEditorTabs(files, activeId) {
     const tabsList = document.getElementById("editorTabsList");
     if (!tabsList) return;
 
     tabsList.innerHTML = "";
     files.forEach(file => {
+      // 跳过已关闭的标签
+      if (closedTabIds.has(file.id)) return;
+
       const isExample = FileManager.isExampleFile(file.id);
       const tab = document.createElement("div");
       tab.className = `editor-tab ${file.id === activeId ? "active" : ""}`;
@@ -147,23 +158,53 @@ window.App = (() => {
         SoundEffects.playPop();
       });
 
-      // 关闭按钮
+      // 关闭按钮：仅关闭标签，不删除文件
       const closeBtn = document.createElement("button");
       closeBtn.className = "editor-tab-close";
-      closeBtn.title = isExample ? "内置示例不可删除" : "关闭文件";
+      closeBtn.title = "关闭标签";
       closeBtn.innerHTML = "×";
       closeBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        if (isExample) {
-          showToast("📚 内置示例不能删除哦，但你可以复制它的代码！", "💡");
-        } else {
-          confirmDeleteFile(file.id, file.name);
-        }
+        closeTab(file.id, isExample);
       });
       tab.appendChild(closeBtn);
 
       tabsList.appendChild(tab);
     });
+
+    // 如果所有标签都关闭了，显示占位提示
+    if (tabsList.children.length === 0) {
+      const placeholder = document.createElement("div");
+      placeholder.className = "editor-tab-placeholder";
+      placeholder.textContent = "💡 点击左侧文件重新打开标签";
+      tabsList.appendChild(placeholder);
+    }
+  }
+
+  // 关闭标签（不删除文件）
+  function closeTab(fileId, isExample) {
+    closedTabIds.add(fileId);
+
+    // 如果关闭的是当前激活的文件，自动切换到下一个未关闭的标签
+    const allFiles = FileManager.getFiles();
+    const activeFile = FileManager.getActiveFile();
+    if (activeFile && activeFile.id === fileId) {
+      // 找到第一个未关闭的文件
+      const nextFile = allFiles.find(f => !closedTabIds.has(f.id));
+      if (nextFile) {
+        FileManager.setActiveFile(nextFile.id);
+      } else {
+        // 所有文件标签都关闭了，但文件仍在文件树中
+        // 只更新标签栏显示占位，不改变 activeFile
+        renderEditorTabs(allFiles, null);
+        return;
+      }
+    }
+
+    // 重新渲染标签栏
+    const files = FileManager.getFiles();
+    const currentActive = FileManager.getActiveFile();
+    renderEditorTabs(files, currentActive ? currentActive.id : null);
   }
 
   // 绑定各类交互事件
