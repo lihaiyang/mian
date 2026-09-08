@@ -194,8 +194,8 @@ window.App = (() => {
       if (nextFile) {
         FileManager.setActiveFile(nextFile.id);
       } else {
-        // 所有文件标签都关闭了，但文件仍在文件树中
-        // 只更新标签栏显示占位，不改变 activeFile
+        // 所有文件标签都关闭了，清空编辑器
+        CodeEditor.setValue("");
         renderEditorTabs(allFiles, null);
         return;
       }
