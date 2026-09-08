@@ -9,11 +9,8 @@ const PythonRunner = (() => {
   let onInitCallbacks = [];
   let stdoutLineBuf = "";
 
-  // 终端输入 Promise 的 resolve 回调
-  let terminalInputResolve = null;
-
   const ENV_SETUP_CODE = `
-import sys, types
+import sys, types, builtins
 from js import window
 
 # 自定义标准输出流（JS 侧做按行缓冲）
@@ -24,7 +21,7 @@ class WebStdout:
     def flush(self):
         pass
 
-# stderr 静默：未捕获异常统一由 JS catch 的 PythonError 展示，避免重复刷屏
+# stderr 静默
 class WebStderr:
     def write(self, s):
         pass
@@ -33,6 +30,12 @@ class WebStderr:
 
 sys.stdout = WebStdout()
 sys.stderr = WebStderr()
+
+# 交互式 input：通过 JS 同步获取输入
+def _kid_input(prompt_text=""):
+    return window.PythonRunner.waitForInput(str(prompt_text))
+
+builtins.input = _kid_input
 
 # ============ 高保真海龟画图模块 (Turtle Module for Pyodide) ============
 turtle_mod = types.ModuleType("turtle")
@@ -220,17 +223,6 @@ sys.modules["turtle"] = turtle_mod
 
       await pyodide.runPythonAsync(ENV_SETUP_CODE);
 
-      // 终端输入：Python 的 input() 通过 sys.stdin 读取，触发此回调
-      pyodide.setStdin({
-        stdin: () => {
-          return new Promise((resolve) => {
-            flushStdout();
-            terminalInputResolve = resolve;
-            showTerminalInput();
-          });
-        }
-      });
-
       updateStatus("ready", "🟢 Python 3.12 魔法就绪！");
       isInitializing = false;
       onInitCallbacks.forEach(fn => fn(pyodide));
@@ -287,14 +279,14 @@ sys.modules["turtle"] = turtle_mod
     }
   }
 
-  // 显示终端输入行
+  // 显示终端输入行（视觉提示）
   function showTerminalInput() {
     const inputLine = document.getElementById("terminalInputLine");
     const input = document.getElementById("terminalInput");
     if (inputLine && input) {
       inputLine.style.display = "flex";
       input.value = "";
-      setTimeout(() => input.focus(), 50);
+      input.focus();
     }
   }
 
@@ -304,17 +296,19 @@ sys.modules["turtle"] = turtle_mod
     if (inputLine) inputLine.style.display = "none";
   }
 
-  // 提交终端输入（由 Enter 键触发）
-  function submitTerminalInput() {
-    const input = document.getElementById("terminalInput");
-    if (!input) return;
-    const val = input.value;
+  // 等待用户输入（由 Python 的 input() 同步调用）
+  function waitForInput(promptText) {
+    flushStdout();
+    // 在终端显示提示文字
+    appendLog("stdout", "👉 " + promptText);
+    // 显示终端输入行（视觉上让用户知道要输入了）
+    showTerminalInput();
+    // 使用 window.prompt() 同步获取输入（这是浏览器唯一可靠的同步输入方式）
+    const val = window.prompt(promptText || "请输入：");
     hideTerminalInput();
-    appendLog("stdout", "❯ " + val);
-    if (terminalInputResolve) {
-      terminalInputResolve(val);
-      terminalInputResolve = null;
-    }
+    // 回显输入内容
+    appendLog("stdout", "❯ " + (val || ""));
+    return val === null ? "" : val;
   }
 
   // 运行代码
@@ -379,7 +373,6 @@ sys.modules["turtle"] = turtle_mod
       isRunning = false;
       setRunButtonState(false);
       hideTerminalInput();
-      terminalInputResolve = null;
     }
   }
 
@@ -480,7 +473,7 @@ sys.modules["turtle"] = turtle_mod
     run: runCode,
     handleStdout,
     flushStdout,
-    submitTerminalInput,
+    waitForInput,
     hideTerminalInput
   };
 })();
