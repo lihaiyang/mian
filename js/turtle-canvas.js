@@ -322,6 +322,14 @@ const TurtleEngine = (() => {
         // Python turtle 中 speed(0) 表示最快，与 1~10 档位对齐
         const s = cmd.speed === 0 ? 10 : Math.max(1, Math.min(10, cmd.speed));
         state.speed = s;
+        // 同步 UI 滑块（如果代码中调用了 t.speed()）
+        const slider = document.getElementById("turtleSpeedRange");
+        const label = document.getElementById("speedLabel");
+        if (slider) slider.value = s;
+        if (label) {
+          const labels = ["超慢", "很慢", "慢速", "适中", "正常", "稍快", "快速", "飞快", "超快", "闪电飞速⚡"];
+          label.textContent = labels[s - 1] || "正常";
+        }
         break;
       }
 

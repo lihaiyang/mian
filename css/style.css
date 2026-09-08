@@ -274,9 +274,9 @@ body {
 .app-workspace {
   flex: 1;
   display: grid;
-  grid-template-columns: 240px 1fr 420px;
-  gap: 12px;
-  padding: 12px;
+  grid-template-columns: 210px 1fr 340px;
+  gap: 10px;
+  padding: 10px;
   height: calc(100vh - 60px);
   overflow: hidden;
   position: relative;
@@ -501,6 +501,55 @@ body.dark-mode .snippets-section {
   transform: translateY(-1px);
 }
 
+/* ================= 编辑器上方积木代码栏 ================= */
+.snippets-bar {
+  flex-shrink: 0;
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--border-soft);
+  padding: 6px 10px;
+  max-height: 80px;
+  overflow: hidden;
+  transition: max-height 0.25s ease;
+}
+
+.snippets-bar.collapsed {
+  max-height: 36px;
+}
+
+.snippets-bar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+.snippets-bar-toggle {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: transform 0.2s;
+}
+
+.snippets-bar.collapsed .snippets-bar-toggle {
+  transform: rotate(180deg);
+}
+
+.snippets-bar .snippet-chip-list {
+  gap: 5px;
+}
+
+.snippets-bar .snippet-chip {
+  font-size: 10.5px;
+  padding: 4px 9px;
+}
+
 /* ================= 2. 中间：代码编辑器 ================= */
 .editor-panel {
   display: flex;
@@ -691,6 +740,26 @@ body.dark-mode .CodeMirror-matchingbracket { background: rgba(166, 227, 161, 0.3
   color: var(--text-light);
 }
 
+/* 自动保存指示器 */
+.auto-save-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--success);
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.3s;
+  margin-right: 10px;
+}
+
+.auto-save-indicator.show {
+  opacity: 1;
+}
+
+.auto-save-indicator.saving {
+  color: var(--warning);
+}
+
 /* ================= 3. 右侧：运行控制台与海龟画图视窗 ================= */
 .output-panel {
   display: flex;
@@ -763,7 +832,7 @@ body.dark-mode .output-tabs {
 }
 
 .term-line.system {
-  color: #89B4FA;
+  color: #7AA2F7;
   font-style: italic;
 }
 
@@ -787,14 +856,14 @@ body.dark-mode .output-tabs {
 
 /* 儿童友好：小侦探错误诊断卡片 */
 .detective-tip-card {
-  background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
-  border: 2px dashed #F59E0B;
+  background: linear-gradient(135deg, #FEF9E7 0%, #FDEBD8 100%);
+  border: 2px solid #E67E22;
   border-radius: var(--radius-md);
   padding: 12px 14px;
   margin: 10px 0;
-  color: #92400E;
+  color: #6B3A00;
   font-family: var(--font-ui);
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+  box-shadow: 0 4px 12px rgba(230, 126, 34, 0.2);
   animation: slideInUp 0.3s ease;
 }
 
@@ -1005,7 +1074,7 @@ body.dark-mode .turtle-canvas-container {
 
 @media (max-width: 1024px) {
   .app-workspace {
-    grid-template-columns: 200px 1fr 360px;
+    grid-template-columns: 180px 1fr 300px;
   }
 }
 

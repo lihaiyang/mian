@@ -86,22 +86,7 @@
         </div>
       </div>
 
-      <!-- 常用魔法积木代码（针对 10 岁孩子打字慢、符号易错定制） -->
-      <div class="snippets-section" data-page-node-id="6s38S8Xq58g8aXB7QFrLDV">
-        <div class="snippets-title" data-page-node-id="QySi3VCQNohqmFpUAMWBin">
-          <span data-page-node-id="Dl9H8lo8UXfHqzl0Evbk1g">🧩 常用魔法积木 (点击插入)</span>
-        </div>
-        <div class="snippet-chip-list" data-page-node-id="YcPbVu9t7HFTL6t4TZvmT5">
-          <button class="snippet-chip" data-code="print(&quot;你好，世界！🌟&quot;)" data-page-node-id="eX9ERwfumjvV0AiZZy8Boq"><span data-page-node-id="j2ytAgeJgtj3oaZbuWvmHg">📢 打印输出</span></button>
-          <button class="snippet-chip" data-code="name = input(&quot;你叫什么名字呀？&quot;)" data-page-node-id="oOa34qI4zApKVwB4cMcmL5"><span data-page-node-id="5faObt4rIXiElbtMaSTaPE">❓ 提问回答</span></button>
-          <button class="snippet-chip" data-code="for i in range(5):&#10;    print(&quot;跑第&quot;, i + 1, &quot;圈&quot;)" data-page-node-id="GXJsLmXSBHYZqs3X8gINFk"><span data-page-node-id="OkgcFYYE34VOtEog3pcgnz">🔄 重复5次</span></button>
-          <button class="snippet-chip" data-code="if score data-page-node-id="5O66AEbzSQQSt9nOy88lP2" >= 60:&#10;    print(&quot;太棒啦！🎉&quot;)&#10;else:&#10;    print(&quot;继续加油哦！💪&quot;)"><span data-page-node-id="HdfzO7DvxCG4QGLMqzzI05">⚖️ 如果判断</span></button>
-          <button class="snippet-chip" data-code="import random&#10;lucky = random.randint(1, 100)" data-page-node-id="G906ndLUAcqZyZCDK3b2PF"><span data-page-node-id="RboFWeRpxkOBPpvrEbPys6">🎲 随机幸运数</span></button>
-          <button class="snippet-chip" data-code="import turtle&#10;t = turtle.Turtle()&#10;t.forward(100)&#10;t.right(90)" data-page-node-id="v4DuOCBo2pHLEp5Sar2KPa"><span data-page-node-id="mNvqXWThXOyLtvbQCAgnJK">🐢 海龟前进转弯</span></button>
-          <button class="snippet-chip" data-code="t.color(&quot;coral&quot;)&#10;t.pensize(5)&#10;t.circle(60)" data-page-node-id="lzVXyRF6HzVRAFLA84Kzhk"><span data-page-node-id="pcakVj9GJbUE0eSsXqEkXU">🎨 海龟画彩色圆</span></button>
-        </div>
-      </div>
-    </aside>
+      </aside>
 
     <!-- 2. 中间：代码编辑器 -->
     <section class="workspace-panel editor-panel" data-page-node-id="DtdgelaInDm5rXAV3bkLFr">
@@ -124,6 +109,23 @@
         </div>
       </div>
 
+      <!-- 常用魔法积木栏（移到编辑器上方，更方便孩子点击） -->
+      <div class="snippets-bar" id="snippetsBar">
+        <div class="snippets-bar-header">
+          <span>🧩 魔法积木</span>
+          <button class="snippets-bar-toggle" id="snippetsToggle" title="收起/展开积木">▲</button>
+        </div>
+        <div class="snippet-chip-list" id="snippetsBarList">
+          <button class="snippet-chip" data-code="print(&quot;你好，世界！🌟&quot;)">📢 打印输出</button>
+          <button class="snippet-chip" data-code="name = input(&quot;你叫什么名字呀？&quot;)">❓ 提问回答</button>
+          <button class="snippet-chip" data-code="for i in range(5):&#10;    print(&quot;跑第&quot;, i + 1, &quot;圈&quot;)">🔄 重复5次</button>
+          <button class="snippet-chip" data-code="if score >= 60:&#10;    print(&quot;太棒啦！🎉&quot;)&#10;else:&#10;    print(&quot;继续加油哦！💪&quot;)">⚖️ 如果判断</button>
+          <button class="snippet-chip" data-code="import random&#10;lucky = random.randint(1, 100)">🎲 随机幸运数</button>
+          <button class="snippet-chip" data-code="import turtle&#10;t = turtle.Turtle()&#10;t.forward(100)&#10;t.right(90)">🐢 海龟前进转弯</button>
+          <button class="snippet-chip" data-code="t.color(&quot;coral&quot;)&#10;t.pensize(5)&#10;t.circle(60)">🎨 海龟画彩色圆</button>
+        </div>
+      </div>
+
       <!-- 编辑器容器 -->
       <div class="editor-body-wrapper" data-page-node-id="dUqFkFn2nU7M7tErGrfj9z">
         <textarea id="codeEditorArea"></textarea>
@@ -136,6 +138,7 @@
           <span id="charCount" data-page-node-id="bhDmgiebZ4Nee55eu8FmkY">0 个字符</span>
         </div>
         <div data-page-node-id="PqORSz2W4q9omhN7E3dCKo">
+          <span id="autoSaveIndicator" class="auto-save-indicator">💾 已自动保存</span>
           <span data-page-node-id="m2SQGapFMflIVc0L6HE8GS">🐍 Python 3.12 语法</span> | 
           <span data-page-node-id="75x0EmUWFSEb3Hh3z0I6cX">Tab = 4 空格</span>
         </div>
@@ -232,6 +235,35 @@
       <div class="modal-footer" data-page-node-id="T30WN4Uc9IRDtb1DQaKd1e">
         <button class="header-btn" id="btnCancelModal" data-page-node-id="9P5mG8Op8MwFKNRBRu2T9s">取消</button>
         <button class="btn-run-magic" id="btnConfirmModal" style="padding:6px 18px; font-size:13px;" data-page-node-id="O6VoLAddb384rjWCcVnSv2">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 自定义确认弹窗（替代浏览器原生 confirm） ================= -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-card" style="max-width: 400px;">
+      <div class="modal-title" id="confirmModalTitle">
+        <span>⚠️ 确认操作</span>
+      </div>
+      <div class="modal-desc" id="confirmModalDesc" style="font-size: 14px; line-height: 1.6;"></div>
+      <div class="modal-footer">
+        <button class="header-btn" id="btnConfirmCancel">取消</button>
+        <button class="btn-run-magic" id="btnConfirmOk" style="padding:6px 18px; font-size:13px; background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 自定义输入弹窗（替代 Python input() 的浏览器原生 prompt） ================= -->
+  <div class="modal-overlay" id="inputModal">
+    <div class="modal-card" style="max-width: 380px;">
+      <div class="modal-title">
+        <span>✏️ 请输入内容</span>
+      </div>
+      <div class="modal-desc" style="font-size: 14px; line-height: 1.6;">Python 代码需要你输入一些信息</div>
+      <input type="text" class="modal-input" id="inputModalField" placeholder="在这里输入..." autocomplete="off">
+      <div class="modal-footer">
+        <button class="header-btn" id="btnInputCancel">取消</button>
+        <button class="btn-run-magic" id="btnInputSubmit" style="padding:6px 18px; font-size:13px;">确定</button>
       </div>
     </div>
   </div>

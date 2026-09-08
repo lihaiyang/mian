@@ -1,6 +1,6 @@
 /**
  * 🐍 Python 浏览器端执行核心 (Pyodide WebAssembly Engine + Turtle Bridge)
- * 包含：标准输出按行缓冲捕获、同步交互式 input()、海龟画图注入、儿童化「小侦探」报错诊断
+ * 包含：标准输出按行缓冲捕获、交互式 input() 自定义弹窗、海龟画图注入、儿童化「小侦探」报错诊断
  */
 const PythonRunner = (() => {
   let pyodide = null;
@@ -9,8 +9,11 @@ const PythonRunner = (() => {
   let onInitCallbacks = [];
   let stdoutLineBuf = "";
 
+  // input() 自定义弹窗的 resolve 回调
+  let inputResolve = null;
+
   const ENV_SETUP_CODE = `
-import sys, types, builtins
+import sys, types
 from js import window
 
 # 自定义标准输出流（JS 侧做按行缓冲）
@@ -30,12 +33,6 @@ class WebStderr:
 
 sys.stdout = WebStdout()
 sys.stderr = WebStderr()
-
-# 同步交互式 input：终端先记录提问文字，再弹浏览器原生输入框（同步返回，Python 可直接使用）
-def _kid_input(prompt_text=""):
-    return window.PythonRunner.syncInput(str(prompt_text))
-
-builtins.input = _kid_input
 
 # ============ 高保真海龟画图模块 (Turtle Module for Pyodide) ============
 turtle_mod = types.ModuleType("turtle")
@@ -64,7 +61,6 @@ class Screen:
 
 class Turtle:
     def __init__(self):
-        # 画布已在每次运行前由运行器统一重置，这里不再重置，保证多海龟共存
         pass
     def forward(self, d):
         window.TurtleEngine.forward(float(d))
@@ -225,10 +221,22 @@ sys.modules["turtle"] = turtle_mod
 
       await pyodide.runPythonAsync(ENV_SETUP_CODE);
 
-      // 兜底：stdin 同步读取（正常情况下 input 已被 builtins 覆盖）
+      // 自定义 stdin：使用美观的弹窗代替浏览器原生 prompt
       pyodide.setStdin({
         stdin: () => {
-          return window.prompt("👉 请输入内容：") || "";
+          return new Promise((resolve) => {
+            flushStdout();
+            inputResolve = resolve;
+            const modal = document.getElementById("inputModal");
+            const input = document.getElementById("inputModalField");
+            if (modal) {
+              modal.classList.add("active");
+              input.value = "";
+              input.focus();
+            } else {
+              resolve(window.prompt("请输入：") || "");
+            }
+          });
         }
       });
 
@@ -241,7 +249,6 @@ sys.modules["turtle"] = turtle_mod
       console.error("Pyodide 引擎加载异常:", err);
       updateStatus("error", "⚠️ 魔法引擎准备中(点击依然可试跑)");
       isInitializing = false;
-      // 唤醒所有等待中的调用方，避免永久挂起
       onInitCallbacks.forEach(fn => fn(null));
       onInitCallbacks = [];
       return null;
@@ -362,14 +369,25 @@ sys.modules["turtle"] = turtle_mod
     }
   }
 
-  // 同步交互式输入：先在终端回显提示文字，再用浏览器原生输入框同步取值
-  // （Python 执行时主线程被阻塞，无法使用异步输入条，window.prompt 是唯一可靠同步方案）
-  function syncInput(promptText) {
-    flushStdout();
-    appendLog("stdout", "👉 " + promptText);
-    const val = window.prompt(promptText || "请输入：");
-    appendLog("system", "[输入] " + (val === null ? "(空)" : val));
-    return val === null ? "" : val;
+  // 提交 input() 弹窗的输入
+  function submitInput(value) {
+    const modal = document.getElementById("inputModal");
+    if (modal) modal.classList.remove("active");
+    appendLog("system", "[输入] " + (value || "(空)"));
+    if (inputResolve) {
+      inputResolve(value || "");
+      inputResolve = null;
+    }
+  }
+
+  // 取消 input() 弹窗
+  function cancelInput() {
+    const modal = document.getElementById("inputModal");
+    if (modal) modal.classList.remove("active");
+    if (inputResolve) {
+      inputResolve("");
+      inputResolve = null;
+    }
   }
 
   // 错误诊断与小侦探翻译（专为 10 岁孩子设计！）
@@ -388,12 +406,12 @@ sys.modules["turtle"] = turtle_mod
 
     if (full.includes("IndentationError")) {
       tipTitle = "🔍 缩进小楼梯没对齐！";
-      tipContent = "Python 非常在乎代码左侧的空格！\n👉 冒号 <b>:</b> 后面紧跟着的那几行，一定要多按一个 <b>Tab 键</b> 或 <b>4个空格</b> 缩进进去哦！";
+      tipContent = "Python 非常在乎代码左侧的空格！<br>👉 冒号 <b>:</b> 后面紧跟着的那几行，一定要多按一个 <b>Tab 键</b> 或 <b>4个空格</b> 缩进进去哦！";
     } else if (full.includes("SyntaxError")) {
       tipTitle = "🔍 语法标点符号有迷路的小伙伴！";
       const hasFullWidthPunct = /[：；，（）【】“”‘’！？]/.test(originalCode) || /invalid character/.test(full);
       if (hasFullWidthPunct) {
-        tipContent = "代码里好像不小心混入了<b>中文全角标点</b>（如中文逗号、冒号、引号）！\n👉 赶紧点击编辑器右上角的【🩺 标点体检】按钮，一键修复吧！";
+        tipContent = "代码里好像不小心混入了<b>中文全角标点</b>（如中文逗号、冒号、引号）！<br>👉 赶紧点击编辑器右上角的【🩺 标点体检】按钮，一键修复吧！";
       } else {
         tipContent = "看看是不是括号 <b>()</b> 没有成对闭合？或者 <b>if / for / while</b> 后面漏掉了英文冒号 <b>:</b> 呢？";
       }
@@ -401,13 +419,37 @@ sys.modules["turtle"] = turtle_mod
       const match = full.match(/name '(\w+)' is not defined/);
       const varName = match ? match[1] : "某个变量";
       tipTitle = `🔍 找不到名字为【${varName}】的小帮手！`;
-      tipContent = `电脑不认识名字 <b>${varName}</b> 呢！\n👉 检查一下是不是拼写错误（比如大小写不一致），或者在使用它之前忘记定义了？`;
+      tipContent = `电脑不认识名字 <b>${varName}</b> 呢！<br>👉 检查一下是不是拼写错误（比如大小写不一致），或者在使用它之前忘记定义了？`;
     } else if (full.includes("TypeError")) {
       tipTitle = "🔍 数据类型对不上哦！";
-      tipContent = "是不是把文字（字符串）和数字直接用 <b>+</b> 拼在一起啦？\n👉 可以试着用 <b>str(数字)</b> 把数字转成文字，或者在 print 里用逗号隔开：<b>print(\"答案:\", 100)</b>！";
+      tipContent = "是不是把文字（字符串）和数字直接用 <b>+</b> 拼在一起啦？<br>👉 可以试着用 <b>str(数字)</b> 把数字转成文字，或者在 print 里用逗号隔开：<b>print(\"答案:\", 100)</b>！";
     } else if (full.includes("ZeroDivisionError")) {
       tipTitle = "🔍 数学小禁区：数字不能除以 0！";
       tipContent = "在数学魔法里，任何数字都不能除以 0 哦！看看你的除数算式是不是算成 0 啦？";
+    } else if (full.includes("ValueError")) {
+      tipTitle = "🔍 数值格式不对哦！";
+      tipContent = "你想要把一个文字转换成数字，但那个文字里没有数字呢！<br>👉 检查一下 <b>int()</b> 或 <b>float()</b> 里面的内容，确保是纯数字（比如 <b>\"123\"</b>）而不是文字（<b>\"abc\"</b>）哦！";
+    } else if (full.includes("IndexError")) {
+      tipTitle = "🔍 列表越界啦！";
+      tipContent = "你想访问列表中的第某个元素，但那个位置不存在！<br>👉 列表的索引从 <b>0</b> 开始，所以 <b>list[0]</b> 是第一个元素。检查一下你的索引是不是太大了？";
+    } else if (full.includes("KeyError")) {
+      tipTitle = "🔍 字典里找不到这个钥匙！";
+      tipContent = "你想从字典里取一个值，但这个键名不存在！<br>👉 检查一下键名是否拼写正确，或者先用 <b>in</b> 判断一下键是否存在？";
+    } else if (full.includes("AttributeError")) {
+      const match = full.match(/'(\w+)' object has no attribute '(\w+)'/);
+      const objName = match ? match[1] : "某个对象";
+      const attrName = match ? match[2] : "某个属性";
+      tipTitle = `🔍 【${objName}】没有【${attrName}】这个功能！`;
+      tipContent = `对象 <b>${objName}</b> 没有 <b>${attrName}</b> 这个属性或方法哦！<br>👉 检查一下是不是拼写错了？比如 <b>t.colo()</b> 应该是 <b>t.color()</b>？`;
+    } else if (full.includes("ImportError") || full.includes("ModuleNotFoundError")) {
+      tipTitle = "🔍 找不到这个魔法模块！";
+      tipContent = "你想 <b>import</b> 一个不存在的模块！<br>👉 检查一下模块名字是否拼写正确？注意大小写哦！";
+    } else if (full.includes("FileNotFoundError")) {
+      tipTitle = "🔍 文件找不到啦！";
+      tipContent = "你想打开一个文件，但电脑找不到它！<br>👉 检查一下文件名和路径是否写对了？";
+    } else if (full.includes("EOFError")) {
+      tipTitle = "🔍 input() 遇到意外结束！";
+      tipContent = "代码执行到一半，input() 没能获取到输入。<br>👉 可能是你在输入框里点了取消？";
     }
 
     const terminal = document.getElementById("terminalLogs");
@@ -438,9 +480,10 @@ sys.modules["turtle"] = turtle_mod
   return {
     init: initPyodideEngine,
     run: runCode,
-    syncInput,
     handleStdout,
-    flushStdout
+    flushStdout,
+    submitInput,
+    cancelInput
   };
 })();
 
