@@ -48,6 +48,10 @@ const CodeEditor = (() => {
           updateStatusBar();
           const content = cm.getValue();
           FileManager.updateActiveContent(content);
+          // 显示保存指示器
+          if (window.App && window.App.showAutoSaveIndicator) {
+            window.App.showAutoSaveIndicator();
+          }
         });
 
         applyFontSize(currentFontSize);

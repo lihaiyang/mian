@@ -13,7 +13,19 @@ window.App = (() => {
   // 已关闭的标签 ID 集合（文件仍在，只是标签页隐藏）
   let closedTabIds = new Set();
 
+  // 存储 key
+  const CLOSED_TABS_KEY = "codepanda_closed_tabs_v1";
+
   function init() {
+    // 0. 恢复已关闭标签状态
+    try {
+      const saved = localStorage.getItem(CLOSED_TABS_KEY);
+      if (saved) {
+        const arr = JSON.parse(saved);
+        if (Array.isArray(arr)) closedTabIds = new Set(arr);
+      }
+    } catch (e) {}
+
     // 1. 初始化文件管理器
     FileManager.init();
 
@@ -98,6 +110,7 @@ window.App = (() => {
       info.addEventListener("click", () => {
         // 从文件树点击文件时，重新打开标签（如果之前关闭了）
         closedTabIds.delete(file.id);
+        saveClosedTabs();
         FileManager.setActiveFile(file.id);
         SoundEffects.playPop();
       });
@@ -184,6 +197,7 @@ window.App = (() => {
   // 关闭标签（不删除文件）
   function closeTab(fileId, isExample) {
     closedTabIds.add(fileId);
+    saveClosedTabs();
 
     // 如果关闭的是当前激活的文件，自动切换到下一个未关闭的标签
     const allFiles = FileManager.getFiles();
@@ -207,6 +221,13 @@ window.App = (() => {
     renderEditorTabs(files, currentActive ? currentActive.id : null);
   }
 
+  // 保存已关闭标签状态到 localStorage
+  function saveClosedTabs() {
+    try {
+      localStorage.setItem(CLOSED_TABS_KEY, JSON.stringify(Array.from(closedTabIds)));
+    } catch (e) {}
+  }
+
   // 绑定各类交互事件
   function bindUIEvents() {
     // 运行按钮
@@ -224,6 +245,8 @@ window.App = (() => {
         "⚠️ 注意啦！",
         "恢复示例宝库会【替换掉你现在的所有文件】哦！<br>想保留自己的代码的话，先点「取消」，用左侧 ⬇️ 按钮下载保存~<br><br>确定要恢复示例宝库吗？",
         () => {
+          closedTabIds.clear();
+          saveClosedTabs();
           FileManager.resetToDefault();
           showToast("🎉 示例宝库已重新装满！", "🎁");
           SoundEffects.playSuccess();
@@ -619,7 +642,8 @@ window.App = (() => {
     switchToTab,
     showToast,
     showConfirmModal,
-    closeConfirmModal
+    closeConfirmModal,
+    showAutoSaveIndicator
   };
 })();
 
