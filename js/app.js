@@ -397,17 +397,6 @@ window.App = (() => {
       }
     });
 
-    // 终端输入行事件
-    const terminalInput = document.getElementById("terminalInput");
-    if (terminalInput) {
-      terminalInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          PythonRunner.submitTerminalInput();
-        }
-      });
-    }
-
     // 全局快捷键拦截
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {

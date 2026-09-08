@@ -308,6 +308,8 @@ sys.modules["turtle"] = turtle_mod
     hideTerminalInput();
     // 回显输入内容
     appendLog("stdout", "❯ " + (val || ""));
+    // 确保后续 print() 的输出能正常显示
+    setTimeout(() => flushStdout(), 0);
     return val === null ? "" : val;
   }
 
