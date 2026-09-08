@@ -1,6 +1,6 @@
 /**
  * 🐍 Python 浏览器端执行核心 (Pyodide WebAssembly Engine + Turtle Bridge)
- * 包含：标准输出按行缓冲捕获、交互式 input() 自定义弹窗、海龟画图注入、儿童化「小侦探」报错诊断
+ * 包含：标准输出按行缓冲捕获、交互式终端输入、海龟画图注入、儿童化「小侦探」报错诊断
  */
 const PythonRunner = (() => {
   let pyodide = null;
@@ -9,8 +9,11 @@ const PythonRunner = (() => {
   let onInitCallbacks = [];
   let stdoutLineBuf = "";
 
+  // 终端输入 Promise 的 resolve 回调
+  let terminalInputResolve = null;
+
   const ENV_SETUP_CODE = `
-import sys, types, builtins
+import sys, types
 from js import window
 
 # 自定义标准输出流（JS 侧做按行缓冲）
@@ -30,12 +33,6 @@ class WebStderr:
 
 sys.stdout = WebStdout()
 sys.stderr = WebStderr()
-
-# 交互式 input：通过 JS 侧的自定义弹窗获取输入（同步返回）
-def _kid_input(prompt_text=""):
-    return window.PythonRunner.waitForInput(str(prompt_text))
-
-builtins.input = _kid_input
 
 # ============ 高保真海龟画图模块 (Turtle Module for Pyodide) ============
 turtle_mod = types.ModuleType("turtle")
@@ -147,7 +144,6 @@ class Turtle:
     def shape(self, s):
         pass
 
-# 单例海龟，供函数式调用（turtle.forward(...) 等）
 _default_turtle = Turtle()
 
 turtle_mod.Turtle = Turtle
@@ -224,11 +220,14 @@ sys.modules["turtle"] = turtle_mod
 
       await pyodide.runPythonAsync(ENV_SETUP_CODE);
 
-      // 自定义 stdin：仅在未通过 builtins.input 覆盖时使用（同步）
+      // 终端输入：Python 的 input() 通过 sys.stdin 读取，触发此回调
       pyodide.setStdin({
         stdin: () => {
-          flushStdout();
-          return window.prompt("👉 请输入内容：") || "";
+          return new Promise((resolve) => {
+            flushStdout();
+            terminalInputResolve = resolve;
+            showTerminalInput();
+          });
         }
       });
 
@@ -269,8 +268,7 @@ sys.modules["turtle"] = turtle_mod
   }
 
   /**
-   * stdout 按行缓冲：Python 的 print("a", "b") 会产生多次 write（"a", " ", "b", "\n"），
-   * 必须缓冲拼接，遇到换行才输出，否则控制台会碎成好几行。
+   * stdout 按行缓冲
    */
   function handleStdout(s) {
     stdoutLineBuf += s;
@@ -282,11 +280,40 @@ sys.modules["turtle"] = turtle_mod
     }
   }
 
-  // 程序结束/报错/等待输入前，把不带换行的残留输出冲刷出来
   function flushStdout() {
     if (stdoutLineBuf) {
       appendLog("stdout", stdoutLineBuf);
       stdoutLineBuf = "";
+    }
+  }
+
+  // 显示终端输入行
+  function showTerminalInput() {
+    const inputLine = document.getElementById("terminalInputLine");
+    const input = document.getElementById("terminalInput");
+    if (inputLine && input) {
+      inputLine.style.display = "flex";
+      input.value = "";
+      setTimeout(() => input.focus(), 50);
+    }
+  }
+
+  // 隐藏终端输入行
+  function hideTerminalInput() {
+    const inputLine = document.getElementById("terminalInputLine");
+    if (inputLine) inputLine.style.display = "none";
+  }
+
+  // 提交终端输入（由 Enter 键触发）
+  function submitTerminalInput() {
+    const input = document.getElementById("terminalInput");
+    if (!input) return;
+    const val = input.value;
+    hideTerminalInput();
+    appendLog("stdout", "❯ " + val);
+    if (terminalInputResolve) {
+      terminalInputResolve(val);
+      terminalInputResolve = null;
     }
   }
 
@@ -306,11 +333,12 @@ sys.modules["turtle"] = turtle_mod
     const terminal = document.getElementById("terminalLogs");
     terminal.innerHTML = "";
     stdoutLineBuf = "";
+    hideTerminalInput();
     appendLog("system", "🚀 开始运行 Python 代码...");
 
     const startTime = performance.now();
 
-    // 检查是否包含海龟绘图代码，若是则自动切换并重置画布
+    // 检查是否包含海龟绘图代码
     const hasTurtle = /import\s+turtle|from\s+turtle/i.test(code);
     if (hasTurtle) {
       TurtleEngine.reset();
@@ -321,7 +349,6 @@ sys.modules["turtle"] = turtle_mod
     }
 
     try {
-      // 保证引擎已加载
       if (!pyodide) {
         appendLog("warning", "⏳ 正在连接 Python 运行环境，初次加载约需数秒，请稍候...");
         await initPyodideEngine();
@@ -336,7 +363,6 @@ sys.modules["turtle"] = turtle_mod
       flushStdout();
       const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
 
-      // 海龟作画是异步逐帧播放的：等画作全部完成后再宣布成功并撒花
       if (hasTurtle) {
         TurtleEngine.onIdle(() => {
           appendLog("success", `✨ 画作完成！代码运行成功，耗时: ${elapsed} 秒 🎉`);
@@ -352,6 +378,8 @@ sys.modules["turtle"] = turtle_mod
     } finally {
       isRunning = false;
       setRunButtonState(false);
+      hideTerminalInput();
+      terminalInputResolve = null;
     }
   }
 
@@ -361,26 +389,16 @@ sys.modules["turtle"] = turtle_mod
     }
   }
 
-  // 等待用户输入（由 Python 的 input() 同步调用）
-  function waitForInput(promptText) {
-    flushStdout();
-    appendLog("stdout", "👉 " + promptText);
-    const val = window.prompt(promptText || "请输入：");
-    appendLog("system", "[输入] " + (val === null ? "(空)" : val));
-    return val === null ? "" : val;
-  }
-
-  // 错误诊断与小侦探翻译（专为 10 岁孩子设计！）
+  // 错误诊断与小侦探翻译
   function handleRuntimeError(err, originalCode) {
     flushStdout();
+    hideTerminalInput();
 
-    // PythonError.message 包含完整 traceback，只取最后一行异常摘要，避免吓到小朋友
     const full = String((err && err.message) ? err.message : err);
     const lines = full.trim().split("\n").map(l => l.trim()).filter(Boolean);
     const lastLine = lines[lines.length - 1] || "未知错误";
     appendLog("error", "❌ 哎呀，程序遇到一点小状况：" + lastLine);
 
-    // 智能小侦探卡片诊断
     let tipTitle = "🔍 小侦探正在诊断...";
     let tipContent = "检查一下代码是否有小字母打错了哦！";
 
@@ -462,7 +480,8 @@ sys.modules["turtle"] = turtle_mod
     run: runCode,
     handleStdout,
     flushStdout,
-    waitForInput
+    submitTerminalInput,
+    hideTerminalInput
   };
 })();
 

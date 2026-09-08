@@ -866,6 +866,46 @@ body.dark-mode .output-tabs {
   word-break: break-all;
 }
 
+/* 终端输入行（模拟命令行输入） */
+.terminal-input-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #16182A;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+body.dark-mode .terminal-input-line {
+  background: #0D0F17;
+}
+
+.terminal-prompt {
+  font-family: var(--font-code);
+  font-size: 14px;
+  color: #A6E3A1;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.terminal-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--term-text);
+  font-family: var(--font-code);
+  font-size: 13px;
+  line-height: 1.5;
+  caret-color: #A6E3A1;
+}
+
+.terminal-input::placeholder {
+  color: #6C7086;
+  font-style: italic;
+}
+
 .term-line {
   margin-bottom: 4px;
 }
