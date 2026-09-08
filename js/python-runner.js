@@ -257,6 +257,8 @@ sys.modules["turtle"] = turtle_mod
     div.textContent = text;
     terminal.appendChild(div);
     terminal.scrollTop = terminal.scrollHeight;
+    // 强制浏览器立即渲染 DOM 变化（否则后续同步阻塞会延迟显示）
+    void terminal.offsetHeight;
   }
 
   /**
@@ -296,20 +298,29 @@ sys.modules["turtle"] = turtle_mod
     if (inputLine) inputLine.style.display = "none";
   }
 
+  // 强制浏览器渲染 DOM 变化（解决同步阻塞时输出不刷新问题）
+  function forceReflow() {
+    const terminal = document.getElementById("terminalLogs");
+    if (terminal) void terminal.offsetHeight;
+  }
+
   // 等待用户输入（由 Python 的 input() 同步调用）
   function waitForInput(promptText) {
     flushStdout();
+    // 强制刷新 DOM，确保之前的所有 print 输出都已渲染到屏幕上
+    forceReflow();
     // 在终端显示提示文字
     appendLog("stdout", "👉 " + promptText);
     // 显示终端输入行（视觉上让用户知道要输入了）
     showTerminalInput();
-    // 使用 window.prompt() 同步获取输入（这是浏览器唯一可靠的同步输入方式）
+    // 再次强制刷新，确保提示文字显示后再弹出 prompt
+    forceReflow();
+    // 使用 window.prompt() 同步获取输入
     const val = window.prompt(promptText || "请输入：");
     hideTerminalInput();
     // 回显输入内容
     appendLog("stdout", "❯ " + (val || ""));
-    // 确保后续 print() 的输出能正常显示
-    setTimeout(() => flushStdout(), 0);
+    forceReflow();
     return val === null ? "" : val;
   }
 
