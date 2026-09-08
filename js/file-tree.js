@@ -127,10 +127,16 @@ const FileManager = (() => {
       return newFile;
     },
 
+    // 判断是否为内置示例
+    isExampleFile(id) {
+      return id && id.startsWith("ex_");
+    },
+
     // 重命名文件
     renameFile(id, newName) {
       const file = files.find(f => f.id === id);
       if (!file) return false;
+      if (this.isExampleFile(id)) return false; // 内置示例不可重命名
 
       let trimmed = newName.trim();
       if (!trimmed) return false;
@@ -149,6 +155,9 @@ const FileManager = (() => {
 
     // 删除文件
     deleteFile(id) {
+      if (this.isExampleFile(id)) {
+        return { success: false, reason: "内置示例不能删除哦！" };
+      }
       if (files.length <= 1) {
         return { success: false, reason: "至少要保留一个代码文件哦！" };
       }

@@ -5,8 +5,8 @@
 const CodeEditor = (() => {
   let cmInstance = null;
   let fallbackTextarea = null;
-  let currentFontSize = 16;
-  const MIN_FONT_SIZE = 13;
+  let currentFontSize = 15;
+  const MIN_FONT_SIZE = 12;
   const MAX_FONT_SIZE = 26;
 
   function init(textareaElement) {

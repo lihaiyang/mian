@@ -80,6 +80,7 @@ window.App = (() => {
 
     listElem.innerHTML = "";
     files.forEach(file => {
+      const isExample = FileManager.isExampleFile(file.id);
       const item = document.createElement("div");
       item.className = `file-item ${file.id === activeId ? "active" : ""}`;
 
@@ -87,36 +88,38 @@ window.App = (() => {
       const info = document.createElement("div");
       info.className = "file-info";
       info.title = file.name;
-      info.innerHTML = `<span class="file-icon">🐍</span><span class="file-name">${escapeHtml(file.name)}</span>`;
+      info.innerHTML = `<span class="file-icon">${isExample ? '🎁' : '🐍'}</span><span class="file-name">${escapeHtml(file.name)}</span>`;
       info.addEventListener("click", () => {
         FileManager.setActiveFile(file.id);
         SoundEffects.playPop();
       });
 
-      // 操作小按钮（重命名、删除）
+      // 操作小按钮（重命名、删除）- 仅用户文件显示
       const actions = document.createElement("div");
       actions.className = "file-actions";
 
-      const btnRename = document.createElement("button");
-      btnRename.className = "file-action-btn";
-      btnRename.title = "重命名";
-      btnRename.innerHTML = "✏️";
-      btnRename.addEventListener("click", (e) => {
-        e.stopPropagation();
-        openRenameModal(file.id, file.name);
-      });
+      if (!isExample) {
+        const btnRename = document.createElement("button");
+        btnRename.className = "file-action-btn";
+        btnRename.title = "重命名";
+        btnRename.innerHTML = "✏️";
+        btnRename.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openRenameModal(file.id, file.name);
+        });
 
-      const btnDel = document.createElement("button");
-      btnDel.className = "file-action-btn";
-      btnDel.title = "删除";
-      btnDel.innerHTML = "🗑️";
-      btnDel.addEventListener("click", (e) => {
-        e.stopPropagation();
-        confirmDeleteFile(file.id, file.name);
-      });
+        const btnDel = document.createElement("button");
+        btnDel.className = "file-action-btn";
+        btnDel.title = "删除";
+        btnDel.innerHTML = "🗑️";
+        btnDel.addEventListener("click", (e) => {
+          e.stopPropagation();
+          confirmDeleteFile(file.id, file.name);
+        });
 
-      actions.appendChild(btnRename);
-      actions.appendChild(btnDel);
+        actions.appendChild(btnRename);
+        actions.appendChild(btnDel);
+      }
 
       item.appendChild(info);
       item.appendChild(actions);
@@ -131,15 +134,33 @@ window.App = (() => {
 
     tabsList.innerHTML = "";
     files.forEach(file => {
+      const isExample = FileManager.isExampleFile(file.id);
       const tab = document.createElement("div");
       tab.className = `editor-tab ${file.id === activeId ? "active" : ""}`;
       tab.title = file.name;
-      tab.innerHTML = `<span>🐍 ${escapeHtml(file.name)}</span>`;
+      tab.innerHTML = `<span>${isExample ? '🎁' : '🐍'} ${escapeHtml(file.name)}</span>`;
 
-      tab.addEventListener("click", () => {
+      tab.addEventListener("click", (e) => {
+        // 点击标签切换到该文件（关闭按钮点击时不触发）
+        if (e.target.closest('.editor-tab-close')) return;
         FileManager.setActiveFile(file.id);
         SoundEffects.playPop();
       });
+
+      // 关闭按钮
+      const closeBtn = document.createElement("button");
+      closeBtn.className = "editor-tab-close";
+      closeBtn.title = isExample ? "内置示例不可删除" : "关闭文件";
+      closeBtn.innerHTML = "×";
+      closeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (isExample) {
+          showToast("📚 内置示例不能删除哦，但你可以复制它的代码！", "💡");
+        } else {
+          confirmDeleteFile(file.id, file.name);
+        }
+      });
+      tab.appendChild(closeBtn);
 
       tabsList.appendChild(tab);
     });
