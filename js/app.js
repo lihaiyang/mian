@@ -397,28 +397,6 @@ window.App = (() => {
       }
     });
 
-    // 自定义输入弹窗事件
-    document.getElementById("btnInputSubmit").addEventListener("click", () => {
-      const input = document.getElementById("inputModalField");
-      PythonRunner.submitInput(input.value);
-    });
-    document.getElementById("btnInputCancel").addEventListener("click", () => {
-      PythonRunner.cancelInput();
-    });
-    document.getElementById("inputModalField").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        PythonRunner.submitInput(e.target.value);
-      } else if (e.key === "Escape") {
-        PythonRunner.cancelInput();
-      }
-    });
-    const inputModalOverlay = document.getElementById("inputModal");
-    inputModalOverlay.addEventListener("click", (e) => {
-      if (e.target === inputModalOverlay) {
-        PythonRunner.cancelInput();
-      }
-    });
-
     // 全局快捷键拦截
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {

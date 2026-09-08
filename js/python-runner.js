@@ -9,11 +9,8 @@ const PythonRunner = (() => {
   let onInitCallbacks = [];
   let stdoutLineBuf = "";
 
-  // input() 自定义弹窗的 resolve 回调
-  let inputResolve = null;
-
   const ENV_SETUP_CODE = `
-import sys, types
+import sys, types, builtins
 from js import window
 
 # 自定义标准输出流（JS 侧做按行缓冲）
@@ -33,6 +30,12 @@ class WebStderr:
 
 sys.stdout = WebStdout()
 sys.stderr = WebStderr()
+
+# 交互式 input：通过 JS 侧的自定义弹窗获取输入（同步返回）
+def _kid_input(prompt_text=""):
+    return window.PythonRunner.waitForInput(str(prompt_text))
+
+builtins.input = _kid_input
 
 # ============ 高保真海龟画图模块 (Turtle Module for Pyodide) ============
 turtle_mod = types.ModuleType("turtle")
@@ -221,22 +224,11 @@ sys.modules["turtle"] = turtle_mod
 
       await pyodide.runPythonAsync(ENV_SETUP_CODE);
 
-      // 自定义 stdin：使用美观的弹窗代替浏览器原生 prompt
+      // 自定义 stdin：仅在未通过 builtins.input 覆盖时使用（同步）
       pyodide.setStdin({
         stdin: () => {
-          return new Promise((resolve) => {
-            flushStdout();
-            inputResolve = resolve;
-            const modal = document.getElementById("inputModal");
-            const input = document.getElementById("inputModalField");
-            if (modal) {
-              modal.classList.add("active");
-              input.value = "";
-              input.focus();
-            } else {
-              resolve(window.prompt("请输入：") || "");
-            }
-          });
+          flushStdout();
+          return window.prompt("👉 请输入内容：") || "";
         }
       });
 
@@ -369,25 +361,13 @@ sys.modules["turtle"] = turtle_mod
     }
   }
 
-  // 提交 input() 弹窗的输入
-  function submitInput(value) {
-    const modal = document.getElementById("inputModal");
-    if (modal) modal.classList.remove("active");
-    appendLog("system", "[输入] " + (value || "(空)"));
-    if (inputResolve) {
-      inputResolve(value || "");
-      inputResolve = null;
-    }
-  }
-
-  // 取消 input() 弹窗
-  function cancelInput() {
-    const modal = document.getElementById("inputModal");
-    if (modal) modal.classList.remove("active");
-    if (inputResolve) {
-      inputResolve("");
-      inputResolve = null;
-    }
+  // 等待用户输入（由 Python 的 input() 同步调用）
+  function waitForInput(promptText) {
+    flushStdout();
+    appendLog("stdout", "👉 " + promptText);
+    const val = window.prompt(promptText || "请输入：");
+    appendLog("system", "[输入] " + (val === null ? "(空)" : val));
+    return val === null ? "" : val;
   }
 
   // 错误诊断与小侦探翻译（专为 10 岁孩子设计！）
@@ -482,8 +462,7 @@ sys.modules["turtle"] = turtle_mod
     run: runCode,
     handleStdout,
     flushStdout,
-    submitInput,
-    cancelInput
+    waitForInput
   };
 })();
 
