@@ -307,7 +307,7 @@ sys.modules["turtle"] = turtle_mod`;
   function handleStdout(s) {
     stdoutLineBuf += s;
     let idx;
-    while ((idx = stdoutLineBuf.indexOf("\\n")) !== -1) {
+    while ((idx = stdoutLineBuf.indexOf("\n")) !== -1) {
       const line = stdoutLineBuf.slice(0, idx);
       stdoutLineBuf = stdoutLineBuf.slice(idx + 1);
       appendLog("stdout", line);
@@ -410,7 +410,7 @@ sys.modules["turtle"] = turtle_mod`;
   function handleRuntimeError(errText, originalCode) {
     hideTerminalInput();
     const full = String(errText || "");
-    const lines = full.trim().split("\\n").filter(Boolean);
+    const lines = full.trim().split("\n").filter(Boolean);
     const lastLine = lines[lines.length - 1] || "\u672a\u77e5\u9519\u8bef";
     appendLog("error", "\u274c \u54ce\u5440\uff0c\u7a0b\u5e8f\u9047\u5230\u4e00\u70b9\u5c0f\u72b6\u51b5\uff1a" + lastLine);
     let tipTitle = "\ud83d\udd0d \u5c0f\u4fa6\u63a2\u6b63\u5728\u8bca\u65ad...";
