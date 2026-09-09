@@ -315,24 +315,25 @@ sys.modules["turtle"] = turtle_mod
    * 待处理的 DOM 更新（包括排版和绘制），因此之前的输出能够在
    * 对话框出现前正确显示出来。
    */
+  /**
+   * 等待用户输入（由 Python 的 _kid_input → builtins.input 同步调用）
+   *
+   * 先冲刷 stdout 确保之前的 print 输出已写入 DOM，
+   * 再用 window.prompt() 同步获取用户输入。
+   * window.prompt 是浏览器 API，在显示对话框之前浏览器会处理
+   * 待处理的 DOM 更新（包括排版和绘制），因此之前的输出能够在
+   * 对话框出现前正确显示出来。
+   */
   function waitForInput(promptText) {
     flushStdout();
-    // 强制重排确保所有 DOM 变更已提交到浏览器渲染管线
     forceReflow();
-    // 在终端显示提示文字（Python 的 input() 已经写了 prompt 到 stdout，
-    // 这里再补一个友好的视觉提示）
     appendLog("stdout", "👉 " + promptText);
-    // 显示终端输入行让用户知道要输入了（虽然实际用的是 prompt 对话框）
     showTerminalInput();
     forceReflow();
 
-    // 使用 window.prompt() 同步获取输入。
-    // 在显示对话框之前，浏览器会处理待处理的 DOM 更新，
-    // 因此之前的 flushStdout 内容能够正确渲染到屏幕上。
     const val = window.prompt(promptText || "请输入：");
 
     hideTerminalInput();
-    // 回显输入内容
     appendLog("stdout", "❯ " + (val || ""));
     forceReflow();
     return val === null ? "" : val;
