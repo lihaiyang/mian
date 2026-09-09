@@ -132,7 +132,8 @@ sys.modules["turtle"] = __import__("turtle")`;
         updateStatus("ready", "\ud83d\udfe1 Python 3.12 \u9b54\u6cd5\u5c31\u7eea\uff01");
         isReady = true;
       }).catch(err => {
-        console.error('Pyodide init error:', err);
+        console.error('Pyodide init error:', err.message || err);
+        console.error('Full traceback:', err.stack || '(no stack)');
         updateStatus("error", "\u26a0\ufe0f \u9b54\u6cd5\u5f15\u64ce\u51c6\u5907\u4e2d");
       });
     }
@@ -194,6 +195,7 @@ sys.modules["turtle"] = __import__("turtle")`;
       try { ConfettiFX.celebrate(); } catch(e) {}
     } catch (err) {
       handleRuntimeError(err.message || String(err), code);
+      console.error('Run error:', err);
       try { SoundEffects.playWarning(); } catch(e) {}
     } finally {
       finishRun();
