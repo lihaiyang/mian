@@ -132,8 +132,11 @@ sys.modules["turtle"] = __import__("turtle")`;
         updateStatus("ready", "\ud83d\udfe1 Python 3.12 \u9b54\u6cd5\u5c31\u7eea\uff01");
         isReady = true;
       }).catch(err => {
-        console.error('Pyodide init error:', err.message || err);
-        console.error('Full traceback:', err.stack || '(no stack)');
+        console.error('Pyodide ERROR:');
+        console.error('  message:', err.message);
+        console.error('  toString:', err.toString());
+        console.error('  props:', Object.keys(err).join(', '));
+        try { console.error('  Python tb:', err.__cause__); } catch(e) {}
         updateStatus("error", "\u26a0\ufe0f \u9b54\u6cd5\u5f15\u64ce\u51c6\u5907\u4e2d");
       });
     }
