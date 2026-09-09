@@ -127,7 +127,7 @@ const PythonRunner = (() => {
           '    return window.PythonRunner.waitForInput(str(prompt_text))',
           'builtins.input = _kid_input',
           'sys.modules["turtle"] = __import__("turtle")',
-        ].join('\\n');
+        ].join('\n');
         return py.runPythonAsync(setupCode);
       }).then(() => {
         updateStatus("ready", "\ud83d\udfe1 Python 3.12 \u9b54\u6cd5\u5c31\u7eea\uff01");
