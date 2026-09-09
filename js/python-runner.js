@@ -9,11 +9,8 @@ const PythonRunner = (() => {
   let onInitCallbacks = [];
   let stdoutLineBuf = "";
 
-  // 终端输入 Promise 的 resolve 回调（由 setStdin 设置，submitTerminalInput 调用）
-  let terminalInputResolve = null;
-
   const ENV_SETUP_CODE = `
-import sys, types
+import sys, types, builtins
 from js import window
 
 # 自定义标准输出流（JS 侧做按行缓冲）
@@ -33,6 +30,14 @@ class WebStderr:
 
 sys.stdout = WebStdout()
 sys.stderr = WebStderr()
+
+# 同步 input()：通过 JS 的 window.prompt 获取用户输入
+# Pyodide 的 setStdin 不支持异步 stdin 函数，所以这里用
+# builtins.input 覆盖 + window.prompt 同步获取输入。
+# 在调用 prompt 之前确保 stdout 已冲刷到屏幕上。
+def _kid_input(prompt_text=""):
+    return window.PythonRunner.waitForInput(str(prompt_text))
+builtins.input = _kid_input
 
 # ============ 高保真海龟画图模块 (Turtle Module for Pyodide) ============
 turtle_mod = types.ModuleType("turtle")
@@ -220,20 +225,6 @@ sys.modules["turtle"] = turtle_mod
 
       await pyodide.runPythonAsync(ENV_SETUP_CODE);
 
-      // 异步 stdin：Python 的 input() 读取时返回 Promise，挂起 Python 执行，
-      // 让浏览器有机会渲染输出并等待用户在终端输入行输入。
-      pyodide.setStdin({
-        stdin: () => {
-          return new Promise((resolve) => {
-            flushStdout();
-            forceReflow();
-            terminalInputResolve = resolve;
-            showTerminalInput();
-            forceReflow();
-          });
-        }
-      });
-
       updateStatus("ready", "🟢 Python 3.12 魔法就绪！");
       isInitializing = false;
       onInitCallbacks.forEach(fn => fn(pyodide));
@@ -315,19 +306,36 @@ sys.modules["turtle"] = turtle_mod
     if (terminal) void terminal.offsetHeight;
   }
 
-  // 提交终端输入（由终端输入行的 Enter 键触发，resolve setStdin 的 Promise）
-  function submitTerminalInput() {
-    const input = document.getElementById("terminalInput");
-    if (!input) return;
-    const val = input.value;
+  /**
+   * 等待用户输入（由 Python 的 _kid_input → builtins.input 同步调用）
+   *
+   * 先冲刷 stdout 确保之前的 print 输出已渲染到屏幕上，
+   * 再用 window.prompt() 同步获取用户输入。
+   * window.prompt 是浏览器 API，在显示对话框之前浏览器会处理
+   * 待处理的 DOM 更新（包括排版和绘制），因此之前的输出能够在
+   * 对话框出现前正确显示出来。
+   */
+  function waitForInput(promptText) {
+    flushStdout();
+    // 强制重排确保所有 DOM 变更已提交到浏览器渲染管线
+    forceReflow();
+    // 在终端显示提示文字（Python 的 input() 已经写了 prompt 到 stdout，
+    // 这里再补一个友好的视觉提示）
+    appendLog("stdout", "👉 " + promptText);
+    // 显示终端输入行让用户知道要输入了（虽然实际用的是 prompt 对话框）
+    showTerminalInput();
+    forceReflow();
+
+    // 使用 window.prompt() 同步获取输入。
+    // 在显示对话框之前，浏览器会处理待处理的 DOM 更新，
+    // 因此之前的 flushStdout 内容能够正确渲染到屏幕上。
+    const val = window.prompt(promptText || "请输入：");
+
     hideTerminalInput();
     // 回显输入内容
-    appendLog("stdout", "❯ " + val);
-    if (terminalInputResolve) {
-      const resolve = terminalInputResolve;
-      terminalInputResolve = null;
-      resolve(val);
-    }
+    appendLog("stdout", "❯ " + (val || ""));
+    forceReflow();
+    return val === null ? "" : val;
   }
 
   // 运行代码
@@ -361,6 +369,10 @@ sys.modules["turtle"] = turtle_mod
       switchTabSafe("console");
     }
 
+    // Yield 一次让浏览器有机会完成视图切换的渲染
+    // 这样控制台或海龟画布在 Python 代码运行前已经可见
+    await new Promise(resolve => setTimeout(resolve, 0));
+
     try {
       if (!pyodide) {
         appendLog("warning", "⏳ 正在连接 Python 运行环境，初次加载约需数秒，请稍候...");
@@ -392,7 +404,6 @@ sys.modules["turtle"] = turtle_mod
       isRunning = false;
       setRunButtonState(false);
       hideTerminalInput();
-      terminalInputResolve = null; // 清理未完成的输入 Promise
     }
   }
 
@@ -493,7 +504,7 @@ sys.modules["turtle"] = turtle_mod
     run: runCode,
     handleStdout,
     flushStdout,
-    submitTerminalInput,
+    waitForInput,
     hideTerminalInput
   };
 })();
