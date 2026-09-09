@@ -110,26 +110,25 @@ const PythonRunner = (() => {
         indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/"
       }).then(py => {
         window.__pyodide = py;
-        // 设置环境
-        const setupCode = [
-          'import sys, types, builtins',
-          'from js import window',
-          'class WebStdout:',
-          '    def write(self, s):',
-          '        if s: window.PythonRunner.handleStdout(str(s))',
-          '    def flush(self): pass',
-          'class WebStderr:',
-          '    def write(self, s): pass',
-          '    def flush(self): pass',
-          'sys.stdout = WebStdout()',
-          'sys.stderr = WebStderr()',
-          'def _kid_input(prompt_text=""):',
-          '    return window.PythonRunner.waitForInput(str(prompt_text))',
-          'builtins.input = _kid_input',
-          'sys.modules["turtle"] = __import__("turtle")',
-        ].join('\n');
+                // 设置环境
+        const setupCode = `import sys, types, builtins
+from js import window
+class WebStdout:
+    def write(self, s):
+        if s: window.PythonRunner.handleStdout(str(s))
+    def flush(self): pass
+class WebStderr:
+    def write(self, s): pass
+    def flush(self): pass
+sys.stdout = WebStdout()
+sys.stderr = WebStderr()
+def _kid_input(prompt_text=""):
+    return window.PythonRunner.waitForInput(str(prompt_text))
+builtins.input = _kid_input
+sys.modules["turtle"] = __import__("turtle")`;
         return py.runPythonAsync(setupCode);
       }).then(() => {
+
         updateStatus("ready", "\ud83d\udfe1 Python 3.12 \u9b54\u6cd5\u5c31\u7eea\uff01");
         isReady = true;
       }).catch(err => {
