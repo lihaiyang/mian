@@ -244,8 +244,9 @@ sys.modules["turtle"] = turtle_mod`;
   function waitForInput(promptText) {
     appendLog("stdout", "\u27a1 " + promptText);
     const val = window.prompt(promptText || "\u8bf7\u8f93\u5165\uff1a");
+    console.log("waitForInput val:", JSON.stringify(val));
     appendLog("stdout", "\u276f " + (val || ""));
-    return val === null ? "" : val;
+    return val || "";
   }
 
   async function runMainThread(code) {
