@@ -397,6 +397,19 @@ window.App = (() => {
       }
     });
 
+    // 终端输入行：回车提交输入（通过 Worker 通信方式）
+    const terminalInput = document.getElementById("terminalInput");
+    if (terminalInput) {
+      terminalInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          PythonRunner.submitTerminalInput();
+        }
+        // 阻止全局快捷键在输入时触发（如 Ctrl+S）
+        e.stopPropagation();
+      });
+    }
+
     // 全局快捷键拦截
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
