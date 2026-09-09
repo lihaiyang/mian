@@ -9,8 +9,11 @@ const PythonRunner = (() => {
   let onInitCallbacks = [];
   let stdoutLineBuf = "";
 
+  // 终端输入 Promise 的 resolve 回调（由 setStdin 设置，submitTerminalInput 调用）
+  let terminalInputResolve = null;
+
   const ENV_SETUP_CODE = `
-import sys, types, builtins
+import sys, types
 from js import window
 
 # 自定义标准输出流（JS 侧做按行缓冲）
@@ -30,12 +33,6 @@ class WebStderr:
 
 sys.stdout = WebStdout()
 sys.stderr = WebStderr()
-
-# 交互式 input：通过 JS 同步获取输入
-def _kid_input(prompt_text=""):
-    return window.PythonRunner.waitForInput(str(prompt_text))
-
-builtins.input = _kid_input
 
 # ============ 高保真海龟画图模块 (Turtle Module for Pyodide) ============
 turtle_mod = types.ModuleType("turtle")
@@ -223,6 +220,20 @@ sys.modules["turtle"] = turtle_mod
 
       await pyodide.runPythonAsync(ENV_SETUP_CODE);
 
+      // 异步 stdin：Python 的 input() 读取时返回 Promise，挂起 Python 执行，
+      // 让浏览器有机会渲染输出并等待用户在终端输入行输入。
+      pyodide.setStdin({
+        stdin: () => {
+          return new Promise((resolve) => {
+            flushStdout();
+            forceReflow();
+            terminalInputResolve = resolve;
+            showTerminalInput();
+            forceReflow();
+          });
+        }
+      });
+
       updateStatus("ready", "🟢 Python 3.12 魔法就绪！");
       isInitializing = false;
       onInitCallbacks.forEach(fn => fn(pyodide));
@@ -304,24 +315,19 @@ sys.modules["turtle"] = turtle_mod
     if (terminal) void terminal.offsetHeight;
   }
 
-  // 等待用户输入（由 Python 的 input() 同步调用）
-  function waitForInput(promptText) {
-    flushStdout();
-    // 强制刷新 DOM，确保之前的所有 print 输出都已渲染到屏幕上
-    forceReflow();
-    // 在终端显示提示文字
-    appendLog("stdout", "👉 " + promptText);
-    // 显示终端输入行（视觉上让用户知道要输入了）
-    showTerminalInput();
-    // 再次强制刷新，确保提示文字显示后再弹出 prompt
-    forceReflow();
-    // 使用 window.prompt() 同步获取输入
-    const val = window.prompt(promptText || "请输入：");
+  // 提交终端输入（由终端输入行的 Enter 键触发，resolve setStdin 的 Promise）
+  function submitTerminalInput() {
+    const input = document.getElementById("terminalInput");
+    if (!input) return;
+    const val = input.value;
     hideTerminalInput();
     // 回显输入内容
-    appendLog("stdout", "❯ " + (val || ""));
-    forceReflow();
-    return val === null ? "" : val;
+    appendLog("stdout", "❯ " + val);
+    if (terminalInputResolve) {
+      const resolve = terminalInputResolve;
+      terminalInputResolve = null;
+      resolve(val);
+    }
   }
 
   // 运行代码
@@ -386,6 +392,7 @@ sys.modules["turtle"] = turtle_mod
       isRunning = false;
       setRunButtonState(false);
       hideTerminalInput();
+      terminalInputResolve = null; // 清理未完成的输入 Promise
     }
   }
 
@@ -486,7 +493,7 @@ sys.modules["turtle"] = turtle_mod
     run: runCode,
     handleStdout,
     flushStdout,
-    waitForInput,
+    submitTerminalInput,
     hideTerminalInput
   };
 })();
