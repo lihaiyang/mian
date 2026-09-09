@@ -113,19 +113,117 @@ const PythonRunner = (() => {
                 // 设置环境
         const setupCode = `import sys, types, builtins
 from js import window
+
 class WebStdout:
     def write(self, s):
         if s: window.PythonRunner.handleStdout(str(s))
     def flush(self): pass
+
 class WebStderr:
     def write(self, s): pass
     def flush(self): pass
+
 sys.stdout = WebStdout()
 sys.stderr = WebStderr()
+
 def _kid_input(prompt_text=""):
     return window.PythonRunner.waitForInput(str(prompt_text))
 builtins.input = _kid_input
-sys.modules["turtle"] = __import__("turtle")`;
+
+import types
+turtle_mod = types.ModuleType("turtle")
+class Turtle:
+    def forward(self, d): window.TurtleEngine.forward(float(d))
+    def backward(self, d): window.TurtleEngine.backward(float(d))
+    def right(self, a): window.TurtleEngine.right(float(a))
+    def left(self, a): window.TurtleEngine.left(float(a))
+    def circle(self, r, extent=None):
+        if extent is None: window.TurtleEngine.circle(float(r))
+        else: window.TurtleEngine.circle(float(r), float(extent))
+    def color(self, c, fill_c=None):
+        window.TurtleEngine.color(str(c), str(fill_c) if fill_c else str(c))
+    def pensize(self, s): window.TurtleEngine.pensize(float(s))
+    def penup(self): window.TurtleEngine.penup()
+    def pendown(self): window.TurtleEngine.pendown()
+    def speed(self, s): window.TurtleEngine.setSpeed(int(s))
+    def goto(self, x, y): window.TurtleEngine.goto(float(x), float(y))
+    def setheading(self, a): window.TurtleEngine.setheading(float(a))
+    def home(self): window.TurtleEngine.home()
+    def dot(self, size=None, color=None):
+        window.TurtleEngine.dot(float(size) if size is not None else None, str(color) if color else None)
+    def write(self, text): window.TurtleEngine.write(str(text))
+    def begin_fill(self): window.TurtleEngine.begin_fill()
+    def end_fill(self): window.TurtleEngine.end_fill()
+    def clear(self): window.TurtleEngine.clear()
+    def reset(self): window.TurtleEngine.reset()
+    def hideturtle(self): window.TurtleEngine.hideturtle()
+    def showturtle(self): window.TurtleEngine.showturtle()
+    def fd(self, d): self.forward(d)
+    def bk(self, d): self.backward(d)
+    def rt(self, a): self.right(a)
+    def lt(self, a): self.left(a)
+    def pu(self): self.penup()
+    def pd(self): self.pendown()
+    def width(self, s): self.pensize(s)
+    def setpos(self, x, y): self.goto(x, y)
+    def seth(self, a): self.setheading(a)
+    def st(self): self.showturtle()
+    def ht(self): self.hideturtle()
+    def setx(self, x): window.TurtleEngine.setx(float(x))
+    def sety(self, y): window.TurtleEngine.sety(float(y))
+    def bgcolor(self, c): window.TurtleEngine.bgcolor(str(c))
+    def fillcolor(self, c): window.TurtleEngine.fillcolor(str(c))
+    def isdown(self): return True
+    def position(self): return (0, 0)
+    def xcor(self): return 0
+    def ycor(self): return 0
+    def heading(self): return 0
+
+turtle_mod.Turtle = Turtle
+turtle_mod.Pen = Turtle
+turtle_mod.Screen = type("Screen", (), {"bgcolor": lambda self, c: window.TurtleEngine.bgcolor(str(c)), "title": lambda self, s: None, "setup": lambda self, *a, **k: None, "done": lambda self: None, "mainloop": lambda self: None, "exitonclick": lambda self: None, "tracer": lambda self, *a, **k: None, "update": lambda self: None, "listen": lambda self: None})()
+turtle_mod.forward = Turtle().forward
+turtle_mod.backward = Turtle().backward
+turtle_mod.right = Turtle().right
+turtle_mod.left = Turtle().left
+turtle_mod.circle = Turtle().circle
+turtle_mod.color = Turtle().color
+turtle_mod.pensize = Turtle().pensize
+turtle_mod.penup = Turtle().penup
+turtle_mod.pendown = Turtle().pendown
+turtle_mod.speed = Turtle().speed
+turtle_mod.goto = Turtle().goto
+turtle_mod.setheading = Turtle().setheading
+turtle_mod.home = Turtle().home
+turtle_mod.dot = Turtle().dot
+turtle_mod.write = Turtle().write
+turtle_mod.begin_fill = Turtle().begin_fill
+turtle_mod.end_fill = Turtle().end_fill
+turtle_mod.clear = Turtle().clear
+turtle_mod.reset = Turtle().reset
+turtle_mod.hideturtle = Turtle().hideturtle
+turtle_mod.showturtle = Turtle().showturtle
+turtle_mod.fd = Turtle().fd
+turtle_mod.bk = Turtle().bk
+turtle_mod.rt = Turtle().rt
+turtle_mod.lt = Turtle().lt
+turtle_mod.pu = Turtle().pu
+turtle_mod.pd = Turtle().pd
+turtle_mod.width = Turtle().width
+turtle_mod.setpos = Turtle().setpos
+turtle_mod.seth = Turtle().seth
+turtle_mod.st = Turtle().st
+turtle_mod.ht = Turtle().ht
+turtle_mod.setx = Turtle().setx
+turtle_mod.sety = Turtle().sety
+turtle_mod.bgcolor = Turtle().bgcolor
+turtle_mod.fillcolor = Turtle().fillcolor
+turtle_mod.isdown = Turtle().isdown
+turtle_mod.position = Turtle().position
+turtle_mod.xcor = Turtle().xcor
+turtle_mod.ycor = Turtle().ycor
+turtle_mod.heading = Turtle().heading
+sys.modules["turtle"] = turtle_mod`;
         return py.runPythonAsync(setupCode);
       }).then(() => {
 
