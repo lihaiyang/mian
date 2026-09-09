@@ -295,7 +295,14 @@ sys.modules["turtle"] = turtle_mod`;
       appendLog("success", "\u2728 \u4ee3\u7801\u8fd0\u884c\u6210\u529f\uff01\ud83c\udf89");
       try { ConfettiFX.celebrate(); } catch(e) {}
     } catch (err) {
-      handleRuntimeError(err.message || String(err), code);
+      console.error('=== PYTHON ERROR ===');
+      console.error('message:', JSON.stringify(err.message));
+      console.error('toString:', err.toString());
+      console.error('type:', err.type);
+      try { console.error('args:', Array.from(err.args || [])); } catch(e) {}
+      try { console.error('__cause__:', String(err.__cause__)); } catch(e) {}
+      const errMsg = err.message || err.toString();
+      handleRuntimeError(errMsg, code);
       console.error('Run error:', err);
       try { SoundEffects.playWarning(); } catch(e) {}
     } finally {
