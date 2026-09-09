@@ -325,12 +325,22 @@ sys.modules["turtle"] = turtle_mod
    * 对话框出现前正确显示出来。
    */
   function waitForInput(promptText) {
+    // 1. 冲刷所有 stdout 缓冲内容到 DOM
     flushStdout();
-    forceReflow();
+    // 2. 在终端显示友好提示
     appendLog("stdout", "👉 " + promptText);
     showTerminalInput();
+    // 3. 强制重排 + 强制获取计算样式，确保浏览器已将
+    //    所有 DOM 变更提交到渲染管线（排版阶段已完成）
     forceReflow();
+    // 读取整个文档的布局属性，强制浏览器完成所有待处理的排版
+    void document.body.offsetHeight;
+    // 用 getComputedStyle 强制浏览器完成样式计算
+    getComputedStyle(document.body).transform;
 
+    // 4. 弹出 prompt 对话框。浏览器在显示对话框之前
+    //    会完成待处理的绘制（paint），因此之前的输出
+    //    应该能在对话框出现前正确显示。
     const val = window.prompt(promptText || "请输入：");
 
     hideTerminalInput();
