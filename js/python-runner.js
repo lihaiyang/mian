@@ -242,12 +242,18 @@ sys.modules["turtle"] = turtle_mod`;
 
   let mainThreadPyodide = null;
   function waitForInput(promptText) {
-    appendLog("stdout", "\u27a1 " + promptText);
-    showTerminalInput();
-    const val = window.prompt(promptText || "\u8bf7\u8f93\u5165\uff1a");
-    hideTerminalInput();
-    appendLog("stdout", "\u276f " + (val || ""));
-    return val === null ? "" : val;
+    try {
+      appendLog("stdout", "\u27a1 " + promptText);
+      showTerminalInput();
+      const val = window.prompt(promptText || "\u8bf7\u8f93\u5165\uff1a");
+      hideTerminalInput();
+      appendLog("stdout", "\u276f " + (val || ""));
+      return val === null ? "" : val;
+    } catch (e) {
+      console.error('waitForInput error:', e);
+      hideTerminalInput();
+      return "";
+    }
   }
 
   async function runMainThread(code) {
