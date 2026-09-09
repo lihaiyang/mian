@@ -1,135 +1,211 @@
 /**
- * 🐍 Python 浏览器端执行核心 - 主线程通信层
- * 
- * 负责与 Web Worker 中的 Pyodide 引擎通信，将 Worker 发来的
- * stdout/turtle/input 等消息路由到对应的 UI 组件。
- * Worker 中的 Python 线程通过 Atomics.wait() 阻塞等待输入，
- * 主线程的事件循环完全不受影响，可以正常渲染输出。
+ * 🐍 Python 浏览器端执行核心
+ * 如果 SharedArrayBuffer 可用，使用 Web Worker 方案；
+ * 否则回退到主线程 + window.prompt() 方案。
  */
-
 const PythonRunner = (() => {
   let worker = null;
   let isReady = false;
   let isRunning = false;
-  let pendingInputResolve = null;
   let stdoutLineBuf = "";
-
-  // 海龟引擎命令映射
-  const TURTLE_METHODS = {
-    forward: 'forward', backward: 'backward', right: 'right', left: 'left',
-    circle: 'circle', color: 'color', pencolor: 'pencolor', fillcolor: 'fillcolor',
-    pensize: 'pensize', penup: 'penup', pendown: 'pendown', speed: 'speed',
-    goto: 'goto', setpos: 'setpos', setheading: 'setheading', seth: 'seth',
-    setx: 'setx', sety: 'sety', home: 'home', dot: 'dot', write: 'write',
-    begin_fill: 'begin_fill', end_fill: 'end_fill', clear: 'clear', reset: 'reset',
-    hideturtle: 'hideturtle', showturtle: 'showturtle', bgcolor: 'bgcolor'
-  };
+  let useWorker = false;
 
   function init() {
-    if (worker) return;
-    updateStatus("loading", "正在召唤 Python 3.12 魔法引擎... ✨");
+    // 检查 SharedArrayBuffer 是否可用
+    if (typeof SharedArrayBuffer !== 'undefined') {
+      useWorker = true;
+      initWorker();
+    } else {
+      // SharedArrayBuffer 不可用，回退到主线程方案
+      // 直接加载 Pyodide（通过已有的 CDN script 标签）
+      initMainThread();
+    }
+  }
 
+  // ========== Worker 方案 ==========
+  function initWorker() {
+    updateStatus("loading", "正在召唤 Python 3.12 魔法引擎... ✨");
     worker = new Worker('js/python-worker.js');
+
+    // 创建 SharedArrayBuffer 并发送给 Worker
+    const SAB_SIZE = 258;
+    const sab = new SharedArrayBuffer(SAB_SIZE);
+    worker.postMessage({ type: 'init', sab: sab }, [sab]);
 
     worker.addEventListener('message', handleWorkerMessage);
     worker.addEventListener('error', (e) => {
       console.error('Worker error:', e);
-      updateStatus("error", "⚠️ Worker 遇到异常");
+      // 回退到主线程
+      useWorker = false;
+      worker = null;
+      initMainThread();
     });
   }
 
   function handleWorkerMessage(event) {
     const data = event.data;
-
     if (!data || typeof data !== 'object') {
-      // 纯文本 = stdout
-      if (typeof data === 'string') {
-        handleStdout(data);
-      }
+      if (typeof data === 'string') handleStdout(data);
       return;
     }
-
     switch (data.type) {
-      case 'init':
-        // Worker 初始化完成，收到 SharedArrayBuffer
-        break;
-
       case 'ready':
         isReady = true;
-        updateStatus("ready", "🟢 Python 3.12 魔法就绪！");
+        updateStatus("ready", "\ud83d\udfe1 Python 3.12 \u9b54\u6cd5\u5c31\u7eea\uff01");
         break;
-
-      case 'stdout':
-        handleStdout(data.text);
-        break;
-
       case 'input':
-        // Worker 请求输入 — 显示终端输入行
-        const prompt = data.prompt || "";
-        if (prompt) {
-          appendLog("stdout", "👉 " + prompt);
-        }
+        if (data.prompt) appendLog("stdout", "\u27a1 " + data.prompt);
         showTerminalInput();
         break;
-
       case 'turtle-detect':
-        // 检测到海龟绘图 — 切换到海龟画布
-        TurtleEngine.reset();
+        if (typeof TurtleEngine !== 'undefined') TurtleEngine.reset();
         switchTabSafe("turtle");
-        appendLog("system", "🐢 侦测到海龟绘图！已自动切换到【海龟画布】视窗~");
+        appendLog("system", "\ud83d\udc22 \u4fa6\u6d4b\u5230\u6d77\u9f9f\u7ed8\u56fe\uff01\u5df2\u81ea\u52a8\u5207\u6362\u5230\u3010\u6d77\u9f9f\u753b\u5e03\u3011\u89c6\u7a97~");
         break;
-
       case 'turtle':
-        // 海龟绘图命令
-        executeTurtleCommand(data);
+        executeTurtle(data);
         break;
-
       case 'done':
-        isRunning = false;
-        setRunButtonState(false);
-        hideTerminalInput();
-        appendLog("success", "✨ 代码运行成功！🎉");
+        finishRun();
+        appendLog("success", "\u2728 \u4ee3\u7801\u8fd0\u884c\u6210\u529f\uff01\ud83c\udf89");
         try { ConfettiFX.celebrate(); } catch(e) {}
         break;
-
       case 'error':
-        isRunning = false;
-        setRunButtonState(false);
-        hideTerminalInput();
+        finishRun();
         handleRuntimeError(data.text, "");
         try { SoundEffects.playWarning(); } catch(e) {}
         break;
+      default:
+        if (typeof data === 'string') handleStdout(data);
     }
   }
 
-  function executeTurtleCommand(data) {
-    const method = data.method;
-    const args = data.args || [];
+  function executeTurtle(data) {
     const engine = typeof TurtleEngine !== 'undefined' ? TurtleEngine : null;
-    if (!engine) return;
+    if (!engine || !data.method) return;
+    const fn = engine[data.method];
+    if (typeof fn === 'function') {
+      try { fn.apply(engine, data.args || []); } catch(e) {}
+    }
+  }
 
-    if (method === 'onIdle') {
-      // 海龟动画完成后回调
-      if (args[0]) {
-        engine.onIdle(args[0]);
-      }
+  function submitTerminalInput() {
+    const input = document.getElementById("terminalInput");
+    if (!input) return;
+    const val = input.value;
+    hideTerminalInput();
+    appendLog("stdout", "\u276f " + val);
+    if (worker && useWorker) {
+      worker.postMessage({ type: 'input-result', value: val });
+    }
+  }
+
+  // ========== 主线程方案（回退） ==========
+  function initMainThread() {
+    updateStatus("loading", "\u6b63\u5728\u53ec\u5524 Python 3.12 \u9b54\u6cd5\u5f15\u64ce... \u2728");
+    // 如果 Pyodide 已通过 CDN script 加载，直接使用
+    if (typeof loadPyodide !== 'undefined' && !window.__pyodideLoading) {
+      window.__pyodideLoading = true;
+      loadPyodide({
+        indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/"
+      }).then(py => {
+        window.__pyodide = py;
+        // 设置环境
+        const setupCode = [
+          'import sys, types, builtins',
+          'from js import window',
+          'class WebStdout:',
+          '    def write(self, s):',
+          '        if s: window.PythonRunner.handleStdout(str(s))',
+          '    def flush(self): pass',
+          'class WebStderr:',
+          '    def write(self, s): pass',
+          '    def flush(self): pass',
+          'sys.stdout = WebStdout()',
+          'sys.stderr = WebStderr()',
+          'def _kid_input(prompt_text=""):',
+          '    return window.PythonRunner.waitForInput(str(prompt_text))',
+          'builtins.input = _kid_input',
+          'sys.modules["turtle"] = __import__("turtle")',
+        ].join('\\n');
+        return py.runPythonAsync(setupCode);
+      }).then(() => {
+        updateStatus("ready", "\ud83d\udfe1 Python 3.12 \u9b54\u6cd5\u5c31\u7eea\uff01");
+        isReady = true;
+      }).catch(err => {
+        console.error('Pyodide init error:', err);
+        updateStatus("error", "\u26a0\ufe0f \u9b54\u6cd5\u5f15\u64ce\u51c6\u5907\u4e2d");
+      });
+    }
+  }
+
+  let mainThreadPyodide = null;
+  function waitForInput(promptText) {
+    appendLog("stdout", "\u27a1 " + promptText);
+    showTerminalInput();
+    const val = window.prompt(promptText || "\u8bf7\u8f93\u5165\uff1a");
+    hideTerminalInput();
+    appendLog("stdout", "\u276f " + (val || ""));
+    return val === null ? "" : val;
+  }
+
+  async function runMainThread(code) {
+    const py = window.__pyodide;
+    if (!py) {
+      appendLog("warning", "\u23f3 Python \u5f15\u64ce\u6b63\u5728\u52a0\u8f7d\u4e2d...");
+      if (!window.__pyodideLoading) initMainThread();
+      // 等待加载完成
+      await new Promise(resolve => {
+        const check = () => {
+          if (window.__pyodide) resolve();
+          else setTimeout(check, 200);
+        };
+        check();
+      });
+    }
+    mainThreadPyodide = window.__pyodide;
+    if (!mainThreadPyodide) {
+      appendLog("error", "\u274c Python \u5f15\u64ce\u52a0\u8f7d\u5931\u8d25");
       return;
     }
 
-    const fn = engine[method];
-    if (typeof fn === 'function') {
-      try {
-        fn.apply(engine, args);
-      } catch (e) {
-        console.warn('Turtle method error:', method, e);
-      }
+    isRunning = true;
+    setRunButtonState(true);
+    stdoutLineBuf = "";
+    const terminal = document.getElementById("terminalLogs");
+    if (terminal) terminal.innerHTML = "";
+    hideTerminalInput();
+    appendLog("system", "\ud83d\ude80 \u5f00\u59cb\u8fd0\u884c Python \u4ee3\u7801...");
+
+    const hasTurtle = /import\\s+turtle|from\\s+turtle/i.test(code);
+    if (hasTurtle) {
+      if (typeof TurtleEngine !== 'undefined') TurtleEngine.reset();
+      switchTabSafe("turtle");
+      appendLog("system", "\ud83d\udc22 \u4fa6\u6d4b\u5230\u6d77\u9f9f\u7ed8\u56fe\uff01\u5df2\u81ea\u52a8\u5207\u6362\u5230\u3010\u6d77\u9f9f\u753b\u5e03\u3011\u89c6\u7a97~");
+    } else {
+      switchTabSafe("console");
+    }
+
+    // Yield 一次让浏览器渲染视图
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    try {
+      await mainThreadPyodide.runPythonAsync(code);
+      appendLog("success", "\u2728 \u4ee3\u7801\u8fd0\u884c\u6210\u529f\uff01\ud83c\udf89");
+      try { ConfettiFX.celebrate(); } catch(e) {}
+    } catch (err) {
+      handleRuntimeError(err.message || String(err), code);
+      try { SoundEffects.playWarning(); } catch(e) {}
+    } finally {
+      finishRun();
     }
   }
 
+  // ========== 公共方法 ==========
   function handleStdout(s) {
     stdoutLineBuf += s;
     let idx;
-    while ((idx = stdoutLineBuf.indexOf("\n")) !== -1) {
+    while ((idx = stdoutLineBuf.indexOf("\\n")) !== -1) {
       const line = stdoutLineBuf.slice(0, idx);
       stdoutLineBuf = stdoutLineBuf.slice(idx + 1);
       appendLog("stdout", line);
@@ -140,7 +216,7 @@ const PythonRunner = (() => {
     const terminal = document.getElementById("terminalLogs");
     if (!terminal) return;
     const div = document.createElement("div");
-    div.className = `term-line ${type}`;
+    div.className = 'term-line ' + type;
     div.textContent = text;
     terminal.appendChild(div);
     terminal.scrollTop = terminal.scrollHeight;
@@ -175,10 +251,10 @@ const PythonRunner = (() => {
     if (!btn || !label) return;
     if (running) {
       btn.classList.add("running");
-      label.textContent = "运行中...";
+      label.textContent = "\u8fd0\u884c\u4e2d...";
     } else {
       btn.classList.remove("running");
-      label.textContent = "运行代码";
+      label.textContent = "\u8fd0\u884c\u4ee3\u7801";
     }
   }
 
@@ -188,120 +264,75 @@ const PythonRunner = (() => {
     }
   }
 
-  // 提交终端输入：由 app.js 的 Enter 键事件触发
-  function submitTerminalInput() {
-    const input = document.getElementById("terminalInput");
-    if (!input) return;
-    const val = input.value;
+  function finishRun() {
+    isRunning = false;
+    setRunButtonState(false);
     hideTerminalInput();
-    // 回显输入
-    appendLog("stdout", "❯ " + val);
-    // 发送到 Worker
-    if (worker && isReady) {
-      worker.postMessage({ type: 'input-result', value: val });
-    }
   }
 
-  // 运行代码
   function runCode(code) {
     if (isRunning) {
       if (window.App && window.App.showToast) {
-        window.App.showToast("⏳ 代码还在运行中，等它跑完再点哦~", "🐢");
+        window.App.showToast("\u23f3 \u4ee3\u7801\u8fd8\u5728\u8fd0\u884c\u4e2d\uff0c\u7b49\u5b83\u8dd1\u5b8c\u518d\u70b9\u54e6~", "\ud83d\udc22");
       }
       return;
     }
-
-    if (!worker) {
-      init();
+    if (useWorker && worker) {
+      runWorkerCode(code);
+    } else {
+      runMainThread(code);
     }
+  }
 
+  function runWorkerCode(code) {
     isRunning = true;
     setRunButtonState(true);
     stdoutLineBuf = "";
-
-    // 清屏
     const terminal = document.getElementById("terminalLogs");
     if (terminal) terminal.innerHTML = "";
     hideTerminalInput();
-    appendLog("system", "🚀 开始运行 Python 代码...");
+    appendLog("system", "\ud83d\ude80 \u5f00\u59cb\u8fd0\u884c Python \u4ee3\u7801...");
 
-    // 检测海龟
-    const hasTurtle = /import\s+turtle|from\s+turtle/i.test(code);
+    const hasTurtle = /import\\s+turtle|from\\s+turtle/i.test(code);
     if (hasTurtle) {
-      TurtleEngine.reset();
+      if (typeof TurtleEngine !== 'undefined') TurtleEngine.reset();
       switchTabSafe("turtle");
-      appendLog("system", "🐢 侦测到海龟绘图！已自动切换到【海龟画布】视窗~");
+      appendLog("system", "\ud83d\udc22 \u4fa6\u6d4b\u5230\u6d77\u9f9f\u7ed8\u56fe\uff01\u5df2\u81ea\u52a8\u5207\u6362\u5230\u3010\u6d77\u9f9f\u753b\u5e03\u3011\u89c6\u7a97~");
     } else {
       switchTabSafe("console");
     }
 
-    // 等待 Worker 就绪
-    if (!isReady) {
-      appendLog("warning", "⏳ 正在连接 Python 运行环境，初次加载约需数秒，请稍候...");
-    }
-
-    // 发送代码到 Worker 执行
-    const tryRun = () => {
-      if (isReady && worker) {
-        appendLog("system", "📤 发送代码到 Python 引擎...");
-        worker.postMessage({ type: 'run', code: code });
-      } else if (worker) {
-        // Worker 还没就绪，等待
-        const checkReady = () => {
-          if (isReady) {
-            tryRun();
-          } else {
-            setTimeout(checkReady, 200);
-          }
-        };
-        checkReady();
-      }
-    };
-    tryRun();
+    worker.postMessage({ type: 'run', code: code });
   }
 
-  // 错误诊断（简化版，保留儿童友好提示）
   function handleRuntimeError(errText, originalCode) {
     hideTerminalInput();
     const full = String(errText || "");
-    const lines = full.trim().split("\n").filter(Boolean);
-    const lastLine = lines[lines.length - 1] || "未知错误";
-    appendLog("error", "❌ 哎呀，程序遇到一点小状况：" + lastLine);
-
-    // 简化的错误诊断
-    let tipTitle = "🔍 小侦探正在诊断...";
-    let tipContent = "检查一下代码是否有小字母打错了哦！";
-
+    const lines = full.trim().split("\\n").filter(Boolean);
+    const lastLine = lines[lines.length - 1] || "\u672a\u77e5\u9519\u8bef";
+    appendLog("error", "\u274c \u54ce\u5440\uff0c\u7a0b\u5e8f\u9047\u5230\u4e00\u70b9\u5c0f\u72b6\u51b5\uff1a" + lastLine);
+    let tipTitle = "\ud83d\udd0d \u5c0f\u4fa6\u63a2\u6b63\u5728\u8bca\u65ad...";
+    let tipContent = "\u68c0\u67e5\u4e00\u4e0b\u4ee3\u7801\u662f\u5426\u6709\u5c0f\u5b57\u6bcd\u6253\u9519\u4e86\u54e6\uff01";
     if (full.includes("IndentationError")) {
-      tipTitle = "🔍 缩进小楼梯没对齐！";
-      tipContent = "Python 非常在乎代码左侧的空格！<br>👉 冒号 <b>:</b> 后面要按 <b>Tab</b> 缩进哦！";
+      tipTitle = "\ud83d\udd0d \u7f29\u8fdb\u5c0f\u697c\u68af\u6ca1\u5bf9\u9f50\uff01";
+      tipContent = "Python \u975e\u5e38\u5728\u4e4e\u4ee3\u7801\u5de6\u4fa7\u7684\u7a7a\u683c\uff01<br>\u27a1 \u5192\u53f7 <b>:</b> \u540e\u9762\u8981\u6309 <b>Tab</b> \u7f29\u8fdb\u54e6\uff01";
     } else if (full.includes("SyntaxError")) {
-      tipTitle = "🔍 语法标点符号有迷路的小伙伴！";
-      tipContent = "看看是不是括号 <b>()</b> 没有成对闭合？或者 <b>if/for/while</b> 后面漏掉了英文冒号 <b>:</b>？";
+      tipTitle = "\ud83d\udd0d \u8bed\u6cd5\u6807\u70b9\u7b26\u53f7\u6709\u8ff7\u8def\u7684\u5c0f\u4f19\u4f34\uff01";
+      tipContent = "\u770b\u770b\u662f\u4e0d\u662f\u62ec\u53f7 <b>()</b> \u6ca1\u6709\u6210\u5bf9\u95ed\u5408\uff1f\u6216\u8005 <b>if/for/while</b> \u540e\u9762\u6f0f\u6389\u4e86\u82f1\u6587\u5192\u53f7 <b>:</b>\uff1f";
     } else if (full.includes("NameError")) {
-      const match = full.match(/name '(\w+)' is not defined/);
-      const varName = match ? match[1] : "某个变量";
-      tipTitle = `🔍 找不到名字为【${varName}】的小帮手！`;
-      tipContent = `电脑不认识 <b>${varName}</b>，检查一下拼写或者是否忘记定义了？`;
-    } else if (full.includes("TypeError")) {
-      tipTitle = "🔍 数据类型对不上哦！";
-      tipContent = "是不是把文字和数字直接用 <b>+</b> 拼在一起啦？试试用 <b>str()</b> 转换一下！";
-    } else if (full.includes("ZeroDivisionError")) {
-      tipTitle = "🔍 数学小禁区：数字不能除以 0！";
-      tipContent = "任何数字都不能除以 0 哦！检查一下你的除数是不是算成 0 了？";
+      const match = full.match(/name '(\\w+)' is not defined/);
+      const varName = match ? match[1] : "\u67d0\u4e2a\u53d8\u91cf";
+      tipTitle = "\ud83d\udd0d \u627e\u4e0d\u5230\u540d\u5b57\u4e3a\u3010" + varName + "\u3011\u7684\u5c0f\u5e2e\u624b\uff01";
+      tipContent = "\u7535\u8111\u4e0d\u8ba4\u8bc6 <b>" + varName + "</b>\uff0c\u68c0\u67e5\u4e00\u4e0b\u62fc\u5199\u6216\u8005\u662f\u5426\u5fd8\u8bb0\u5b9a\u4e49\u4e86\uff1f";
     } else if (full.includes("EOFError")) {
-      tipTitle = "🔍 input() 遇到意外结束！";
-      tipContent = "代码执行到一半，input() 没能获取到输入。<br>👉 可能在输入框里没有输入内容？";
+      tipTitle = "\ud83d\udd0d input() \u9047\u5230\u610f\u5916\u7ed3\u675f\uff01";
+      tipContent = "\u4ee3\u7801\u6267\u884c\u5230\u4e00\u534a\uff0cinput() \u6ca1\u80fd\u83b7\u53d6\u5230\u8f93\u5165\u3002";
     }
-
     const terminal = document.getElementById("terminalLogs");
     if (!terminal) return;
     const tipDiv = document.createElement("div");
     tipDiv.className = "detective-tip-card";
-    tipDiv.innerHTML = `
-      <div class="detective-header">${tipTitle}</div>
-      <div class="detective-body">${tipContent}</div>
-    `;
+    tipDiv.innerHTML = '<div class="detective-header">' + tipTitle + '</div><div class="detective-body">' + tipContent + '</div>';
     terminal.appendChild(tipDiv);
     terminal.scrollTop = terminal.scrollHeight;
   }
@@ -310,7 +341,9 @@ const PythonRunner = (() => {
     init,
     run: runCode,
     submitTerminalInput,
-    hideTerminalInput
+    hideTerminalInput,
+    handleStdout,
+    waitForInput
   };
 })();
 
