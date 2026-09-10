@@ -57,6 +57,12 @@
         <span class="run-icon" data-page-node-id="oitfBo5MdDRckkT14wyduY">🚀</span>
         <span id="runBtnLabel" data-page-node-id="XqW7vD4GdSu8k1LqChWg3S">运行代码</span>
       </button>
+
+      <!-- 停止按钮：运行中才出现，用于中断死循环 -->
+      <button class="btn-stop-magic" id="btnStopCode" title="停止运行" aria-label="停止运行">
+        <span>⏹</span>
+        <span>停止</span>
+      </button>
     </div>
   </header>
 
@@ -171,14 +177,14 @@
 
       <!-- 3.1 视图 A：控制台终端 -->
       <div class="console-view" id="consoleView" data-page-node-id="cHLtP2OH184hyWt9S72wf0">
-        <div class="terminal-logs" id="terminalLogs" data-page-node-id="0nzvzAuHMqYrGcKEdCCuoJ">
+        <div class="terminal-logs" id="terminalLogs" aria-live="polite" aria-label="运行输出" data-page-node-id="0nzvzAuHMqYrGcKEdCCuoJ">
           <div class="term-line system" data-page-node-id="unSZEUOqqzycZdNHNBPHI1">🌟 欢迎来到萌码 Python 奇幻工坊！</div>
           <div class="term-line system" data-page-node-id="T3p1EDdd7HIp6ZQsknYRUt">💡 点击右上角绿色的「🚀 运行代码」按钮，见证奇迹发生吧！</div>
         </div>
         <!-- 终端输入行（模拟命令行输入） -->
         <div class="terminal-input-line" id="terminalInputLine" style="display:none;">
           <span class="terminal-prompt">❯</span>
-          <input type="text" class="terminal-input" id="terminalInput" placeholder="在这里输入..." autocomplete="off" spellcheck="false">
+          <input type="text" class="terminal-input" id="terminalInput" placeholder="在这里输入..." autocomplete="off" spellcheck="false" maxlength="128">
         </div>
       </div>
 
@@ -273,8 +279,6 @@
   <script src="vendor/codemirror/matchbrackets.min.js"></script>
   <!-- 五彩纸屑庆祝特效 -->
   <script src="vendor/confetti.min.js"></script>
-  <!-- Pyodide WebAssembly Python 3 引擎 -->
-  <script src="vendor/pyodide/pyodide.js"></script>
 
   <!-- ================= 自定义业务脚本模块 ================= -->
   <script src="js/audio-confetti.js"></script>
