@@ -8,6 +8,7 @@
   
   <!-- CodeMirror 核心与 Python 语法高亮样式 -->
   <link rel="stylesheet" href="vendor/codemirror/codemirror.min.css" data-page-node-id="F6m5S0eWVsUeraOTNQriYe">
+  <link rel="stylesheet" href="vendor/codemirror/show-hint.min.css">
   
   <!-- 全局自定义少儿样式 -->
   <link rel="stylesheet" href="css/style.css" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
@@ -239,6 +240,9 @@
           <button class="header-btn" id="btnDownloadDrawing" style="height:28px; padding:0 10px; font-size:11px;" data-page-node-id="n5VuFMHDxW6qBrNOXCc4Hc">
             <span data-page-node-id="BEMBF2G507qI2XuogzEVVM">📸 保存画作</span>
           </button>
+          <button class="header-btn" id="btnMakePoster" title="把作品名、画作和代码合成一张分享卡片" style="height:28px; padding:0 10px; font-size:11px;">
+            <span>🖼️ 作品卡</span>
+          </button>
         </div>
       </div>
 
@@ -286,6 +290,7 @@
   <script src="vendor/codemirror/python.min.js"></script>
   <script src="vendor/codemirror/closebrackets.min.js"></script>
   <script src="vendor/codemirror/matchbrackets.min.js"></script>
+  <script src="vendor/codemirror/show-hint.min.js"></script>
   <!-- 五彩纸屑庆祝特效 -->
   <script src="vendor/confetti.min.js"></script>
 
@@ -294,6 +299,7 @@
   <script src="js/examples.js"></script>
   <script src="js/turtle-canvas.js"></script>
   <script src="js/zip-writer.js"></script>
+  <script src="js/poster.js"></script>
   <script src="js/python-runner.js"></script>
   <script src="js/editor.js"></script>
   <script src="js/file-tree.js"></script>

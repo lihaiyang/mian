@@ -18,6 +18,115 @@ const CodeEditor = (() => {
   let punctTimer = null;
   let punctCount = 0;
 
+
+  // ================= 智能补全词库 =================
+  const PY_KEYWORDS = ["and","as","assert","break","class","continue","def","del","elif","else","except","False","finally","for","from","global","if","import","in","is","lambda","None","not","or","pass","raise","return","True","try","while","with","yield","print","input","range","len","int","str","float","list","dict","set","tuple","bool","abs","round","max","min","sum","sorted","reversed","enumerate","zip","type","isinstance","open","help"];
+  // 模块成员表：[成员名, 中文说明]；孩子写 turtle. / random. / math. 都能补全
+  const MODULE_MEMBERS = {
+    turtle: [["forward","前进"],["fd","前进(简写)"],["backward","后退"],["bk","后退(简写)"],["right","右转"],["rt","右转(简写)"],["left","左转"],["lt","左转(简写)"],["circle","画圆"],["color","设颜色"],["pencolor","画笔颜色"],["fillcolor","填充颜色"],["pensize","画笔粗细"],["penup","抬笔"],["pu","抬笔(简写)"],["pendown","落笔"],["pd","落笔(简写)"],["goto","去坐标"],["setpos","去坐标"],["setheading","设朝向"],["seth","设朝向(简写)"],["home","回原点"],["dot","画圆点"],["write","写字"],["begin_fill","开始填充"],["end_fill","结束填充"],["clear","清空画面"],["reset","全部重置"],["hideturtle","藏起海龟"],["ht","藏海龟(简写)"],["showturtle","显示海龟"],["st","显海龟(简写)"],["speed","速度"],["done","完成绘图"],["Screen","画布对象"]],
+    random: [["randint","随机整数"],["random","随机小数"],["choice","随机选一个"],["shuffle","打乱顺序"],["uniform","随机浮点数"],["sample","随机抽取"],["seed","随机种子"]],
+    math: [["sqrt","平方根"],["pi","圆周率"],["sin","正弦"],["cos","余弦"],["tan","正切"],["floor","向下取整"],["ceil","向上取整"],["pow","幂运算"],["fabs","绝对值"],["degrees","弧度转角度"],["radians","角度转弧度"]],
+    time: [["sleep","等待几秒"],["time","当前时间戳"]],
+    json: [["dumps","转成文字"],["loads","解析文字"]],
+    numpy: [["array","创建数组"],["arange","生成等差数列"],["linspace","等分区间"],["zeros","全 0 数组"],["ones","全 1 数组"],["sqrt","平方根"],["sum","求和"],["mean","平均值"],["max","最大值"],["min","最小值"],["reshape","改变形状"],["random","随机数"]]
+  };
+  const MODULE_EMOJI = { turtle: "🐢", random: "🎲", math: "📐", time: "⏰", json: "📦", numpy: "🧮" };
+  const STRING_METHODS = [["upper","变大写"],["lower","变小写"],["strip","去掉空格"],["split","切分"],["join","连接"],["replace","替换"],["find","找位置"],["count","数个数"],["startswith","是否以…开头"],["endswith","是否以…结尾"],["title","首字母大写"],["format","填空格式"]];
+
+  // 扫描代码，得到「模块名 -> 可用别名」以及孩子自己取的名字（变量/函数）
+  let scopeCache = { text: null, map: null, bare: null };
+  function scanScope(cm) {
+    const text = cm.getValue();
+    if (scopeCache.text === text) return scopeCache;
+    const map = Object.create(null);
+    const bare = [];
+    const seen = Object.create(null);
+    const pushBare = (name, note) => {
+      if (!name || seen[name]) return;
+      seen[name] = 1;
+      bare.push({ text: name, displayText: note ? name + "  " + note : name });
+    };
+    let m;
+    const reImport = /^[ \t]*import[ \t]+([A-Za-z_][\w.]*)(?:[ \t]+as[ \t]+([A-Za-z_][\w]*))?/gm;
+    while ((m = reImport.exec(text)) !== null) {
+      const base = m[1].split(".")[0];
+      const local = m[2] || base;
+      if (!map[base]) map[base] = [];
+      if (map[base].indexOf(local) === -1) map[base].push(local);
+      pushBare(local, "📦 模块");
+    }
+    const reFrom = /^[ \t]*from[ \t]+([A-Za-z_][\w.]*)[ \t]+import[ \t]+([A-Za-z_][\w]*)(?:[ \t]+as[ \t]+([A-Za-z_][\w]*))?/gm;
+    while ((m = reFrom.exec(text)) !== null) {
+      pushBare(m[3] || m[1] + "." + m[2], "📦 " + m[1] + " 里的");
+    }
+    const reDef = /^[ \t]*def[ \t]+([A-Za-z_]\w*)/gm;
+    while ((m = reDef.exec(text)) !== null) pushBare(m[1], "🔧 你定义的函数");
+    const reVar = /^[ \t]*([A-Za-z_]\w*)[ \t]*=[^=]/gm;
+    while ((m = reVar.exec(text)) !== null) pushBare(m[1], "📌 你定义的名字");
+    scopeCache = { text: text, map: map, bare: bare };
+    return scopeCache;
+  }
+
+  function moduleOf(cm, owner) {
+    const scope = scanScope(cm);
+    if (MODULE_MEMBERS[owner]) return owner;
+    const aliases = scope.map[owner];
+    if (aliases && aliases.length && MODULE_MEMBERS[owner]) return owner;
+    // 反查：别名 -> 真实模块名（例如 import turtle as tt 后的 tt）
+    for (const mod in scope.map) {
+      if (scope.map[mod].indexOf(owner) !== -1) return mod;
+    }
+    return null;
+  }
+
+  // CodeMirror 补全源：按 import 实况 + 已输入内容过滤
+  function pythonHint(cm) {
+    const cursor = cm.getCursor();
+    const line = cm.getLine(cursor.line).slice(0, cursor.ch);
+    const match = line.match(/[A-Za-z_][\w.]*$/);
+    if (!match) return null;
+    const token = match[0];
+    const dot = token.lastIndexOf(".");
+    let list = [];
+    let fromCh = cursor.ch - token.length;
+    if (dot !== -1) {
+      const owner = token.slice(0, dot);
+      const prefix = token.slice(dot + 1).toLowerCase();
+      fromCh = cursor.ch - prefix.length;
+      const mod = moduleOf(cm, owner);
+      if (mod) {
+        const emoji = MODULE_EMOJI[mod] || "📦";
+        list = MODULE_MEMBERS[mod]
+          .filter(pair => pair[0].toLowerCase().indexOf(prefix) === 0)
+          .map(pair => ({ text: pair[0], displayText: pair[0] + "  " + emoji + " " + pair[1] }));
+      } else {
+        list = STRING_METHODS
+          .filter(pair => pair[0].toLowerCase().indexOf(prefix) === 0)
+          .map(pair => ({ text: pair[0] + "()", displayText: pair[0] + "()  ✂️ " + pair[1] }));
+      }
+    } else {
+      const lower = token.toLowerCase();
+      const scope = scanScope(cm);
+      const pool = scope.bare.concat(PY_KEYWORDS.map(k => ({ text: k, displayText: k })));
+      list = pool.filter(item => item.text.toLowerCase().indexOf(lower) === 0 && item.text !== token);
+    }
+    if (!list.length) return null;
+    return { list: list.slice(0, 12), from: CodeMirror.Pos(cursor.line, fromCh), to: cursor };
+  }
+
+  function maybeAutoHint(cm, change) {
+    if (!change || !change.text) return;
+    if (change.origin !== "+input") return;
+    const typed = change.text.join("");
+    // 只在「刚敲进去的是短片段（字母/数字/下划线/点号）且以字母或点结尾」时提示；
+    // 粘贴整段代码（含空格换行）或长文本时不打扰
+    if (!/^[A-Za-z0-9_.]{1,24}$/.test(typed)) return;
+    if (!/[A-Za-z_.]$/.test(typed)) return;
+    if (typeof cm.showHint === "function") {
+      cm.showHint({ hint: pythonHint, completeSingle: false });
+    }
+  }
+
   function init(textareaElement) {
     fallbackTextarea = textareaElement;
 
@@ -43,6 +152,11 @@ const CodeEditor = (() => {
             "Tab": function(cm) {
               cm.replaceSelection("    ", "end");
             },
+            "Ctrl-Space": function(cm) {
+              if (typeof cm.showHint === "function") {
+                cm.showHint({ hint: pythonHint, completeSingle: false });
+              }
+            },
             "Ctrl-Enter": function() {
               if (window.App && window.App.runCurrentCode) {
                 window.App.runCurrentCode();
@@ -57,8 +171,9 @@ const CodeEditor = (() => {
         });
 
         cmInstance.on("cursorActivity", updateStatusBar);
-        cmInstance.on("change", (cm) => {
+        cmInstance.on("change", (cm, change) => {
           updateStatusBar();
+          maybeAutoHint(cm, change);
           const content = cm.getValue();
           FileManager.updateActiveContent(content);
           if (window.App && window.App.showAutoSaveIndicator) {

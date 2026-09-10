@@ -10,6 +10,62 @@ importScripts('/vendor/pyodide/pyodide.js');
 let pyodide = null;
 let inputBuf = null;
 
+
+// ================= 第三方库自动加载 =================
+const STDLIB_SKIP = new Set(["sys","os","os.path","math","random","time","json","re","collections","itertools","functools","datetime","statistics","decimal","fractions","string","unicodedata","typing","dataclasses","enum","abc","copy","heapq","bisect","array","queue","textwrap","pprint","csv","io","pathlib","hashlib","base64","uuid","pickle","secrets","platform","traceback","warnings","contextlib","operator","numbers","cmath","keyword","inspect","ast","dis","gc","weakref","threading","asyncio","glob","shutil","tempfile","subprocess","importlib","pkgutil","token","tokenize","types","builtins","js","pyodide","micropip","sqlite3","zlib","gzip","tarfile","zipfile","xml","html","urllib","http","socket","ssl","email","mimetypes","locale","calendar","zoneinfo","turtle","antigravity","this","code","codeop","compileall","site","sysconfig","signal","errno","stat","fnmatch","filecmp","difflib","stringprep","readline","rlcompleter","pdb","cProfile","timeit","venv","unittest","doctest","pydoc","getpass","gettext","struct","binascii","codecs","encodings","msvcrt","nt","posix","_thread","atexit","select","selectors","hmac","ssl"]);
+const loadedPackages = new Set();
+const failedPackages = new Set();
+
+function extractImportNames(code) {
+  const names = new Set();
+  const re = /^[ \t]*(?:import|from)[ \t]+([A-Za-z_][A-Za-z0-9_]*)/gm;
+  let m;
+  while ((m = re.exec(code)) !== null) names.add(m[1]);
+  return Array.from(names);
+}
+
+async function ensurePackages(code) {
+  const names = extractImportNames(code).filter(
+    n => !STDLIB_SKIP.has(n) && !loadedPackages.has(n) && !failedPackages.has(n)
+  );
+  if (!names.length) return;
+
+  self.postMessage({ type: 'packages-loading', names: names });
+  for (const name of names) {
+    try {
+      // 先试 Pyodide 官方包
+      await pyodide.loadPackage(name);
+      loadedPackages.add(name);
+      self.postMessage({ type: 'package-ok', name: name });
+    } catch (e1) {
+      try {
+        // 再试 PyPI（micropip）
+        await pyodide.runPythonAsync(
+          'import micropip' + String.fromCharCode(10) +
+          'await micropip.install(' + JSON.stringify(name) + ')'
+        );
+        loadedPackages.add(name);
+        self.postMessage({ type: 'package-ok', name: name });
+      } catch (e2) {
+        failedPackages.add(name);
+        self.postMessage({ type: 'package-fail', name: name, reason: String((e2 && e2.message) || e2).slice(0, 200) });
+        console.warn('package load failed:', name, e1 && e1.message, e2 && e2.message);
+      }
+    }
+  }
+}
+
+// ================= 运行后的变量收集（变量望远镜） =================
+async function collectVariables() {
+  try {
+    const json = await pyodide.runPythonAsync(VARS_CODE);
+    const list = JSON.parse(String(json || '[]'));
+    if (list.length) self.postMessage({ type: 'vars', list: list });
+  } catch (e) { /* 变量查看失败不影响主流程 */ }
+}
+
+const VARS_CODE = "import json as __kid_json\n__kid_skip = {\"sys\",\"types\",\"builtins\",\"turtle_mod\",\"json\",\"js_self\",\"Atomics\",\"__kid_json\",\"__kid_err\",\"__kid_skip\",\"traceback\"}\n__kid_vars = []\nfor __k, __v in list(globals().items()):\n    if __k.startswith(\"_\"): continue\n    if __k in __kid_skip: continue\n    __t = type(__v).__name__\n    if __t in (\"module\",\"function\",\"type\",\"builtin_function_or_method\",\"method\",\"classmethod\",\"staticmethod\"): continue\n    try:\n        __r = repr(__v)\n    except Exception:\n        __r = \"(无法显示)\"\n    if len(__r) > 140: __r = __r[:140] + \" ...\"\n    __kid_vars.append({\"name\": __k, \"value\": __r, \"type\": __t})\n    if len(__kid_vars) >= 24: break\n__kid_json.dumps(__kid_vars)";
+
 // ---- 输出批量缓冲 ----
 const OUT_FLUSH_MS = 16;
 const OUT_FLUSH_CHARS = 16 * 1024;
@@ -60,7 +116,14 @@ const ENV_SETUP_CODE = "import sys, types, builtins\nfrom js import self as js_s
 
 async function initWorker() {
   try {
-    pyodide = await loadPyodide({ indexURL: '/vendor/pyodide/' });
+    pyodide = await loadPyodide({
+      // 核心运行时（pyodide.asm.wasm / python_stdlib.zip）本地自托管，快且不依赖外网
+      indexURL: '/vendor/pyodide/'
+      // 注意：0.26.2 还不支持 packageBaseUrl，loadPackage() 的 wheel 地址是按
+      // pyodide-lock.json 里的 file_name 相对 indexURL 解析的。因此我们把该
+      // lockfile 的 file_name 全部改写成了 CDN 绝对 URL（见 tools/fetch-vendor.sh），
+      // 这样 numpy / matplotlib 等按需包从 CDN 拉取，仓库不用塞 15MB 的 wheel。
+    });
 
     self.pyInputBuf = inputBuf;
 
@@ -94,6 +157,23 @@ function extractErrorLine(tracebackText) {
   }
 }
 
+// 从 traceback 中取出出错那一行的源代码
+function extractCodeLine(tracebackText) {
+  try {
+    const lines = tracebackText.split(String.fromCharCode(10));
+    let idx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].indexOf('File "<学生代码>"') !== -1) idx = i;
+    }
+    if (idx >= 0 && idx + 1 < lines.length) {
+      const src = lines[idx + 1].trim();
+      // 跳过 Python 的位置指示行（^^^^）
+      if (src && src.indexOf('^') !== 0) return src.slice(0, 90);
+    }
+  } catch (e) {}
+  return "";
+}
+
 function formatPythonError(err) {
   let msg = (err && err.message) ? String(err.message) : String(err);
   if (!msg || msg === 'PythonError') {
@@ -117,11 +197,21 @@ async function runCode(code) {
     self.postMessage({ type: 'turtle-detect' });
   }
 
+  // 自动安装第三方库（numpy / matplotlib 等）
+  try { await ensurePackages(code); } catch (e) { /* 安装失败不阻塞运行 */ }
+
   // 用 Python 层捕获异常：可拿到完整可读的 traceback（供儿童友好提示解析）
   const wrapped = [
     'import traceback',
+    '__kid_src = ' + JSON.stringify(code),
+    '__kid_fname = "<学生代码>"',
     'try:',
-    '    exec(compile(' + JSON.stringify(code) + ', "<学生代码>", "exec"), globals())',
+    '    import linecache',
+    '    linecache.cache[__kid_fname] = (len(__kid_src), None, __kid_src.splitlines(True), __kid_fname)',
+    'except Exception:',
+    '    pass',
+    'try:',
+    '    exec(compile(__kid_src, __kid_fname, "exec"), globals())',
     '    __kid_err = ""',
     'except BaseException:',
     '    __kid_err = traceback.format_exc()',
@@ -141,8 +231,16 @@ async function runCode(code) {
     if (stopped) {
       self.postMessage({ type: 'stopped' });
     } else if (errText) {
-      self.postMessage({ type: 'error', text: String(errText), line: extractErrorLine(String(errText)) });
+      const tb = String(errText);
+      self.postMessage({
+        type: 'error',
+        text: tb,
+        line: extractErrorLine(tb),
+        codeLine: extractCodeLine(tb)
+      });
     } else {
+      // 成功运行后收集变量，展示「变量望远镜」
+      await collectVariables();
       self.postMessage({ type: 'done' });
     }
   } catch (err) {

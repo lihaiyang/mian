@@ -1278,3 +1278,68 @@ body.dark-mode .turtle-canvas-container {
 body.dark-mode .magic-fix-btn.has-warn {
   background: rgba(245, 158, 11, 0.18);
 }
+
+/* ===== 🔭 变量望远镜卡片 ===== */
+.vars-card {
+  margin-top: 10px;
+  background: linear-gradient(135deg, #EEF2FF 0%, #F5F3FF 100%);
+  border: 1px solid #DDD6FE;
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+.vars-header {
+  font-weight: 800;
+  color: #5B21B6;
+  margin-bottom: 6px;
+}
+
+.vars-row {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 2px 0;
+  font-family: var(--font-code);
+  border-bottom: 1px dashed rgba(148, 163, 184, 0.25);
+}
+
+.vars-row:last-child { border-bottom: none; }
+
+.vars-name { color: #1E40AF; font-weight: 700; white-space: nowrap; }
+.vars-eq { color: #94A3B8; }
+.vars-value { color: #0F766E; flex: 1; word-break: break-all; }
+.vars-type { color: #94A3B8; font-size: 10px; white-space: nowrap; }
+
+body.dark-mode .vars-card {
+  background: linear-gradient(135deg, rgba(91,95,237,0.16) 0%, rgba(168,85,247,0.12) 100%);
+  border-color: rgba(167, 139, 250, 0.35);
+}
+body.dark-mode .vars-header { color: #C4B5FD; }
+body.dark-mode .vars-name { color: #93C5FD; }
+body.dark-mode .vars-value { color: #6EE7B7; }
+
+/* ===== 代码补全提示框（CodeMirror show-hint）===== */
+.CodeMirror-hints {
+  font-family: var(--font-code) !important;
+  font-size: 13px !important;
+  border-radius: 10px !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: var(--shadow-popup) !important;
+  z-index: 9999 !important;
+}
+
+.CodeMirror-hint {
+  padding: 4px 10px !important;
+  color: var(--text-main) !important;
+}
+
+li.CodeMirror-hint-active {
+  background: var(--primary) !important;
+  color: #fff !important;
+}
+
+body.dark-mode .CodeMirror-hints {
+  background: #1A1D2B !important;
+  border-color: #2E344A !important;
+}

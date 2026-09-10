@@ -130,6 +130,22 @@ const PythonRunner = (() => {
         appendLog("system", "🐢 侦测到海龟绘图！已自动切换到【海龟画布】视窗~");
         break;
 
+      case 'packages-loading':
+        appendLog("system", "📦 正在准备小帮手：" + (data.names || []).join("、") + " ...（第一次会慢一点）");
+        break;
+
+      case 'package-ok':
+        appendLog("system", "✅ " + data.name + " 准备就绪！");
+        break;
+
+      case 'package-fail':
+        appendLog("warning", "⚠️ 暂时没有 " + data.name + " 这个工具箱，换一个试试吧");
+        break;
+
+      case 'vars':
+        renderVariableTelescope(data.list || []);
+        break;
+
       case 'turtle':
         executeTurtle(data);
         break;
@@ -164,7 +180,7 @@ const PythonRunner = (() => {
           appendLog("system", "⏹ 已停止运行");
           break;
         }
-        handleRuntimeError(text, data.line || 0);
+        handleRuntimeError(text, data.line || 0, data.codeLine || "");
         try { SoundEffects.playWarning(); } catch (e) {}
         break;
       }
@@ -329,6 +345,35 @@ const PythonRunner = (() => {
     trySend();
   }
 
+  // 🔭 变量望远镜：展示运行后的变量名与值，帮助孩子理解「变量」
+  function renderVariableTelescope(list) {
+    if (!list || !list.length) return;
+    const terminal = document.getElementById("terminalLogs");
+    if (!terminal) return;
+
+    const card = document.createElement("div");
+    card.className = "vars-card";
+
+    let rows = "";
+    for (const v of list) {
+      rows += '<div class="vars-row"><span class="vars-name">' + escapeHtml(v.name) + '</span>' +
+              '<span class="vars-eq">=</span>' +
+              '<span class="vars-value">' + escapeHtml(v.value) + '</span>' +
+              '<span class="vars-type">' + escapeHtml(v.type) + '</span></div>';
+    }
+
+    card.innerHTML = '<div class="vars-header">🔭 变量望远镜：这次运行记住了这些小伙伴</div>' +
+                     '<div class="vars-body">' + rows + '</div>';
+    terminal.appendChild(card);
+    scheduleScroll();
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[c]);
+  }
+
   // ================= 终端渲染 =================
   function handleStdout(s) {
     stdoutLineBuf += s;
@@ -425,7 +470,7 @@ const PythonRunner = (() => {
   }
 
   // ================= 儿童友好错误诊断 =================
-  function handleRuntimeError(errText, errorLine) {
+  function handleRuntimeError(errText, errorLine, errorCodeLine) {
     hideTerminalInput();
     const full = String(errText || "");
     const lines = full.trim().split(NL).filter(Boolean);
@@ -434,6 +479,15 @@ const PythonRunner = (() => {
 
     // 有行号时，展示可点击的「跳到出错那一行」
     if (errorLine > 0) {
+      if (errorCodeLine) {
+        const codeDiv = document.createElement("div");
+        codeDiv.className = "term-line error";
+        codeDiv.style.fontFamily = "var(--font-code)";
+        codeDiv.textContent = "第 " + errorLine + " 行代码：" + errorCodeLine;
+        const t0 = document.getElementById("terminalLogs");
+        if (t0) { t0.appendChild(codeDiv); }
+      }
+
       const jumpDiv = document.createElement("div");
       jumpDiv.className = "term-line error";
       jumpDiv.style.cursor = "pointer";
@@ -470,6 +524,22 @@ const PythonRunner = (() => {
     } else if (full.indexOf("EOFError") !== -1) {
       tipTitle = "🔍 input() 遇到意外结束！";
       tipContent = "代码执行到一半，input() 没能获取到输入。<br>👉 可能在输入框里没有输入内容？";
+
+    } else if (full.indexOf("UnboundLocalError") !== -1) {
+      tipTitle = "🔍 变量还没准备好就被用啦！";
+      tipContent = "函数里的变量要先赋值才能使用哦～检查一下是不是写错了顺序？";
+    } else if (full.indexOf("TabError") !== -1) {
+      tipTitle = "🔍 空格和 Tab 混在一起啦！";
+      tipContent = "缩进要么都用 <b>4 个空格</b>，要么都用 <b>Tab</b>，不要混着用哦！";
+    } else if (full.indexOf("ValueError") !== -1 && full.indexOf("could not convert") !== -1) {
+      tipTitle = "🔍 文字不能直接变成数字！";
+      tipContent = "是不是 <b>int()</b> 里面放了文字呀？比如 <b>int(\"abc\")</b> 是不行的哦！";
+    } else if (full.indexOf("ModuleNotFoundError") !== -1 || full.indexOf("ImportError") !== -1) {
+      tipTitle = "🔍 找不到这个工具箱！";
+      tipContent = "Python 里没有这个名字的模块～检查拼写，或者换一个内置工具箱试试（比如 random、math、turtle）。";
+    } else if (full.indexOf("MemoryError") !== -1) {
+      tipTitle = "🔍 东西太多啦，内存装不下！";
+      tipContent = "试试把数字或列表改小一点，比如 range 后面的数字小一些。";
     } else if (full.indexOf("RecursionError") !== -1) {
       tipTitle = "🔍 函数自己叫自己太多次啦！";
       tipContent = "递归要记得写「什么时候停下来」的条件哦！";

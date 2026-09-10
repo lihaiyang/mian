@@ -641,6 +641,29 @@ window.App = (() => {
       });
     }
 
+    // 生成作品卡（海报分享）
+    const btnPoster = document.getElementById("btnMakePoster");
+    if (btnPoster) {
+      btnPoster.addEventListener("click", () => {
+        const file = FileManager.getActiveFile();
+        const turtleCanvas = document.getElementById("turtleCanvas");
+        showToast("🖼️ 正在制作作品卡...", "🎨");
+        Poster.toBlob({
+          filename: file ? file.name : "我的作品",
+          code: CodeEditor.getValue(),
+          turtleCanvas: turtleCanvas
+        }).then((blob) => {
+          if (!blob) { showToast("作品卡生成失败了", "😢"); return; }
+          downloadBlob(blob, `${(file ? file.name : "作品").replace(/\.py$/i, "")}_作品卡.png`);
+          showToast("🖼️ 作品卡已生成，快发给爸爸妈妈看看吧！", "🎉");
+          SoundEffects.playSuccess();
+        }).catch((err) => {
+          console.error("作品卡生成失败", err);
+          showToast("作品卡生成失败了", "😢");
+        });
+      });
+    }
+
     // 护眼大字号切换
     const btnBigFont = document.getElementById("btnBigFont");
     if (btnBigFont) {
