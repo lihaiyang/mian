@@ -98,6 +98,10 @@ function flushOutput() {
 // 暴露给 Python 调用（注意：不能以双下划线开头，否则类体内会被 Python 名称改写）
 self.pyEnqueueOutput = enqueueOutput;
 self.pyFlushOutput = flushOutput;
+// 单步调试时判断用户是否按了「停止」（Python 侧轮询用）
+self.pyStepStopped = function () {
+  return !!(self.__interruptBuf && Atomics.load(self.__interruptBuf, 1) === 1);
+};
 
 self.addEventListener('message', async (event) => {
   const data = event.data;
@@ -106,13 +110,107 @@ self.addEventListener('message', async (event) => {
     if (data.interruptSab) {
       self.__interruptBuf = new Int32Array(data.interruptSab);
     }
+    initVfsFiles = Array.isArray(data.vfs) ? data.vfs : [];
     await initWorker();
   } else if (data.type === 'run') {
-    await runCode(data.code);
+    await runCode(data.code, !!data.stepping);
   }
 });
 
 const ENV_SETUP_CODE = "import sys, types, builtins\nfrom js import self as js_self, Atomics\n\nclass WebStdout:\n    def write(self, s):\n        if s:\n            js_self.pyEnqueueOutput(str(s))\n    def flush(self):\n        pass\nclass WebStderr:\n    def write(self, s):\n        pass\n    def flush(self):\n        pass\nsys.stdout = WebStdout()\nsys.stderr = WebStderr()\n\nimport json\ndef _kid_input(prompt_text=\"\"):\n    msg = json.dumps({\"type\": \"input\", \"prompt\": str(prompt_text)})\n    js_self.pyFlushOutput()\n    js_self.postMessage(msg)\n    sab = js_self.pyInputBuf\n    while Atomics.load(sab, 0) == 0:\n        Atomics.wait(sab, 0, 0)\n    length = Atomics.load(sab, 1)\n    chars = []\n    for i in range(length):\n        chars.append(chr(Atomics.load(sab, 2 + i)))\n    result = \"\".join(chars)\n    Atomics.store(sab, 0, 0)\n    Atomics.store(sab, 1, 0)\n    return result\nbuiltins.input = _kid_input\n\ndef _turtle_send(method, *args):\n    msg = json.dumps({\n        \"type\": \"turtle\", \"method\": method,\n        \"args\": [float(a) if isinstance(a, (int, float)) else str(a) for a in args]\n    })\n    js_self.postMessage(msg)\nturtle_mod = types.ModuleType(\"turtle\")\nclass Screen:\n    def __init__(self): pass\n    def bgcolor(self, c): _turtle_send(\"bgcolor\", c)\n    def title(self, s): pass\n    def setup(self, *a, **k): pass\n    def done(self): pass\n    def mainloop(self): pass\n    def exitonclick(self): pass\n    def tracer(self, *a, **k): pass\n    def update(self): pass\n    def listen(self): pass\nclass Turtle:\n    def __init__(self): pass\n    def forward(self, d): _turtle_send(\"forward\", d)\n    def fd(self, d): self.forward(d)\n    def backward(self, d): _turtle_send(\"backward\", d)\n    def bk(self, d): self.backward(d)\n    def right(self, a): _turtle_send(\"right\", a)\n    def rt(self, a): self.right(a)\n    def left(self, a): _turtle_send(\"left\", a)\n    def lt(self, a): self.left(a)\n    def circle(self, r, extent=None):\n        if extent is None: _turtle_send(\"circle\", r)\n        else: _turtle_send(\"circle\", r, extent)\n    def color(self, c, fill_c=None): _turtle_send(\"color\", c, fill_c if fill_c else c)\n    def pencolor(self, c): _turtle_send(\"pencolor\", c)\n    def fillcolor(self, c): _turtle_send(\"fillcolor\", c)\n    def pensize(self, s): _turtle_send(\"pensize\", s)\n    def width(self, s): self.pensize(s)\n    def penup(self): _turtle_send(\"penup\")\n    def pu(self): self.penup()\n    def up(self): self.penup()\n    def pendown(self): _turtle_send(\"pendown\")\n    def pd(self): self.pendown()\n    def down(self): self.pendown()\n    def speed(self, s): _turtle_send(\"speed\", s)\n    def goto(self, x, y): _turtle_send(\"goto\", x, y)\n    def setpos(self, x, y): self.goto(x, y)\n    def setheading(self, a): _turtle_send(\"setheading\", a)\n    def seth(self, a): self.setheading(a)\n    def setx(self, x): _turtle_send(\"setx\", x)\n    def sety(self, y): _turtle_send(\"sety\", y)\n    def home(self): _turtle_send(\"home\")\n    def dot(self, size=None, color=None): _turtle_send(\"dot\", size, color)\n    def write(self, text, *a, **k): _turtle_send(\"write\", text)\n    def begin_fill(self): _turtle_send(\"begin_fill\")\n    def end_fill(self): _turtle_send(\"end_fill\")\n    def clear(self): _turtle_send(\"clear\")\n    def reset(self): _turtle_send(\"reset\")\n    def hideturtle(self): _turtle_send(\"hideturtle\")\n    def ht(self): self.hideturtle()\n    def showturtle(self): _turtle_send(\"showturtle\")\n    def st(self): self.showturtle()\n    def shape(self, s): pass\n_default_turtle = Turtle()\nturtle_mod.Turtle = Turtle\nturtle_mod.Pen = Turtle\nturtle_mod.Screen = Screen\nturtle_mod.bgcolor = lambda c: _turtle_send(\"bgcolor\", str(c))\nturtle_mod.title = lambda s: None\nturtle_mod.done = lambda: None\nturtle_mod.mainloop = lambda: None\nturtle_mod.exitonclick = lambda: None\nturtle_mod.tracer = lambda *a, **k: None\nturtle_mod.update = lambda: None\nturtle_mod.getscreen = lambda: Screen()\nturtle_mod.forward = _default_turtle.forward\nturtle_mod.fd = _default_turtle.fd\nturtle_mod.backward = _default_turtle.backward\nturtle_mod.bk = _default_turtle.bk\nturtle_mod.right = _default_turtle.right\nturtle_mod.rt = _default_turtle.rt\nturtle_mod.left = _default_turtle.left\nturtle_mod.lt = _default_turtle.lt\nturtle_mod.circle = _default_turtle.circle\nturtle_mod.color = _default_turtle.color\nturtle_mod.pencolor = _default_turtle.pencolor\nturtle_mod.fillcolor = _default_turtle.fillcolor\nturtle_mod.pensize = _default_turtle.pensize\nturtle_mod.width = _default_turtle.width\nturtle_mod.penup = _default_turtle.penup\nturtle_mod.pu = _default_turtle.pu\nturtle_mod.up = _default_turtle.up\nturtle_mod.pendown = _default_turtle.pendown\nturtle_mod.pd = _default_turtle.pd\nturtle_mod.down = _default_turtle.down\nturtle_mod.speed = _default_turtle.speed\nturtle_mod.goto = _default_turtle.goto\nturtle_mod.setpos = _default_turtle.setpos\nturtle_mod.setheading = _default_turtle.setheading\nturtle_mod.seth = _default_turtle.seth\nturtle_mod.setx = _default_turtle.setx\nturtle_mod.sety = _default_turtle.sety\nturtle_mod.home = _default_turtle.home\nturtle_mod.dot = _default_turtle.dot\nturtle_mod.write = _default_turtle.write\nturtle_mod.begin_fill = _default_turtle.begin_fill\nturtle_mod.end_fill = _default_turtle.end_fill\nturtle_mod.clear = _default_turtle.clear\nturtle_mod.reset = _default_turtle.reset\nturtle_mod.hideturtle = _default_turtle.hideturtle\nturtle_mod.ht = _default_turtle.ht\nturtle_mod.showturtle = _default_turtle.showturtle\nturtle_mod.st = _default_turtle.st\nsys.modules[\"turtle\"] = turtle_mod";
+
+// ================= 虚拟文件系统持久化 =================
+// 孩子用 open("日记.txt","w") 写出来的文件，保存在 /home/pyodide 下。
+// 这里在「准备就绪」时把上次保存的文件写回内存文件系统，每次运行后再收集一次交给主线程存起来。
+const VFS_ROOT = "/home/pyodide";
+const VFS_MAX_FILE = 64 * 1024;     // 单个文件最多 64KB
+const VFS_MAX_TOTAL = 400 * 1024;   // 全部文件最多 400KB（localStorage 容量有限）
+let initVfsFiles = [];
+
+function collectUserFiles() {
+  const out = [];
+  let total = 0;
+  let decoder = null;
+  try { decoder = new TextDecoder("utf-8", { fatal: false }); } catch (e) { return out; }
+  function walk(dir, rel) {
+    let entries = [];
+    try { entries = pyodide.FS.readdir(dir); } catch (e) { return; }
+    for (const name of entries) {
+      if (name === "." || name === ".." || name === "__pycache__") continue;
+      const full = dir + "/" + name;
+      const relPath = rel ? rel + "/" + name : name;
+      let st = null;
+      try { st = pyodide.FS.stat(full); } catch (e) { continue; }
+      if (pyodide.FS.isDir(st.mode)) { walk(full, relPath); continue; }
+      if (!pyodide.FS.isFile(st.mode)) continue;
+      if (/\.pyc$/.test(name)) continue;
+      let bytes = null;
+      try { bytes = pyodide.FS.readFile(full); } catch (e) { continue; }
+      if (!bytes || !bytes.length || bytes.length > VFS_MAX_FILE) continue;
+      if (total + bytes.length > VFS_MAX_TOTAL) continue;
+      const text = decoder.decode(bytes);
+      if (text.indexOf(String.fromCharCode(0)) !== -1) continue;  // 二进制文件跳过
+      total += bytes.length;
+      out.push({ path: relPath, text: text });
+    }
+  }
+  try { walk(VFS_ROOT, ""); } catch (e) {}
+  return out;
+}
+
+function restoreUserFiles(list) {
+  if (!list || !list.length) return 0;
+  let count = 0;
+  for (const item of list) {
+    try {
+      const parts = String(item.path || "").split("/").filter(function (p) { return !!p; });
+      const name = parts.pop();
+      if (!name) continue;
+      let dir = VFS_ROOT;
+      for (const p of parts) {
+        dir = dir + "/" + p;
+        try { pyodide.FS.mkdir(dir); } catch (e) {}
+      }
+      pyodide.FS.writeFile(dir + "/" + name, item.text || "", { encoding: "utf8" });
+      count++;
+    } catch (e) { /* 单个文件失败不影响运行 */ }
+  }
+  return count;
+}
+
+// ================= 单步调试（逐行运行）辅助代码 =================
+// 复用 input() 的 SharedArrayBuffer：Python 侧阻塞等待主线程指令
+//   [0] = 1 → 走一步；[0] = 2 → 一路跑完
+const STEP_HELPER_CODE = [
+  "_kid_step_mode = {\"on\": False}",
+  "",
+  "def _kid_pause(lineno):",
+  "    js_self.pyFlushOutput()",
+  "    js_self.postMessage(json.dumps({\"type\": \"step\", \"line\": int(lineno)}))",
+  "    sab = js_self.pyInputBuf",
+  "    result = 0",
+  "    while result == 0:",
+  "        result = Atomics.load(sab, 0)",
+  "        if result != 0:",
+  "            break",
+  "        Atomics.wait(sab, 0, 0, 100)",
+  "        if js_self.pyStepStopped():",
+  "            raise KeyboardInterrupt",
+  "    Atomics.store(sab, 0, 0)",
+  "    Atomics.store(sab, 1, 0)",
+  "    return result != 2",
+  "",
+  "def _kid_tracer(frame, event, arg):",
+  "    if \"<学生代码>\" not in frame.f_code.co_filename:",
+  "        return None",
+  "    if event == \"line\":",
+  "        if not _kid_step_mode[\"on\"]:",
+  "            return None",
+  "        if not _kid_pause(frame.f_lineno):",
+  "            _kid_step_mode[\"on\"] = False",
+  "            return None",
+  "    return _kid_tracer",
+].join(String.fromCharCode(10));
 
 async function initWorker() {
   try {
@@ -137,6 +235,14 @@ async function initWorker() {
     }
 
     await pyodide.runPythonAsync(ENV_SETUP_CODE);
+    await pyodide.runPythonAsync(STEP_HELPER_CODE);
+
+    // 找回上次保存的数据文件（open() 写过的东西）
+    const restored = restoreUserFiles(initVfsFiles);
+    if (restored > 0) {
+      self.postMessage({ type: 'vfs-restored', names: initVfsFiles.map(function (f) { return f.path; }) });
+    }
+
     flushOutput();
     self.postMessage({ type: 'ready' });
   } catch (err) {
@@ -185,7 +291,7 @@ function formatPythonError(err) {
   return msg || '未知错误';
 }
 
-async function runCode(code) {
+async function runCode(code, stepping) {
   // 每次运行前复位中断信号与停止标志
   if (self.__interruptBuf) {
     Atomics.store(self.__interruptBuf, 0, 0);
@@ -210,11 +316,18 @@ async function runCode(code) {
     '    linecache.cache[__kid_fname] = (len(__kid_src), None, __kid_src.splitlines(True), __kid_fname)',
     'except Exception:',
     '    pass',
+    '__kid_stepping = ' + (stepping ? 'True' : 'False'),
+    'if __kid_stepping:',
+    '    _kid_step_mode["on"] = True',
+    '    sys.settrace(_kid_tracer)',
     'try:',
     '    exec(compile(__kid_src, __kid_fname, "exec"), globals())',
     '    __kid_err = ""',
     'except BaseException:',
     '    __kid_err = traceback.format_exc()',
+    'finally:',
+    '    sys.settrace(None)',
+    '    _kid_step_mode["on"] = False',
     '__kid_err',
   ].join(String.fromCharCode(10));
 
@@ -251,4 +364,9 @@ async function runCode(code) {
     }
     self.postMessage({ type: 'error', text: formatPythonError(err) });
   }
+
+  // 把这次运行中 open() 写出来的数据文件交给主线程保存
+  try {
+    self.postMessage({ type: 'vfs-save', files: collectUserFiles() });
+  } catch (e) { /* 保存失败不影响运行 */ }
 }

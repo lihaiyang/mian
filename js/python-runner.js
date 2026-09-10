@@ -17,6 +17,11 @@ const PythonRunner = (() => {
   let worker = null;
   let isReady = false;
   let isRunning = false;
+  let runOutputText = "";        // 本轮运行的输出（成长档案要用）
+  let runTurtle = false;         // 本轮是否用了海龟
+  let runPackages = [];          // 本轮加载过的第三方库
+  let stepMode = false;          // 单步模式开关
+  let waitingForStep = false;    // 是否正停在某一行等孩子点「下一步」
   let stdoutLineBuf = "";
   let inputSab = null;
   let inputBuf = null;
@@ -28,6 +33,31 @@ const PythonRunner = (() => {
   let longRunTimer = null;      // 长时间运行的提醒计时器
   const LONG_RUN_MS = 12000;    // 超过 12 秒提醒一次
   let suppressOutput = false;   // 停止后抑制残留输出（例如 Python traceback）
+
+  // ================= 虚拟文件系统（open() 写出的数据文件）=================
+  const VFS_KEY = "codepanda_vfs_v1";
+  let lastVfsSignature = "";
+
+  function loadVfs() {
+    try {
+      const raw = localStorage.getItem(VFS_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      return Array.isArray(list) ? list : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveVfs(files) {
+    try {
+      localStorage.setItem(VFS_KEY, JSON.stringify(files || []));
+      return true;
+    } catch (e) {
+      // 存储配额满：不影响运行，只提示一次
+      console.warn("数据文件保存失败（存储空间可能已满）", e);
+      return false;
+    }
+  }
 
   // ================= 初始化 =================
   function init() {
@@ -46,6 +76,7 @@ const PythonRunner = (() => {
 
     startWorker();
     bindStopButton();
+    bindStepButtons();
   }
 
   function startWorker() {
@@ -60,7 +91,7 @@ const PythonRunner = (() => {
       }
     });
 
-    worker.postMessage({ type: 'init', sab: inputSab, interruptSab: interruptSab });
+    worker.postMessage({ type: 'init', sab: inputSab, interruptSab: interruptSab, vfs: loadVfs() });
   }
 
   // 引擎无响应时的兜底：重建 Worker（会重新加载 Pyodide）
@@ -75,6 +106,85 @@ const PythonRunner = (() => {
     hideTerminalInput();
     updateStatus("loading", "正在重新启动 Python 引擎... ✨");
     startWorker();
+  }
+
+  // ================= 单步调试 =================
+  function setStepMode(on, silent) {
+    stepMode = !!on;
+    const btn = document.getElementById("btnStepMode");
+    if (btn) btn.classList.toggle("active", stepMode);
+    const bar = document.getElementById("stepBar");
+    if (bar) bar.style.display = stepMode ? "flex" : "none";
+    const hint = document.getElementById("stepHint");
+    if (hint && !waitingForStep) {
+      hint.textContent = stepMode ? "🐾 单步模式已打开：点「运行代码」开始逐行执行" : "";
+    }
+    // 运行途中关掉单步：直接放行，别把孩子卡住
+    if (!stepMode && waitingForStep) resumeStep(true);
+    if (!silent) {
+      appendLog("system", stepMode ? "🐾 单步模式已打开：程序会一行一行停下来" : "🐾 单步模式已关闭，代码会一次跑完");
+    }
+  }
+
+  // 放行：advanceAll = true 表示不再逐行暂停
+  function resumeStep(advanceAll) {
+    if (!waitingForStep || !inputBuf) return;
+    waitingForStep = false;
+    Atomics.store(inputBuf, 1, 0);
+    Atomics.store(inputBuf, 0, advanceAll ? 2 : 1);
+    Atomics.notify(inputBuf, 0, 1);
+  }
+
+  function clearStepUi() {
+    waitingForStep = false;
+    if (typeof CodeEditor !== "undefined" && CodeEditor.clearRunningLine) CodeEditor.clearRunningLine();
+    const hint = document.getElementById("stepHint");
+    if (hint) hint.textContent = stepMode ? "🐾 单步模式已打开：点「运行代码」开始逐行执行" : "🐾 单步模式准备中…";
+  }
+
+  // 把本轮运行结果写进「成长档案」，并播报新通关/新徽章
+  function reportProgress(success) {
+    if (typeof Progress === "undefined" || !Progress.recordRun) return;
+    try {
+      const code = (typeof CodeEditor !== "undefined" && CodeEditor.getValue) ? CodeEditor.getValue() : "";
+      const res = Progress.recordRun({
+        code: code,
+        output: runOutputText,
+        success: !!success,
+        turtle: runTurtle,
+        packages: runPackages.slice()
+      }) || {};
+      const missions = res.newMissions || [];
+      const badges = res.newBadges || [];
+      missions.forEach(m => appendLog("success", "🎉 闯关成功【" + m.title + "】" + m.emoji + " 点右上角 🌟 成长 看看"));
+      badges.forEach(b => appendLog("success", "🏅 获得新徽章【" + b.title + "】" + b.emoji));
+      if (missions.length || badges.length) {
+        try { ConfettiFX.celebrate(); } catch (e) {}
+        try { if (window.App && window.App.showToast) window.App.showToast("🎉 有新成就啦！", "🌟"); } catch (e) {}
+      }
+    } catch (e) {
+      console.warn("成长档案记录失败", e);
+    }
+  }
+
+  function bindStepButtons() {
+    const btnMode = document.getElementById("btnStepMode");
+    if (btnMode) {
+      btnMode.addEventListener("click", () => setStepMode(!stepMode));
+    }
+    const btnNext = document.getElementById("btnStepNext");
+    if (btnNext) {
+      btnNext.addEventListener("click", () => resumeStep(false));
+    }
+    const btnRun = document.getElementById("btnStepRun");
+    if (btnRun) {
+      btnRun.addEventListener("click", () => {
+        appendLog("system", "⏭ 好，让程序一路跑完~");
+        resumeStep(true);
+      });
+    }
+    const bar = document.getElementById("stepBar");
+    if (bar) bar.style.display = "none";
   }
 
   function bindStopButton() {
@@ -115,7 +225,22 @@ const PythonRunner = (() => {
 
       case 'stdout-batch':
         if (suppressOutput) { stdoutLineBuf = ""; break; }
+        runOutputText += (data.text || "");
+        if (runOutputText.length > 4000) runOutputText = runOutputText.slice(-4000);
         handleStdout(data.text || "");
+        break;
+
+      case 'step':
+        // 单步模式：程序停在第 data.line 行，等孩子点「下一步」
+        waitingForStep = true;
+        switchTabSafe("console");
+        if (typeof CodeEditor !== "undefined" && CodeEditor.markRunningLine) {
+          CodeEditor.markRunningLine(data.line);
+        }
+        const stepHint = document.getElementById("stepHint");
+        if (stepHint) stepHint.textContent = "🐾 正停在第 " + data.line + " 行，点「下一步 ▶」继续";
+        const stepBarEl = document.getElementById("stepBar");
+        if (stepBarEl) stepBarEl.style.display = "flex";
         break;
 
       case 'input':
@@ -125,6 +250,7 @@ const PythonRunner = (() => {
         break;
 
       case 'turtle-detect':
+        runTurtle = true;
         if (typeof TurtleEngine !== 'undefined') TurtleEngine.reset();
         switchTabSafe("turtle");
         appendLog("system", "🐢 侦测到海龟绘图！已自动切换到【海龟画布】视窗~");
@@ -135,6 +261,7 @@ const PythonRunner = (() => {
         break;
 
       case 'package-ok':
+        if (runPackages.indexOf(data.name) === -1) runPackages.push(data.name);
         appendLog("system", "✅ " + data.name + " 准备就绪！");
         break;
 
@@ -146,6 +273,30 @@ const PythonRunner = (() => {
         renderVariableTelescope(data.list || []);
         break;
 
+      // open() 写出的数据文件：变化时才落盘并提示，避免刷屏
+      case 'vfs-save': {
+        const files = data.files || [];
+        const sig = files.map(f => f.path + ":" + (f.text || "").length).sort().join("|");
+        if (sig !== lastVfsSignature) {
+          lastVfsSignature = sig;
+          saveVfs(files);
+          if (files.length) {
+            appendLog("system", "💾 你的数据文件已保存：" + files.map(f => f.path).join("、") + "（下次运行还在哦）");
+          }
+          if (typeof Progress !== "undefined" && Progress.recordVfs) {
+            const res = Progress.recordVfs(files.length) || {};
+            if (res.newMission) appendLog("success", "🎉 闯关成功【" + res.newMission.title + "】" + res.newMission.emoji);
+            (res.newBadges || []).forEach(b => appendLog("success", "🏅 获得新徽章【" + b.title + "】" + b.emoji));
+          }
+        }
+        break;
+      }
+
+      // 打开页面时找回了上次的数据文件
+      case 'vfs-restored':
+        appendLog("system", "📂 已找回上次保存的数据文件：" + (data.names || []).join("、"));
+        break;
+
       case 'turtle':
         executeTurtle(data);
         break;
@@ -153,9 +304,11 @@ const PythonRunner = (() => {
       case 'done':
         clearInterrupt();
         suppressOutput = false;
+        clearStepUi();
         flushStdoutBuffer();
         finishRun();
         appendLog("success", "✨ 代码运行成功！🎉");
+        reportProgress(true);
         // 记录「上次成功运行」的代码，便于孩子改坏后一键复原
         try { if (window.App && window.App.saveSnapshot) window.App.saveSnapshot(); } catch (e) {}
         try { ConfettiFX.celebrate(); } catch (e) {}
@@ -164,6 +317,7 @@ const PythonRunner = (() => {
       case 'stopped':
         clearInterrupt();
         suppressOutput = false;
+        clearStepUi();
         flushStdoutBuffer();
         finishRun();
         appendLog("system", "⏹ 已停止运行");
@@ -172,6 +326,7 @@ const PythonRunner = (() => {
       case 'error': {
         clearInterrupt();
         suppressOutput = false;
+        clearStepUi();
         flushStdoutBuffer();
         finishRun();
         const text = data.text || "";
@@ -180,6 +335,7 @@ const PythonRunner = (() => {
           appendLog("system", "⏹ 已停止运行");
           break;
         }
+        reportProgress(false);
         handleRuntimeError(text, data.line || 0, data.codeLine || "");
         try { SoundEffects.playWarning(); } catch (e) {}
         break;
@@ -281,6 +437,9 @@ const PythonRunner = (() => {
     if (!worker) init();
 
     isRunning = true;
+    runOutputText = "";
+    runTurtle = false;
+    runPackages = [];
     setRunButtonState(true);
     stdoutLineBuf = "";
     suppressOutput = false;
@@ -321,7 +480,7 @@ const PythonRunner = (() => {
     }, LONG_RUN_MS);
 
     if (isReady) {
-      worker.postMessage({ type: 'run', code: code });
+      worker.postMessage({ type: 'run', code: code, stepping: stepMode });
       return;
     }
 
@@ -332,7 +491,7 @@ const PythonRunner = (() => {
       readyWaitTimer = null;
       if (!isRunning) return;             // 期间被停止
       if (isReady && worker) {
-        worker.postMessage({ type: 'run', code: code });
+        worker.postMessage({ type: 'run', code: code, stepping: stepMode });
         return;
       }
       if (Date.now() > deadline) {
@@ -501,55 +660,119 @@ const PythonRunner = (() => {
       if (term) { term.appendChild(jumpDiv); scheduleScroll(); }
     }
 
-    let tipTitle = "🔍 小侦探正在诊断...";
-    let tipContent = "检查一下代码是否有小字母打错了哦！";
+    // ===== 小侦探：把 Python 报错翻译成孩子能懂的话 =====
+    const ERROR_GUIDE = [
+      { key: "IndentationError", name: "缩进没对齐", title: "🔍 缩进小楼梯没对齐！",
+        tips: ["冒号 <b>:</b> 后面的代码要往右缩进 4 个空格（按一次 Tab）",
+               "同一个块里的代码缩进要一样多，不要一会儿 2 个空格、一会儿 4 个空格"] },
+      { key: "TabError", name: "空格和 Tab 混用", title: "🔍 空格和 Tab 混在一起啦！",
+        tips: ["缩进要么都用 <b>4 个空格</b>，要么都用 <b>Tab</b>，不要混着用",
+               "可以在编辑器里全选代码，重新对齐一遍缩进"] },
+      { key: "SyntaxError", name: "标点或语法写错", title: "🔍 语法标点可能有迷路的小伙伴！",
+        tips: ["检查括号 <b>()</b>、引号有没有成对闭合",
+               "检查 <b>if / for / while / def</b> 那一行末尾是不是漏了英文冒号 <b>:</b>",
+               "点下面的「🩺 标点体检」按钮，可以自动把中文标点改成英文标点"] },
+      { key: "NameError", name: "名字不认识", title: "🔍 电脑不认识这个名字！",
+        tips: ["检查变量名有没有拼错（大小写也算哦！）",
+               "变量要先赋值再使用，例如先写 <b>score = 0</b> 再用 <b>score</b>"] },
+      { key: "UnboundLocalError", name: "变量还没准备好", title: "🔍 变量还没准备好就被用啦！",
+        tips: ["函数里的变量要先赋值才能使用", "检查一下是不是把顺序写反了"] },
+      { key: "TypeError", name: "类型对不上", title: "🔍 数据类型对不上哦！",
+        tips: ["文字和数字不能直接用 <b>+</b> 拼在一起，试试 <b>str(数字)</b> 转成文字",
+               "input() 拿到的是文字，要和数字比较大小，先用 <b>int()</b> 转换"] },
+      { key: "ValueError", name: "值不合适", title: "🔍 这个值不太合适哦！",
+        tips: ["<b>int(\"abc\")</b> 是不行的，input() 得到的是文字，要输入数字才行",
+               "检查 <b>range()</b>、<b>int()</b> 里的内容是不是写错了"] },
+      { key: "ZeroDivisionError", name: "除以 0", title: "🔍 数学小禁区：数字不能除以 0！",
+        tips: ["任何数字都不能除以 0，检查除数是不是算成了 0",
+               "如果是随机的除数，记得先判断它不等于 0"] },
+      { key: "IndexError", name: "下标越界", title: "🔍 队伍里没有这个位置！",
+        tips: ["列表从 <b>0</b> 开始编号：长度是 3 的列表只有 0、1、2",
+               "可以用 <b>len(列表)</b> 看看一共有多少个"] },
+      { key: "KeyError", name: "字典里没这个键", title: "🔍 字典里没找到这把钥匙！",
+        tips: ["先 <b>print(字典.keys())</b> 看看有哪些钥匙",
+               "也可以用 <b>字典.get(键)</b> 更安全"] },
+      { key: "AttributeError", name: "没有这个方法", title: "🔍 这个小帮手没有这个本领！",
+        tips: ["检查方法名有没有拼错",
+               "列表有 <b>append</b>，文字有 <b>upper</b>，要用在正确的对象上"] },
+      { key: "ModuleNotFoundError", name: "找不到模块", title: "🔍 找不到这个工具箱！",
+        tips: ["检查模块名字有没有拼错（比如 <b>turtle</b>、<b>random</b>、<b>math</b>）",
+               "第三方模块第一次使用会从网上准备，等几秒再运行一次就好"] },
+      { key: "ImportError", name: "导入失败", title: "🔍 这个工具箱里没有那个零件！",
+        tips: ["检查 <b>from ... import ...</b> 的名字有没有拼错"] },
+      { key: "FileNotFoundError", name: "找不到文件", title: "🔍 找不到这个文件！",
+        tips: ["检查文件名有没有写错", "读文件之前要先写进去（用 <b>open(名字, \"w\")</b>）"] },
+      { key: "RecursionError", name: "递归太深", title: "🔍 函数自己叫自己太多次啦！",
+        tips: ["递归要记得写「什么时候停下来」的条件",
+               "检查有没有忘记 return，或者条件永远不成立"] },
+      { key: "EOFError", name: "输入提前结束", title: "🔍 input() 遇到意外结束！",
+        tips: ["在下方输入框里输入内容再按回车", "按了「⏹ 停止」也会出现这个提示"] },
+      { key: "MemoryError", name: "内存不够", title: "🔍 东西太多啦，内存装不下！",
+        tips: ["把 range 或者列表改小一点再试试"] }
+    ];
 
-    if (full.indexOf("IndentationError") !== -1) {
-      tipTitle = "🔍 缩进小楼梯没对齐！";
-      tipContent = "Python 非常在乎代码左侧的空格！<br>👉 冒号 <b>:</b> 后面要按 <b>Tab</b> 缩进哦！";
-    } else if (full.indexOf("SyntaxError") !== -1) {
-      tipTitle = "🔍 语法标点符号有迷路的小伙伴！";
-      tipContent = "看看是不是括号 <b>()</b> 没有成对闭合？或者 <b>if/for/while</b> 后面漏掉了英文冒号 <b>:</b>？";
-    } else if (full.indexOf("NameError") !== -1) {
-      const match = full.match(/name '([A-Za-z0-9_]+)' is not defined/);
-      const varName = match ? match[1] : "某个变量";
-      tipTitle = "🔍 找不到名字为【" + varName + "】的小帮手！";
-      tipContent = "电脑不认识 <b>" + varName + "</b>，检查一下拼写或者是否忘记定义了？";
-    } else if (full.indexOf("TypeError") !== -1) {
-      tipTitle = "🔍 数据类型对不上哦！";
-      tipContent = "是不是把文字和数字直接用 <b>+</b> 拼在一起啦？试试用 <b>str()</b> 转换一下！";
-    } else if (full.indexOf("ZeroDivisionError") !== -1) {
-      tipTitle = "🔍 数学小禁区：数字不能除以 0！";
-      tipContent = "任何数字都不能除以 0 哦！检查一下你的除数是不是算成 0 了？";
-    } else if (full.indexOf("EOFError") !== -1) {
-      tipTitle = "🔍 input() 遇到意外结束！";
-      tipContent = "代码执行到一半，input() 没能获取到输入。<br>👉 可能在输入框里没有输入内容？";
+    let guide = null;
+    for (let i = 0; i < ERROR_GUIDE.length; i++) {
+      if (full.indexOf(ERROR_GUIDE[i].key) !== -1) { guide = ERROR_GUIDE[i]; break; }
+    }
+    if (!guide) {
+      guide = { name: "未知小状况", title: "🔍 小侦探正在诊断...", tips: ["检查代码里有没有写错的字母或符号"] };
+    }
+    const tips = guide.tips.slice();
+    const nameMatch = full.match(/name '([A-Za-z0-9_]+)' is not defined/);
+    if (nameMatch) tips.unshift("电脑不认识 <b>" + nameMatch[1] + "</b>，看看是不是拼错了？");
 
-    } else if (full.indexOf("UnboundLocalError") !== -1) {
-      tipTitle = "🔍 变量还没准备好就被用啦！";
-      tipContent = "函数里的变量要先赋值才能使用哦～检查一下是不是写错了顺序？";
-    } else if (full.indexOf("TabError") !== -1) {
-      tipTitle = "🔍 空格和 Tab 混在一起啦！";
-      tipContent = "缩进要么都用 <b>4 个空格</b>，要么都用 <b>Tab</b>，不要混着用哦！";
-    } else if (full.indexOf("ValueError") !== -1 && full.indexOf("could not convert") !== -1) {
-      tipTitle = "🔍 文字不能直接变成数字！";
-      tipContent = "是不是 <b>int()</b> 里面放了文字呀？比如 <b>int(\"abc\")</b> 是不行的哦！";
-    } else if (full.indexOf("ModuleNotFoundError") !== -1 || full.indexOf("ImportError") !== -1) {
-      tipTitle = "🔍 找不到这个工具箱！";
-      tipContent = "Python 里没有这个名字的模块～检查拼写，或者换一个内置工具箱试试（比如 random、math、turtle）。";
-    } else if (full.indexOf("MemoryError") !== -1) {
-      tipTitle = "🔍 东西太多啦，内存装不下！";
-      tipContent = "试试把数字或列表改小一点，比如 range 后面的数字小一些。";
-    } else if (full.indexOf("RecursionError") !== -1) {
-      tipTitle = "🔍 函数自己叫自己太多次啦！";
-      tipContent = "递归要记得写「什么时候停下来」的条件哦！";
+    // 出错路线：第 3 行 → draw() 里 → 第 7 行出错
+    const frames = [];
+    const reFrame = /File "<学生代码>", line ([0-9]+)(?:, in ([^\n]+))?/g;
+    let fm;
+    while ((fm = reFrame.exec(full)) !== null) {
+      const fn = (fm[2] || "").trim();
+      frames.push({ line: parseInt(fm[1], 10), fn: fn === "<module>" ? "" : fn });
+    }
+    let pathText = "";
+    if (frames.length > 1) {
+      const parts = frames.map(f => "第 " + f.line + " 行" + (f.fn ? "（" + f.fn + " 里）" : ""));
+      pathText = "🕵️ 出错路线：" + parts.join(" → ");
     }
 
     const terminal = document.getElementById("terminalLogs");
     if (!terminal) return;
     const tipDiv = document.createElement("div");
     tipDiv.className = "detective-tip-card";
-    tipDiv.innerHTML = '<div class="detective-header">' + tipTitle + '</div><div class="detective-body">' + tipContent + '</div>';
+    tipDiv.innerHTML =
+      '<div class="detective-header">' + guide.title + "（" + guide.name + "）" + '</div>' +
+      '<div class="detective-body">' +
+      (pathText ? '<div class="detective-path">' + pathText + "</div>" : "") +
+      tips.map(t => '<div class="detective-tip-line">💡 ' + t + "</div>").join("") +
+      "</div>";
+
+    // 行动按钮：一键标点体检 / 回到上次成功的代码
+    const actions = document.createElement("div");
+    actions.className = "detective-actions";
+    const needPunct = full.indexOf("SyntaxError") !== -1 || full.indexOf("IndentationError") !== -1 || full.indexOf("TabError") !== -1;
+    if (needPunct && typeof CodeEditor !== "undefined" && CodeEditor.fixChinesePunctuation) {
+      const btnFix = document.createElement("button");
+      btnFix.className = "detective-btn";
+      btnFix.textContent = "🩺 标点体检";
+      btnFix.addEventListener("click", () => {
+        try { CodeEditor.fixChinesePunctuation(); } catch (e) {}
+        appendLog("system", "🩺 已尝试修复中文标点，再运行一次看看吧~");
+      });
+      actions.appendChild(btnFix);
+    }
+    if (errorLine > 0) {
+      const btnBack = document.createElement("button");
+      btnBack.className = "detective-btn";
+      btnBack.textContent = "⏪ 回到上次成功的代码";
+      btnBack.addEventListener("click", () => {
+        const btn = document.getElementById("btnSnapshot");
+        if (btn) btn.click();
+      });
+      actions.appendChild(btnBack);
+    }
+    if (actions.children.length) tipDiv.appendChild(actions);
+
     terminal.appendChild(tipDiv);
     scheduleScroll();
   }

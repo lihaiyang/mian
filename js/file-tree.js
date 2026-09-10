@@ -6,6 +6,17 @@ const FileManager = (() => {
   const STORAGE_KEY = "codepanda_python_files_v1";
   const ACTIVE_FILE_KEY = "codepanda_active_file_id";
 
+  // 多孩子档案：每个小伙伴一套独立的文件存储（命名空间为空 = 老版本键，保证老数据不丢）
+  let namespace = "";
+
+  function filesKey() {
+    return namespace ? STORAGE_KEY + "__" + namespace : STORAGE_KEY;
+  }
+
+  function activeKey() {
+    return namespace ? ACTIVE_FILE_KEY + "__" + namespace : ACTIVE_FILE_KEY;
+  }
+
   let files = [];
   let activeFileId = null;
   let listeners = [];
@@ -15,7 +26,7 @@ const FileManager = (() => {
   // 初始化加载
   function init() {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(filesKey());
       if (saved) {
         files = JSON.parse(saved);
       }
@@ -26,7 +37,7 @@ const FileManager = (() => {
     if (!files || files.length === 0) {
       resetToDefault();
     } else {
-      activeFileId = localStorage.getItem(ACTIVE_FILE_KEY) || files[0].id;
+      activeFileId = localStorage.getItem(activeKey()) || files[0].id;
       // 确认 activeFileId 是否有效
       if (!files.find(f => f.id === activeFileId)) {
         activeFileId = files[0].id;
@@ -45,9 +56,9 @@ const FileManager = (() => {
   // 保存到本地存储（失败时通知界面，避免静默丢失孩子的代码）
   function saveToStorage() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(files));
+      localStorage.setItem(filesKey(), JSON.stringify(files));
       if (activeFileId) {
-        localStorage.setItem(ACTIVE_FILE_KEY, activeFileId);
+        localStorage.setItem(activeKey(), activeFileId);
       }
       if (lastStorageError) {
         lastStorageError = null;
@@ -73,6 +84,21 @@ const FileManager = (() => {
   return {
     init,
 
+    // 切换档案的存储空间（会重新载入该小伙伴的作品库）
+    setNamespace(id) {
+      const next = id ? String(id) : "";
+      if (next === namespace) return files;
+      namespace = next;
+      files = [];
+      activeFileId = null;
+      init();
+      return files;
+    },
+
+    getNamespace() {
+      return namespace;
+    },
+
     onChange(fn) {
       listeners.push(fn);
     },
@@ -94,7 +120,7 @@ const FileManager = (() => {
       const file = files.find(f => f.id === id);
       if (file) {
         activeFileId = id;
-        localStorage.setItem(ACTIVE_FILE_KEY, activeFileId);
+        localStorage.setItem(activeKey(), activeFileId);
         notifyChange();
       }
     },

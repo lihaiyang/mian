@@ -17,6 +17,7 @@ const CodeEditor = (() => {
   let punctMarks = [];
   let punctTimer = null;
   let punctCount = 0;
+  let runningLineHandle = null;   // 单步调试高亮的那一行
 
 
   // ================= 智能补全词库 =================
@@ -397,6 +398,24 @@ const CodeEditor = (() => {
     zoomOut,
     toggleBigFont,
     gotoLine,
+
+    // 单步调试：高亮当前正在执行的那一行
+    markRunningLine(line) {
+      if (!cmInstance) return;
+      this.clearRunningLine();
+      const lineNo = Math.max(0, (parseInt(line, 10) || 1) - 1);
+      if (lineNo >= cmInstance.lineCount()) return;
+      runningLineHandle = cmInstance.addLineClass(lineNo, "background", "cm-run-line");
+      cmInstance.scrollIntoView({ line: lineNo, ch: 0 }, 120);
+    },
+
+    clearRunningLine() {
+      if (cmInstance && runningLineHandle !== null) {
+        cmInstance.removeLineClass(runningLineHandle, "background", "cm-run-line");
+        runningLineHandle = null;
+      }
+    },
+
     getPunctuationCount,
     fixChinesePunctuation,
     refresh() {

@@ -48,6 +48,12 @@
         <span data-page-node-id="2gVHTI6TQbOSrHzu2YnxIk">趣味宝库</span>
       </button>
 
+      <!-- 成长档案 -->
+      <button class="header-btn" id="btnProgress" title="看看我的学习记录、闯关任务和徽章" data-page-node-id="btnProgressNode">
+        <span>🌟</span>
+        <span>成长</span>
+      </button>
+
       <!-- 主题切换 -->
       <button class="header-btn" id="btnToggleTheme" title="切换白天/星空夜景模式" data-page-node-id="iQBGfUGH19lan2SY2EgMTQ">
         <span id="themeIcon" data-page-node-id="QsA4yp2TkYhFaIhcDS2hi8">🌙</span>
@@ -116,6 +122,7 @@
             <span data-page-node-id="w7mnCawAA6Qzvx6jtdHPer">标点体检</span>
           </button>
           
+          <button class="magic-fix-btn" id="btnStepMode" title="单步模式：一行一行运行，看清楚每一步">🐾 单步</button>
           <button class="magic-fix-btn" id="btnSnapshot" title="回到上一次成功运行时的代码">⏪ 上次成功</button>
           <button class="icon-btn" id="btnZoomIn" title="放大字体（看得更清楚）" data-page-node-id="TjCRKKfbLb61zyC3EUfXhl">A+</button>
           <button class="icon-btn" id="btnZoomOut" title="缩小字体" data-page-node-id="KCBTwDtfL5eC0xnVVPdazf">A-</button>
@@ -191,6 +198,13 @@
           <div class="term-line system" data-page-node-id="unSZEUOqqzycZdNHNBPHI1">🌟 欢迎来到萌码 Python 奇幻工坊！</div>
           <div class="term-line system" data-page-node-id="T3p1EDdd7HIp6ZQsknYRUt">💡 点击右上角绿色的「🚀 运行代码」按钮，见证奇迹发生吧！</div>
         </div>
+        <!-- 单步调试控制条（打开单步模式后出现） -->
+        <div class="step-bar" id="stepBar" style="display:none;">
+          <span class="step-hint" id="stepHint">🐾 单步模式准备中…</span>
+          <button class="header-btn" id="btnStepNext" title="执行下一行">下一步 ▶</button>
+          <button class="header-btn" id="btnStepRun" title="不再逐行暂停，直接跑完">一路跑完 ⏭</button>
+        </div>
+
         <!-- 终端输入行（模拟命令行输入） -->
         <div class="terminal-input-line" id="terminalInputLine" style="display:none;">
           <span class="terminal-prompt">❯</span>
@@ -278,6 +292,48 @@
     </div>
   </div>
 
+  <!-- ================= 弹窗：趣味宝库（分类示例库） ================= -->
+  <div class="modal-overlay" id="galleryModal">
+    <div class="modal-card gallery-card">
+      <div class="modal-title">
+        <span>🎁 趣味宝库</span>
+      </div>
+      <div class="modal-desc">挑一个喜欢的作品点开就能玩，<b>不会弄丢你自己的代码</b>。想让宝库重新装满，用下面的「恢复初始示例」。</div>
+      <div class="gallery-tabs" id="galleryTabs"></div>
+      <div class="gallery-list" id="galleryList"></div>
+      <div class="modal-footer">
+        <button class="header-btn" id="btnGalleryReset" title="用初始示例替换当前所有文件（会先确认）">♻️ 恢复初始示例</button>
+        <button class="btn-run-magic" id="btnGalleryClose" style="padding:6px 18px; font-size:13px;">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 弹窗：成长档案（多档案 / 学习记录 / 闯关任务 / 徽章） ================= -->
+  <div class="modal-overlay" id="progressModal">
+    <div class="modal-card progress-card">
+      <div class="modal-title"><span>🌟 我的成长档案</span></div>
+      <div class="profile-row" id="profileRow"></div>
+      <div class="profile-editor" id="profileEditor" style="display:none;">
+        <input type="text" class="modal-input" id="profileNameInput" placeholder="小伙伴的名字（最多 12 个字）" maxlength="12">
+        <div class="profile-emoji-row" id="profileEmojiRow"></div>
+        <div class="profile-editor-actions">
+          <button class="header-btn" id="btnProfileCancel">取消</button>
+          <button class="btn-run-magic" id="btnProfileSave" style="padding:6px 16px; font-size:13px;">保存</button>
+        </div>
+      </div>
+      <div class="progress-stats" id="progressStats"></div>
+      <div class="progress-section-title"><span>🎯 闯关任务</span><span class="progress-section-count" id="missionProgress"></span></div>
+      <div class="mission-list" id="missionList"></div>
+      <div class="progress-section-title"><span>🏅 成就徽章</span></div>
+      <div class="badge-list" id="badgeList"></div>
+      <div class="modal-footer">
+        <button class="header-btn" id="btnNewProfile">➕ 新伙伴</button>
+        <button class="header-btn" id="btnEditProfile">✏️ 改名字</button>
+        <button class="btn-run-magic" id="btnProgressClose" style="padding:6px 18px; font-size:13px;">关闭</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ================= 炫彩通知小泡泡 ================= -->
   <div class="toast-box" id="toastBox" data-page-node-id="6qIoeipxlRgpMlcnI9x99W">
     <span id="toastIcon" data-page-node-id="daRqEznTKjdg1aIar9ic3v">🎉</span>
@@ -303,6 +359,7 @@
   <script src="js/python-runner.js"></script>
   <script src="js/editor.js"></script>
   <script src="js/file-tree.js"></script>
+  <script src="js/progress.js"></script>
   <script src="js/app.js"></script>
 
 </body>

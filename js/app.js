@@ -29,6 +29,11 @@ window.App = (() => {
     // 1. 初始化文件管理器
     FileManager.init();
 
+    // 1.1 成长档案：按当前小伙伴切换作品库 + 载入学习记录
+    if (typeof Progress !== "undefined") {
+      Progress.init();
+    }
+
     // 2. 初始化代码编辑器
     const editorArea = document.getElementById("codeEditorArea");
     CodeEditor.init(editorArea);
@@ -378,19 +383,36 @@ window.App = (() => {
 
     // 恢复示例库
     const btnReset = document.getElementById("btnResetDemos");
-    btnReset.addEventListener("click", () => {
-      showConfirmModal(
-        "⚠️ 注意啦！",
-        "恢复示例宝库会【替换掉你现在的所有文件】哦！<br>想保留自己的代码的话，先点「取消」，用左侧 ⬇️ 按钮下载保存~<br><br>确定要恢复示例宝库吗？",
-        () => {
-          closedTabIds.clear();
-          saveClosedTabs();
-          FileManager.resetToDefault();
-          showToast("🎉 示例宝库已重新装满！", "🎁");
-          SoundEffects.playSuccess();
-        }
-      );
-    });
+    btnReset.addEventListener("click", openGallery);
+
+    // 趣味宝库：关闭 / 恢复初始示例
+    const btnGalleryClose = document.getElementById("btnGalleryClose");
+    if (btnGalleryClose) {
+      btnGalleryClose.addEventListener("click", closeGalleryModal);
+    }
+    const galleryOverlay = document.getElementById("galleryModal");
+    if (galleryOverlay) {
+      galleryOverlay.addEventListener("click", (e) => {
+        if (e.target === galleryOverlay) closeGalleryModal();
+      });
+    }
+    const btnGalleryReset = document.getElementById("btnGalleryReset");
+    if (btnGalleryReset) {
+      btnGalleryReset.addEventListener("click", () => {
+        showConfirmModal(
+          "⚠️ 注意啦！",
+          "恢复示例宝库会【替换掉你现在的所有文件】哦！<br>想保留自己的代码的话，先点「取消」，用左侧 📦 打包下载备份~<br><br>确定要恢复示例宝库吗？",
+          () => {
+            closedTabIds.clear();
+            saveClosedTabs();
+            FileManager.resetToDefault();
+            closeGalleryModal();
+            showToast("🎉 示例宝库已重新装满！", "🎁");
+            SoundEffects.playSuccess();
+          }
+        );
+      });
+    }
 
     // 暗黑太空模式切换
     const btnTheme = document.getElementById("btnToggleTheme");
@@ -734,6 +756,90 @@ window.App = (() => {
     const content = CodeEditor.getValue();
     FileManager.updateActiveContent(content);
     showToast("💾 保存成功！你的代码安然无恙~", "🌟");
+    SoundEffects.playSuccess();
+  }
+
+  // ================= 趣味宝库（分类示例库） =================
+  let galleryCategory = "basic";
+
+  function renderGallery() {
+    const tabs = document.getElementById("galleryTabs");
+    const list = document.getElementById("galleryList");
+    if (!tabs || !list || typeof DEFAULT_EXAMPLES === "undefined") return;
+    const cats = typeof EXAMPLE_CATEGORIES !== "undefined" ? EXAMPLE_CATEGORIES : [];
+    if (cats.length && !cats.some(c => c.id === galleryCategory)) galleryCategory = cats[0].id;
+
+    tabs.innerHTML = "";
+    cats.forEach(cat => {
+      const btn = document.createElement("button");
+      btn.className = "gallery-tab" + (cat.id === galleryCategory ? " active" : "");
+      btn.textContent = cat.emoji + " " + cat.name;
+      btn.addEventListener("click", () => {
+        galleryCategory = cat.id;
+        renderGallery();
+        SoundEffects.playPop();
+      });
+      tabs.appendChild(btn);
+    });
+
+    const meta = typeof EXAMPLE_META !== "undefined" ? EXAMPLE_META : {};
+    const items = DEFAULT_EXAMPLES.filter(ex => ((meta[ex.id] || {}).category || "basic") === galleryCategory);
+    list.innerHTML = "";
+    if (!items.length) {
+      list.innerHTML = "<div class=\"gallery-empty\">这个分类还在准备中，先玩别的吧~</div>";
+      return;
+    }
+    items.forEach(ex => {
+      const info = meta[ex.id] || {};
+      const card = document.createElement("button");
+      card.className = "gallery-item";
+      const head = document.createElement("div");
+      head.className = "gallery-item-head";
+      const nameEl = document.createElement("span");
+      nameEl.className = "gallery-item-name";
+      nameEl.textContent = ex.name.replace(/\.py$/, "");
+      const starEl = document.createElement("span");
+      starEl.className = "gallery-item-star";
+      starEl.textContent = "⭐".repeat(Math.max(1, Math.min(3, info.level || 1)));
+      head.appendChild(nameEl);
+      head.appendChild(starEl);
+      const descEl = document.createElement("div");
+      descEl.className = "gallery-item-desc";
+      descEl.textContent = info.desc || "点开看看这个作品吧";
+      card.appendChild(head);
+      card.appendChild(descEl);
+      card.addEventListener("click", () => openExample(ex));
+      list.appendChild(card);
+    });
+  }
+
+  function openGallery() {
+    renderGallery();
+    document.getElementById("galleryModal").classList.add("active");
+    SoundEffects.playPop();
+  }
+
+  function closeGalleryModal() {
+    document.getElementById("galleryModal").classList.remove("active");
+  }
+
+  // 打开示例：已有同名文件就直接用（保留孩子的改动），没有才新建
+  function openExample(ex) {
+    const files = FileManager.getAllFiles();
+    let target = files.find(f => f.name === ex.name);
+    if (!target) {
+      target = FileManager.createFile(ex.name, ex.content);
+    } else {
+      FileManager.setActiveFile(target.id);
+    }
+    if (target) {
+      closedTabIds.delete(target.id);
+      saveClosedTabs();
+      const active = FileManager.getActiveFile();
+      if (active) CodeEditor.setValue(active.content);
+    }
+    closeGalleryModal();
+    showToast("🎁 已打开：" + ex.name.replace(/\.py$/, ""), "🎁");
     SoundEffects.playSuccess();
   }
 
