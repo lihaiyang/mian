@@ -1236,3 +1236,45 @@ body.dark-mode .turtle-canvas-container {
     font-size: 16px;
   }
 }
+
+/* 护眼大字号模式激活态 */
+.icon-btn.active {
+  background: var(--primary);
+  color: #FFFFFF;
+  border-color: var(--primary);
+}
+
+/* 分享/导入等图标按钮在窄屏下隐藏次要项 */
+@media (max-width: 860px) {
+  #btnExportAll, #btnShareCode { display: none; }
+}
+
+/* ===== 中文标点实时体检：波浪下划线提示 ===== */
+.cm-punct-warn {
+  text-decoration: underline wavy #F59E0B;
+  text-underline-offset: 3px;
+  background: rgba(245, 158, 11, 0.14);
+  border-radius: 2px;
+}
+
+/* ===== 出错行闪烁高亮（点击错误提示后跳转） ===== */
+.cm-error-line {
+  animation: errorLineFlash 0.6s ease-in-out 3;
+}
+
+@keyframes errorLineFlash {
+  0%, 100% { background: rgba(239, 68, 68, 0.05); }
+  50% { background: rgba(239, 68, 68, 0.28); }
+}
+
+/* ===== 标点体检按钮：发现问题时变橙色提醒 ===== */
+.magic-fix-btn.has-warn {
+  border-color: var(--warning);
+  color: var(--warning);
+  background: var(--warning-light);
+  animation: stopPulse 1.6s ease-in-out infinite;
+}
+
+body.dark-mode .magic-fix-btn.has-warn {
+  background: rgba(245, 158, 11, 0.18);
+}

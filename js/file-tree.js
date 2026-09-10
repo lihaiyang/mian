@@ -9,6 +9,8 @@ const FileManager = (() => {
   let files = [];
   let activeFileId = null;
   let listeners = [];
+  let storageErrorListeners = [];
+  let lastStorageError = null;
 
   // 初始化加载
   function init() {
@@ -40,15 +42,26 @@ const FileManager = (() => {
     notifyChange();
   }
 
-  // 保存到本地存储
+  // 保存到本地存储（失败时通知界面，避免静默丢失孩子的代码）
   function saveToStorage() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(files));
       if (activeFileId) {
         localStorage.setItem(ACTIVE_FILE_KEY, activeFileId);
       }
+      if (lastStorageError) {
+        lastStorageError = null;
+        storageErrorListeners.forEach(fn => { try { fn(null); } catch (e) {} });
+      }
+      return true;
     } catch (e) {
       console.error("保存本地存储失败", e);
+      // 浏览器存储配额溢出等错误：必须让孩子知道，否则会静默丢代码
+      lastStorageError = e && e.name === "QuotaExceededError"
+        ? "浏览器存储空间满了，新改动可能无法保存！建议用 📦 打包下载备份后，删除一些不用的文件。"
+        : "保存到浏览器失败，请用 📦 打包下载备份你的代码！";
+      storageErrorListeners.forEach(fn => { try { fn(lastStorageError); } catch (e2) {} });
+      return false;
     }
   }
 
@@ -173,6 +186,33 @@ const FileManager = (() => {
       saveToStorage();
       notifyChange();
       return { success: true };
+    },
+
+    // 监听本地存储写入失败（例如配额溢出）
+    onStorageError(fn) {
+      storageErrorListeners.push(fn);
+    },
+
+    getStorageError() {
+      return lastStorageError;
+    },
+
+    // 粗略估算已用存储空间（字节）
+    getStorageUsage() {
+      try {
+        let total = 0;
+        for (const f of files) {
+          total += (f.content || "").length + (f.name || "").length;
+        }
+        return total * 2; // UTF-16 约 2 字节/字符
+      } catch (e) {
+        return 0;
+      }
+    },
+
+    // 全部作品（供打包下载）
+    getAllFiles() {
+      return files.slice();
     },
 
     resetToDefault

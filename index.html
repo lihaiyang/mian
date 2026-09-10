@@ -78,7 +78,11 @@
         </div>
         <div class="panel-tools" data-page-node-id="rP8l99yI16iWzsRoZi7569">
           <button class="icon-btn" id="btnNewFile" title="新建 Python 文件" data-page-node-id="br9CpLxXrjeQ6G1zZGsaSH">➕</button>
+          <button class="icon-btn" id="btnImportFile" title="导入电脑里的 .py 文件">📂</button>
           <button class="icon-btn" id="btnExportZip" title="下载当前文件到电脑 (.py)" data-page-node-id="u10TZGXuTENGTp7Y1zHBbl">⬇️</button>
+          <button class="icon-btn" id="btnExportAll" title="打包下载全部作品 (zip)">📦</button>
+          <button class="icon-btn" id="btnShareCode" title="生成分享链接，发给同学或老师">🔗</button>
+          <input type="file" id="fileImportInput" accept=".py,.txt" style="display:none">
         </div>
       </div>
 
@@ -111,8 +115,10 @@
             <span data-page-node-id="w7mnCawAA6Qzvx6jtdHPer">标点体检</span>
           </button>
           
+          <button class="magic-fix-btn" id="btnSnapshot" title="回到上一次成功运行时的代码">⏪ 上次成功</button>
           <button class="icon-btn" id="btnZoomIn" title="放大字体（看得更清楚）" data-page-node-id="TjCRKKfbLb61zyC3EUfXhl">A+</button>
           <button class="icon-btn" id="btnZoomOut" title="缩小字体" data-page-node-id="KCBTwDtfL5eC0xnVVPdazf">A-</button>
+          <button class="icon-btn" id="btnBigFont" title="护眼大字号模式（一键切换）">🔤</button>
         </div>
       </div>
 
@@ -126,10 +132,13 @@
           <button class="snippet-chip" data-code="print(&quot;你好，世界！🌟&quot;)">📢 打印输出</button>
           <button class="snippet-chip" data-code="name = input(&quot;你叫什么名字呀？&quot;)">❓ 提问回答</button>
           <button class="snippet-chip" data-code="for i in range(5):&#10;    print(&quot;跑第&quot;, i + 1, &quot;圈&quot;)">🔄 重复5次</button>
-          <button class="snippet-chip" data-code="if score >= 60:&#10;    print(&quot;太棒啦！🎉&quot;)&#10;else:&#10;    print(&quot;继续加油哦！💪&quot;)">⚖️ 如果判断</button>
+          <button class="snippet-chip" data-code="score = 85&#10;if score >= 60:&#10;    print(&quot;太棒啦！🎉&quot;)&#10;else:&#10;    print(&quot;继续加油哦！💪&quot;)">⚖️ 如果判断</button>
           <button class="snippet-chip" data-code="import random&#10;lucky = random.randint(1, 100)">🎲 随机幸运数</button>
           <button class="snippet-chip" data-code="import turtle&#10;t = turtle.Turtle()&#10;t.forward(100)&#10;t.right(90)">🐢 海龟前进转弯</button>
           <button class="snippet-chip" data-code="t.color(&quot;coral&quot;)&#10;t.pensize(5)&#10;t.circle(60)">🎨 海龟画彩色圆</button>
+          <button class="snippet-chip" data-code="import turtle&#10;t = turtle.Turtle()&#10;t.speed(6)&#10;t.pensize(3)&#10;&#10;t.color(&quot;#EF4444&quot;)&#10;for i in range(4):&#10;    t.forward(100)&#10;    t.right(90)&#10;" title="完整可跑的海龟模板">🐢 海龟模板</button>
+          <button class="snippet-chip" data-code="name = input(&quot;你叫什么名字？&quot;)&#10;age = input(&quot;你几岁啦？&quot;)&#10;print(&quot;你好&quot;, name, &quot;！你今年&quot;, age, &quot;岁&quot;)" title="完整可跑的问答模板">💬 问答模板</button>
+          <button class="snippet-chip" data-code="numbers = [3, 7, 1, 9, 5]&#10;print(&quot;最大&quot;, max(numbers))&#10;print(&quot;最小&quot;, min(numbers))&#10;print(&quot;总和&quot;, sum(numbers))" title="列表与统计">🔢 列表统计</button>
         </div>
       </div>
 
@@ -284,6 +293,7 @@
   <script src="js/audio-confetti.js"></script>
   <script src="js/examples.js"></script>
   <script src="js/turtle-canvas.js"></script>
+  <script src="js/zip-writer.js"></script>
   <script src="js/python-runner.js"></script>
   <script src="js/editor.js"></script>
   <script src="js/file-tree.js"></script>

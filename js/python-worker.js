@@ -82,6 +82,18 @@ async function initWorker() {
   }
 }
 
+// 从 Python traceback 中解析出错行号（取最内层的 <学生代码> 帧）
+function extractErrorLine(tracebackText) {
+  try {
+    const re = /File "<学生代码>", line ([0-9]+)/g;
+    let m, last = 0;
+    while ((m = re.exec(tracebackText)) !== null) last = parseInt(m[1], 10);
+    return last;
+  } catch (e) {
+    return 0;
+  }
+}
+
 function formatPythonError(err) {
   let msg = (err && err.message) ? String(err.message) : String(err);
   if (!msg || msg === 'PythonError') {
@@ -129,7 +141,7 @@ async function runCode(code) {
     if (stopped) {
       self.postMessage({ type: 'stopped' });
     } else if (errText) {
-      self.postMessage({ type: 'error', text: String(errText) });
+      self.postMessage({ type: 'error', text: String(errText), line: extractErrorLine(String(errText)) });
     } else {
       self.postMessage({ type: 'done' });
     }

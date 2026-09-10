@@ -25,6 +25,8 @@ const PythonRunner = (() => {
   let readyWaitTimer = null;
   let stopFallbackTimer = null;
   let scrollScheduled = false;
+  let longRunTimer = null;      // 长时间运行的提醒计时器
+  const LONG_RUN_MS = 12000;    // 超过 12 秒提醒一次
   let suppressOutput = false;   // 停止后抑制残留输出（例如 Python traceback）
 
   // ================= 初始化 =================
@@ -138,6 +140,8 @@ const PythonRunner = (() => {
         flushStdoutBuffer();
         finishRun();
         appendLog("success", "✨ 代码运行成功！🎉");
+        // 记录「上次成功运行」的代码，便于孩子改坏后一键复原
+        try { if (window.App && window.App.saveSnapshot) window.App.saveSnapshot(); } catch (e) {}
         try { ConfettiFX.celebrate(); } catch (e) {}
         break;
 
@@ -160,7 +164,7 @@ const PythonRunner = (() => {
           appendLog("system", "⏹ 已停止运行");
           break;
         }
-        handleRuntimeError(text);
+        handleRuntimeError(text, data.line || 0);
         try { SoundEffects.playWarning(); } catch (e) {}
         break;
       }
@@ -291,6 +295,15 @@ const PythonRunner = (() => {
       switchTabSafe("console");
     }
 
+    // 长时间运行提醒（例如忘记写结束条件的循环）
+    if (longRunTimer) clearTimeout(longRunTimer);
+    longRunTimer = setTimeout(() => {
+      longRunTimer = null;
+      if (isRunning) {
+        appendLog("warning", "⏳ 代码已经跑了一会儿啦，如果它停不下来，可以点上方红色「⏹ 停止」按钮");
+      }
+    }, LONG_RUN_MS);
+
     if (isReady) {
       worker.postMessage({ type: 'run', code: code });
       return;
@@ -402,6 +415,7 @@ const PythonRunner = (() => {
 
   function finishRun() {
     isRunning = false;
+    if (longRunTimer) { clearTimeout(longRunTimer); longRunTimer = null; }
     setRunButtonState(false);
     hideTerminalInput();
     if (readyWaitTimer) {
@@ -411,12 +425,27 @@ const PythonRunner = (() => {
   }
 
   // ================= 儿童友好错误诊断 =================
-  function handleRuntimeError(errText) {
+  function handleRuntimeError(errText, errorLine) {
     hideTerminalInput();
     const full = String(errText || "");
     const lines = full.trim().split(NL).filter(Boolean);
     const lastLine = lines[lines.length - 1] || "未知错误";
     appendLog("error", "❌ 哎呀，程序遇到一点小状况：" + lastLine);
+
+    // 有行号时，展示可点击的「跳到出错那一行」
+    if (errorLine > 0) {
+      const jumpDiv = document.createElement("div");
+      jumpDiv.className = "term-line error";
+      jumpDiv.style.cursor = "pointer";
+      jumpDiv.style.textDecoration = "underline";
+      jumpDiv.textContent = "👆 点我这里，跳到第 " + errorLine + " 行看看";
+      jumpDiv.addEventListener("click", () => {
+        try { CodeEditor.gotoLine(errorLine); } catch (e) {}
+        try { SoundEffects.playPop(); } catch (e) {}
+      });
+      const term = document.getElementById("terminalLogs");
+      if (term) { term.appendChild(jumpDiv); scheduleScroll(); }
+    }
 
     let tipTitle = "🔍 小侦探正在诊断...";
     let tipContent = "检查一下代码是否有小字母打错了哦！";
@@ -455,8 +484,21 @@ const PythonRunner = (() => {
     scheduleScroll();
   }
 
+  // 分享链接无法自动复制时，渲染到终端供手动复制
+  function showShareLink(url) {
+    appendLog("system", "🔗 分享链接（选中后复制发给同学）：");
+    const div = document.createElement("div");
+    div.className = "term-line stdout";
+    div.textContent = url;
+    div.style.wordBreak = "break-all";
+    div.style.userSelect = "all";
+    const term = document.getElementById("terminalLogs");
+    if (term) { term.appendChild(div); term.scrollTop = term.scrollHeight; }
+  }
+
   return {
     init,
+    showShareLink,
     run: runCode,
     stop: stopCode,
     submitTerminalInput,

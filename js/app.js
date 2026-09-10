@@ -59,8 +59,19 @@ window.App = (() => {
       CodeEditor.setValue(activeFile.content);
     }
 
+    // 4.5 恢复上次的主题（避免每次刷新都回到白天模式）
+    applySavedTheme();
+
     // 5. 绑定所有用户界面事件
     bindUIEvents();
+
+    // 5.1 监听本地存储写入失败（配额溢出等），避免静默丢代码
+    FileManager.onStorageError((msg) => {
+      if (msg) showToast("⚠️ " + msg, "💾");
+    });
+
+    // 5.2 若链接里带了分享代码，导入为一个新文件
+    loadSharedCodeFromUrl();
 
     // 6. 异步启动 Python 引擎初始化
     PythonRunner.init();
@@ -72,6 +83,133 @@ window.App = (() => {
     showOnboardingGuide();
 
     console.log("🐼 萌码 Python 少儿工坊初始化就绪！");
+  }
+
+  // ================= 主题持久化 =================
+  const THEME_KEY = "codepanda_theme";
+
+  function applySavedTheme() {
+    let isDark = false;
+    try { isDark = localStorage.getItem(THEME_KEY) === "dark"; } catch (e) {}
+    document.body.classList.toggle("dark-mode", isDark);
+    const icon = document.getElementById("themeIcon");
+    if (icon) icon.textContent = isDark ? "☀️" : "🌙";
+  }
+
+  function saveTheme(isDark) {
+    try { localStorage.setItem(THEME_KEY, isDark ? "dark" : "light"); } catch (e) {}
+  }
+
+  // ================= 下载 / 剪贴板 =================
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // 复制文本（带超时与降级，绝不使用阻塞式弹窗）
+  function copyText(text) {
+    const fallback = () => fallbackCopy(text);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return Promise.race([
+        navigator.clipboard.writeText(text).then(() => true).catch(fallback),
+        new Promise(resolve => setTimeout(() => resolve(fallback()), 1200))
+      ]);
+    }
+    return Promise.resolve(fallback());
+  }
+
+  // 老式复制方案：临时 textarea + execCommand
+  function fallbackCopy(text) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.top = "-1000px";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      const ok = document.execCommand && document.execCommand("copy");
+      ta.remove();
+      return !!ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // ================= 代码分享链接 =================
+  function utf8ToB64(str) {
+    const bytes = new TextEncoder().encode(str);
+    let bin = "";
+    bytes.forEach(b => { bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  function b64ToUtf8(b64) {
+    let s = String(b64).replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    const bin = atob(s);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+
+  function buildShareUrl(name, code) {
+    const base = location.origin + location.pathname;
+    return `${base}#code=${utf8ToB64(code)}&name=${encodeURIComponent(name)}`;
+  }
+
+  function loadSharedCodeFromUrl() {
+    const hash = location.hash || "";
+    if (hash.indexOf("#code=") !== 0) return;
+    try {
+      const params = new URLSearchParams(hash.slice(1));
+      const b64 = params.get("code");
+      const name = params.get("name") || "分享的代码.py";
+      if (!b64) return;
+      const code = b64ToUtf8(b64);
+      const created = FileManager.createFile(name.replace(/\.py$/i, "") + "_分享版.py", code);
+      showToast(`🔗 已打开分享的代码「${created.name}」`, "🎁");
+      history.replaceState(null, "", location.pathname);
+    } catch (e) {
+      console.warn("解析分享链接失败", e);
+    }
+  }
+
+  // ================= 运行快照（上次成功运行） =================
+  const SNAPSHOT_KEY = "codepanda_snapshots_v1";
+
+  function readSnapshots() {
+    try {
+      return JSON.parse(localStorage.getItem(SNAPSHOT_KEY) || "{}") || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function readSnapshot(fileId) {
+    const all = readSnapshots();
+    return all[fileId] || "";
+  }
+
+  // 由 python-runner 在运行成功时调用
+  function saveSnapshot() {
+    try {
+      const file = FileManager.getActiveFile();
+      if (!file) return;
+      const all = readSnapshots();
+      all[file.id] = CodeEditor.getValue();
+      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(all));
+    } catch (e) {
+      // 快照失败不影响主流程
+    }
   }
 
   // HTML 转义：文件名由用户输入，避免特殊字符破坏渲染
@@ -261,6 +399,7 @@ window.App = (() => {
       document.body.classList.toggle("dark-mode");
       const isDark = document.body.classList.contains("dark-mode");
       themeIcon.textContent = isDark ? "☀️" : "🌙";
+      saveTheme(isDark);
       CodeEditor.refresh();
       SoundEffects.playPop();
     });
@@ -407,6 +546,108 @@ window.App = (() => {
         }
         // 阻止全局快捷键在输入时触发（如 Ctrl+S）
         e.stopPropagation();
+      });
+    }
+
+    // ================= 导入 / 打包下载 / 分享 / 复原 / 大字号 =================
+
+    // 导入电脑里的 .py 文件
+    const btnImport = document.getElementById("btnImportFile");
+    const fileInput = document.getElementById("fileImportInput");
+    if (btnImport && fileInput) {
+      btnImport.addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const created = FileManager.createFile(file.name, String(reader.result || ""));
+          showToast(`📂 已导入「${created.name}」`, "✨");
+          SoundEffects.playSuccess();
+        };
+        reader.onerror = () => showToast("⚠️ 读取文件失败，换一个文件试试？", "😢");
+        reader.readAsText(file, "utf-8");
+        fileInput.value = "";   // 允许连续导入同一个文件
+      });
+    }
+
+    // 打包下载全部作品
+    const btnExportAll = document.getElementById("btnExportAll");
+    if (btnExportAll) {
+      btnExportAll.addEventListener("click", () => {
+        const all = FileManager.getAllFiles();
+        if (!all.length) { showToast("还没有作品可以打包哦~", "📦"); return; }
+        try {
+          const blob = ZipWriter.build(all.map(f => ({ name: f.name, content: f.content })));
+          downloadBlob(blob, `我的代码宝箱_${new Date().toISOString().slice(0, 10)}.zip`);
+          showToast(`📦 已打包 ${all.length} 个作品，快看看下载文件夹吧！`, "🎉");
+          SoundEffects.playSuccess();
+        } catch (err) {
+          console.error("打包失败", err);
+          showToast("打包失败了，可以先用 ⬇️ 一个个下载", "😢");
+        }
+      });
+    }
+
+    // 生成分享链接
+    const btnShare = document.getElementById("btnShareCode");
+    if (btnShare) {
+      btnShare.addEventListener("click", () => {
+        const file = FileManager.getActiveFile();
+        if (!file) return;
+        const code = CodeEditor.getValue();
+        if (!code.trim()) { showToast("代码是空的，先写点内容再分享吧~", "📝"); return; }
+
+        const url = buildShareUrl(file.name, code);
+        if (url.length > 8000) {
+          showToast("代码太长啦，分享链接装不下，建议用 📦 打包发送", "😅");
+          return;
+        }
+        copyText(url).then((ok) => {
+          if (ok) {
+            showToast("🔗 分享链接已复制！发给同学就能打开你的代码", "✨");
+          } else {
+            // 无法自动复制时，把链接打印到控制台，方便手动选中复制
+            window.App.switchToTab("console");
+            if (window.PythonRunner && window.PythonRunner.showShareLink) {
+              window.PythonRunner.showShareLink(url);
+            }
+            showToast("🔗 链接已显示在控制台，长按或选中复制即可", "📋");
+          }
+          SoundEffects.playSuccess();
+        });
+      });
+    }
+
+    // 复原到上次成功运行的代码
+    const btnSnapshot = document.getElementById("btnSnapshot");
+    if (btnSnapshot) {
+      btnSnapshot.addEventListener("click", () => {
+        const file = FileManager.getActiveFile();
+        if (!file) return;
+        const snap = readSnapshot(file.id);
+        if (!snap) { showToast("还没有成功运行的记录哦，先点 🚀 运行一次吧！", "💡"); return; }
+        if (snap === CodeEditor.getValue()) { showToast("当前代码就是上次成功的版本呀~", "👍"); return; }
+        showConfirmModal(
+          "⏪ 回到上次成功的代码？",
+          "会把当前编辑区的代码替换成<b>上一次成功运行</b>的版本。<br>如果现在写了新东西，建议先点 💾 保存或用 ⬇️ 下载备份哦！",
+          () => {
+            CodeEditor.setValue(snap);
+            FileManager.updateActiveContent(snap);
+            showToast("⏪ 已经回到上次成功的版本啦！", "✨");
+            SoundEffects.playSuccess();
+          }
+        );
+      });
+    }
+
+    // 护眼大字号切换
+    const btnBigFont = document.getElementById("btnBigFont");
+    if (btnBigFont) {
+      btnBigFont.addEventListener("click", () => {
+        const isBig = CodeEditor.toggleBigFont();
+        showToast(isBig ? "🔤 已切换到护眼大字号！" : "🔤 已恢复普通字号", "👀");
+        SoundEffects.playPop();
       });
     }
 
@@ -628,6 +869,7 @@ window.App = (() => {
 
   return {
     init,
+    saveSnapshot,
     runCurrentCode,
     saveCurrentFile,
     switchToTab,
