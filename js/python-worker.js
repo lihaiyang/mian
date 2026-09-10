@@ -216,7 +216,10 @@ async function initWorker() {
   try {
     pyodide = await loadPyodide({
       // 核心运行时（pyodide.asm.wasm / python_stdlib.zip）本地自托管，快且不依赖外网
-      indexURL: '/vendor/pyodide/'
+      indexURL: '/vendor/pyodide/',
+      // 缓存版本号：/vendor/* 是 immutable 强缓存，lockfile 内容改动后必须换 URL，
+      // 否则老用户浏览器里缓存的旧 lockfile（本地相对路径）会让 numpy 等按需包继续 404。
+      lockFileURL: '/vendor/pyodide/pyodide-lock.json?v=2'
       // 注意：0.26.2 还不支持 packageBaseUrl，loadPackage() 的 wheel 地址是按
       // pyodide-lock.json 里的 file_name 相对 indexURL 解析的。因此我们把该
       // lockfile 的 file_name 全部改写成了 CDN 绝对 URL（见 tools/fetch-vendor.sh），
