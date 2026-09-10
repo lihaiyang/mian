@@ -26,32 +26,59 @@ function extractImportNames(code) {
 
 async function ensurePackages(code) {
   const names = extractImportNames(code).filter(
-    n => !STDLIB_SKIP.has(n) && !loadedPackages.has(n) && !failedPackages.has(n)
+    n => !STDLIB_SKIP.has(n) && !loadedPackages.has(n)
   );
   if (!names.length) return;
 
+  // 上一次失败可能只是网络抖动，这次重新尝试
+  failedPackages.clear();
   self.postMessage({ type: 'packages-loading', names: names });
+
   for (const name of names) {
-    try {
-      // 先试 Pyodide 官方包
-      await pyodide.loadPackage(name);
-      loadedPackages.add(name);
+    if (await tryPyodidePackage(name)) {
       self.postMessage({ type: 'package-ok', name: name });
-    } catch (e1) {
-      try {
-        // 再试 PyPI（micropip）
-        await pyodide.runPythonAsync(
-          'import micropip' + String.fromCharCode(10) +
-          'await micropip.install(' + JSON.stringify(name) + ')'
-        );
-        loadedPackages.add(name);
-        self.postMessage({ type: 'package-ok', name: name });
-      } catch (e2) {
-        failedPackages.add(name);
-        self.postMessage({ type: 'package-fail', name: name, reason: String((e2 && e2.message) || e2).slice(0, 200) });
-        console.warn('package load failed:', name, e1 && e1.message, e2 && e2.message);
-      }
+      continue;
     }
+    if (await tryMicropip(name)) {
+      self.postMessage({ type: 'package-ok', name: name });
+      continue;
+    }
+    failedPackages.add(name);
+    self.postMessage({ type: 'package-fail', name: name, reason: lastPackageError });
+  }
+}
+
+let lastPackageError = "网络不给力，没能下载下来";
+
+// Pyodide 官方包：loadPackage 内部失败时【不会抛异常】（只打印日志），
+// 所以必须真的 import 一次确认，否则会出现「✅ 准备就绪」却 ModuleNotFoundError 的假象。
+async function tryPyodidePackage(name) {
+  try {
+    await pyodide.loadPackage(name);
+    await pyodide.runPythonAsync("import " + name);
+    loadedPackages.add(name);
+    return true;
+  } catch (e) {
+    lastPackageError = String((e && e.message) || e).slice(0, 120);
+    console.warn("pyodide 官方包加载失败:", name, lastPackageError);
+    return false;
+  }
+}
+
+// 退路：从 PyPI 用 micropip 安装
+async function tryMicropip(name) {
+  try {
+    await pyodide.runPythonAsync(
+      "import micropip" + String.fromCharCode(10) +
+      "await micropip.install(" + JSON.stringify(name) + ")"
+    );
+    await pyodide.runPythonAsync("import " + name);
+    loadedPackages.add(name);
+    return true;
+  } catch (e) {
+    lastPackageError = String((e && e.message) || e).slice(0, 120);
+    console.warn("micropip 安装失败:", name, lastPackageError);
+    return false;
   }
 }
 

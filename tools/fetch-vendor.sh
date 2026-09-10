@@ -24,3 +24,33 @@ s = re.sub(r'"file_name": "(?!https?://)([^"]+)"', lambda m: '"file_name": "' + 
 open(path, "w", encoding="utf-8").write(s)
 print("pyodide-lock.json 的 file_name 已指向:", base)
 PY
+
+PY
+
+# 内置 numpy（无依赖、孩子最常用）：下载到仓库里，避免受第三方 CDN 可用性影响
+WHEEL="numpy-1.26.4-cp312-cp312-pyodide_2024_0_wasm32.whl"
+mkdir -p "$DEST/wheels"
+if [ ! -f "$DEST/wheels/$WHEEL" ]; then
+  echo "下载内置 wheel: $WHEEL"
+  curl -fL "$BASE/$WHEEL" -o "$DEST/wheels/$WHEEL"
+fi
+
+python3 - "$DEST/pyodide-lock.json" "$WHEEL" <<'PY2'
+import re, sys
+path, wheel = sys.argv[1], sys.argv[2]
+s = open(path, encoding="utf-8").read()
+new = "/vendor/pyodide/wheels/" + wheel
+s = re.sub(r'"file_name": "[^"]*/' + re.escape(wheel) + '"', '"file_name": "' + new + '"', s)
+open(path, "w", encoding="utf-8").write(s)
+print("numpy 改为使用内置 wheel:", new)
+PY2
+
+# 校验内置 wheel 与 lockfile 记录的 sha256 一致
+python3 - "$DEST/pyodide-lock.json" "$DEST/wheels/$WHEEL" <<'PY3'
+import hashlib, json, sys
+lock = json.load(open(sys.argv[1], encoding="utf-8"))
+actual = hashlib.sha256(open(sys.argv[2], "rb").read()).hexdigest()
+expected = lock["packages"]["numpy"]["sha256"]
+assert actual == expected, "wheel 校验失败: %s != %s" % (actual, expected)
+print("内置 numpy wheel 校验通过:", actual[:16], "...")
+PY3

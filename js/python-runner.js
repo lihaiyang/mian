@@ -266,7 +266,8 @@ const PythonRunner = (() => {
         break;
 
       case 'package-fail':
-        appendLog("warning", "⚠️ 暂时没有 " + data.name + " 这个工具箱，换一个试试吧");
+        appendLog("warning", "⚠️ 没能取到工具箱「" + data.name + "」" + (data.reason ? "：" + data.reason : ""));
+        appendLog("system", "💡 numpy 已经内置，可以直接用；其它工具箱第一次使用需要联网下载，网络不好时就会失败，过一会儿再运行一次试试吧~");
         break;
 
       case 'vars':
