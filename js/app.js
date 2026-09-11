@@ -35,16 +35,42 @@ window.App = (() => {
       Progress.init();
     }
 
+    // 1.15 通过分享短链打开（/?share=xxxxxxxx）
+    (function importShared() {
+      try {
+        const sid = new URLSearchParams(location.search).get("share");
+        if (!sid) return;
+        fetch("/api/share?id=" + encodeURIComponent(sid))
+          .then(r => r.json())
+          .then(data => {
+            if (!data || !data.ok || !data.share) { showToast((data && data.error) || "分享打开失败", "⚠️"); return; }
+            const s = data.share;
+            const f = FileManager.createFile((s.title || "分享的作品") + ".py", s.content || "");
+            CodeEditor.setValue(f.content);
+            showToast("🎁 已打开分享的作品：" + (s.title || ""), "🎁");
+            try { history.replaceState(null, "", location.pathname); } catch (e) {}
+          })
+          .catch(() => showToast("分享打开失败，可能需要联网", "⚠️"));
+      } catch (e) {}
+    })();
+
     // 1.2 云同步：登录后自动同步；同时负责顶栏的头像 / 昵称
     if (typeof CloudSync !== "undefined") {
       CloudSync.init();
       const chip = document.getElementById("btnUserChip");
-      if (chip) chip.addEventListener("click", () => CloudSync.openPanel());
-      const cloudClose = document.getElementById("cloudClose");
-      if (cloudClose) cloudClose.addEventListener("click", () => CloudSync.closePanel());
-      const cloudModal = document.getElementById("cloudModal");
-      if (cloudModal) {
-        cloudModal.addEventListener("click", (e) => { if (e.target === cloudModal) CloudSync.closePanel(); });
+      if (chip) chip.addEventListener("click", () => openMyPanel("profile"));
+      const panelClose = document.getElementById("myPanelClose");
+      if (panelClose) panelClose.addEventListener("click", closeMyPanel);
+      const panelEl = document.getElementById("myPanel");
+      if (panelEl) {
+        panelEl.addEventListener("click", (e) => { if (e.target === panelEl) closeMyPanel(); });
+      }
+      const tabs = document.getElementById("myPanelTabs");
+      if (tabs) {
+        tabs.addEventListener("click", (e) => {
+          const btn = e.target.closest(".my-tab");
+          if (btn) switchPanelTab(btn.dataset.tab);
+        });
       }
       if (typeof Progress !== "undefined" && Progress.onChange) {
         Progress.onChange(() => CloudSync.renderChip());
@@ -804,11 +830,24 @@ window.App = (() => {
     // 生成分享链接
     const btnShare = document.getElementById("btnShareCode");
     if (btnShare) {
-      btnShare.addEventListener("click", () => {
+      btnShare.addEventListener("click", async () => {
         const file = FileManager.getActiveFile();
         if (!file) return;
         const code = CodeEditor.getValue();
         if (!code.trim()) { showToast("代码是空的，先写点内容再分享吧~", "📝"); return; }
+
+        // 开了云同步就用短链（/s/xxxx），否则退回把代码装进链接的老办法
+        if (typeof CloudSync !== "undefined" && CloudSync.isSignedIn && CloudSync.isSignedIn()) {
+          try {
+            const shortUrl = await CloudSync.shareCurrentFile();
+            const ok = await CloudSync.copyText(shortUrl);
+            showToast(ok ? "🔗 短链已复制，发给同学吧！" : "短链已生成：" + shortUrl, "✨");
+            if (!ok) { switchTab("console"); if (window.PythonRunner && PythonRunner.showShareLink) PythonRunner.showShareLink(shortUrl); }
+            return;
+          } catch (e) {
+            showToast("短链生成失败，改用长链接分享：" + e.message, "⚠️");
+          }
+        }
 
         const url = buildShareUrl(file.name, code);
         if (url.length > 8000) {
@@ -1033,6 +1072,36 @@ window.App = (() => {
     SoundEffects.playSuccess();
   }
 
+  // ================= 我的档案面板（成长 + 云同步 + 分享） =================
+  function switchPanelTab(tab) {
+    const name = tab || "profile";
+    Array.prototype.forEach.call(document.querySelectorAll(".my-tab"), b => {
+      b.classList.toggle("active", b.dataset.tab === name);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".my-pane"), p => {
+      p.classList.toggle("active", p.id === "pane" + name.charAt(0).toUpperCase() + name.slice(1));
+    });
+    try {
+      if (name === "profile" && typeof Progress !== "undefined" && Progress.renderAll) Progress.renderAll();
+      if (name === "cloud" && typeof CloudSync !== "undefined" && CloudSync.renderPanel) CloudSync.renderPanel();
+      if (name === "share" && typeof CloudSync !== "undefined" && CloudSync.renderShareTab) CloudSync.renderShareTab();
+    } catch (e) {}
+  }
+
+  function openMyPanel(tab) {
+    const panel = document.getElementById("myPanel");
+    if (!panel) return;
+    switchPanelTab(tab || "profile");
+    panel.classList.add("active");
+    try { if (typeof CloudSync !== "undefined" && CloudSync.renderChip) CloudSync.renderChip(); } catch (e) {}
+    try { SoundEffects.playPop(); } catch (e) {}
+  }
+
+  function closeMyPanel() {
+    const panel = document.getElementById("myPanel");
+    if (panel) panel.classList.remove("active");
+  }
+
   // ================= 自定义确认弹窗 =================
   function showConfirmModal(title, descHtml, onConfirm) {
     document.getElementById("confirmModalTitle").innerHTML = `<span>${title}</span>`;
@@ -1238,6 +1307,9 @@ window.App = (() => {
 
   return {
     init,
+    openMyPanel,
+    switchPanelTab,
+    closeMyPanel,
     saveSnapshot,
     runCurrentCode,
     saveCurrentFile,

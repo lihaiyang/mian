@@ -1684,6 +1684,36 @@ body.dark-mode .file-tool-btn { background: #1E293B; border-color: #334155; }
 .cloud-status { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
 body.dark-mode .cloud-code-box { background: rgba(91, 95, 237, .16); }
 
+
+/* ================= 我的档案（成长 + 云同步 + 分享） ================= */
+.my-panel-card { max-width: 640px; width: 92vw; }
+.my-panel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.my-panel-avatar { font-size: 22px; line-height: 1; }
+.my-panel-name { font-size: 16px; font-weight: 800; color: var(--text-main); }
+.my-panel-tabs { display: flex; gap: 6px; border-bottom: 2px solid var(--border-soft); margin-bottom: 12px; }
+.my-tab {
+  border: none; background: transparent; font-family: inherit; font-size: 13px; font-weight: 700;
+  color: var(--text-muted); padding: 7px 12px; cursor: pointer; border-radius: 10px 10px 0 0;
+  border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all .18s ease; white-space: nowrap;
+}
+.my-tab:hover { background: var(--primary-light); color: var(--primary); }
+.my-tab.active { color: var(--primary); border-bottom-color: var(--primary); background: var(--primary-light); }
+.my-panel-body { min-height: 200px; max-height: 62vh; overflow-y: auto; }
+.my-pane { display: none; }
+.my-pane.active { display: block; }
+body.dark-mode .my-tab.active { background: rgba(91, 95, 237, .18); }
+
+/* 分享标签页 */
+.share-block { border: 1px dashed var(--border-color); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+.share-block-title { font-size: 13px; font-weight: 800; color: var(--text-main); margin-bottom: 4px; }
+.share-block-sub { font-size: 11.5px; color: var(--text-muted); line-height: 1.7; margin-bottom: 8px; }
+.share-link-box {
+  display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 10px;
+  background: var(--primary-light); border-radius: 10px; font-family: var(--font-code); font-size: 12px;
+  word-break: break-all; color: var(--primary);
+}
+.share-empty { font-size: 12px; color: var(--text-light); text-align: center; padding: 14px; }
+
 /* 文件夹面板工具行允许换行（按钮变多了） */
 .filetree-panel .panel-tools { flex-wrap: wrap; }
 .filetree-panel .panel-tools .icon-btn { width: 28px; height: 28px; }

@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="vendor/codemirror/show-hint.min.css">
   
   <!-- 全局自定义少儿样式 -->
-  <link rel="stylesheet" href="css/style.css?v=20260911i" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
+  <link rel="stylesheet" href="css/style.css?v=20260912a" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
 </head>
 <body data-page-node-id="MABBDhhrP5uEOfEzmMJlsw">
 
@@ -53,12 +53,6 @@
       <button class="header-btn" id="btnResetDemos" title="恢复所有好玩的初始示例代码" data-page-node-id="98KQCKeXC37G73yST2L2YO">
         <span data-page-node-id="lVHTuDGxYeBRsQwWM8oe5G">🎁</span>
         <span data-page-node-id="2gVHTI6TQbOSrHzu2YnxIk">趣味宝库</span>
-      </button>
-
-      <!-- 成长档案 -->
-      <button class="header-btn" id="btnProgress" title="看看我的学习记录、闯关任务和徽章" data-page-node-id="btnProgressNode">
-        <span>🌟</span>
-        <span>成长</span>
       </button>
 
       <!-- 主题切换 -->
@@ -323,39 +317,45 @@
     </div>
   </div>
 
-  <!-- ================= 弹窗：成长档案（多档案 / 学习记录 / 闯关任务 / 徽章） ================= -->
-  <div class="modal-overlay" id="progressModal">
-    <div class="modal-card progress-card">
-      <div class="modal-title"><span>🌟 我的成长档案</span></div>
-      <div class="profile-row" id="profileRow"></div>
-      <div class="profile-editor" id="profileEditor" style="display:none;">
-        <input type="text" class="modal-input" id="profileNameInput" placeholder="小伙伴的名字（最多 12 个字）" maxlength="12">
-        <div class="profile-emoji-row" id="profileEmojiRow"></div>
-        <div class="profile-editor-actions">
-          <button class="header-btn" id="btnProfileCancel">取消</button>
-          <button class="btn-run-magic" id="btnProfileSave" style="padding:6px 16px; font-size:13px;">保存</button>
+  <!-- ================= 弹窗：我的档案（成长 + 云同步 + 分享，一个入口） ================= -->
+  <div class="modal-overlay" id="myPanel">
+    <div class="modal-card my-panel-card">
+      <div class="my-panel-head">
+        <span class="my-panel-avatar" id="panelAvatar">🐼</span>
+        <span class="my-panel-name" id="panelName">小朋友</span>
+        <span class="cloud-dot" id="panelCloudDot" title="云同步状态">☁️</span>
+      </div>
+      <div class="my-panel-tabs" id="myPanelTabs">
+        <button class="my-tab active" data-tab="profile">👤 成长</button>
+        <button class="my-tab" data-tab="cloud">☁️ 云同步</button>
+        <button class="my-tab" data-tab="share">🔗 分享</button>
+      </div>
+      <div class="my-panel-body">
+        <div class="my-pane active" id="paneProfile">
+          <div class="profile-row" id="profileRow"></div>
+          <div class="profile-editor" id="profileEditor" style="display:none;">
+            <input type="text" class="modal-input" id="profileNameInput" placeholder="小伙伴的名字（最多 12 个字）" maxlength="12">
+            <div class="profile-emoji-row" id="profileEmojiRow"></div>
+            <div class="profile-editor-actions">
+              <button class="header-btn" id="btnProfileCancel">取消</button>
+              <button class="btn-run-magic" id="btnProfileSave" style="padding:6px 16px; font-size:13px;">保存</button>
+            </div>
+          </div>
+          <div class="progress-stats" id="progressStats"></div>
+          <div class="progress-section-title"><span>🎯 闯关任务</span><span class="progress-section-count" id="missionProgress"></span></div>
+          <div class="mission-list" id="missionList"></div>
+          <div class="progress-section-title"><span>🏅 成就徽章</span></div>
+          <div class="badge-list" id="badgeList"></div>
+          <div class="modal-footer">
+            <button class="header-btn" id="btnNewProfile">➕ 新伙伴</button>
+            <button class="header-btn" id="btnEditProfile">✏️ 改名字</button>
+          </div>
         </div>
+        <div class="my-pane" id="paneCloud"><div id="cloudBody"></div></div>
+        <div class="my-pane" id="paneShare"><div id="shareBody"></div></div>
       </div>
-      <div class="progress-stats" id="progressStats"></div>
-      <div class="progress-section-title"><span>🎯 闯关任务</span><span class="progress-section-count" id="missionProgress"></span></div>
-      <div class="mission-list" id="missionList"></div>
-      <div class="progress-section-title"><span>🏅 成就徽章</span></div>
-      <div class="badge-list" id="badgeList"></div>
       <div class="modal-footer">
-        <button class="header-btn" id="btnNewProfile">➕ 新伙伴</button>
-        <button class="header-btn" id="btnEditProfile">✏️ 改名字</button>
-        <button class="btn-run-magic" id="btnProgressClose" style="padding:6px 18px; font-size:13px;">关闭</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ================= 弹窗：云同步（匿名同步码） ================= -->
-  <div class="modal-overlay" id="cloudModal">
-    <div class="modal-card cloud-card">
-      <div class="modal-title"><span>☁️ 云同步</span></div>
-      <div id="cloudBody"></div>
-      <div class="modal-footer">
-        <button class="btn-run-magic" id="cloudClose" style="padding:6px 18px; font-size:13px;">关闭</button>
+        <button class="btn-run-magic" id="myPanelClose" style="padding:6px 18px; font-size:13px;">关闭</button>
       </div>
     </div>
   </div>
@@ -377,17 +377,17 @@
   <script src="vendor/confetti.min.js"></script>
 
   <!-- ================= 自定义业务脚本模块 ================= -->
-  <script src="js/audio-confetti.js?v=20260911i"></script>
-  <script src="js/examples.js?v=20260911i"></script>
-  <script src="js/turtle-canvas.js?v=20260911i"></script>
-  <script src="js/zip-writer.js?v=20260911i"></script>
-  <script src="js/poster.js?v=20260911i"></script>
-  <script src="js/python-runner.js?v=20260911i"></script>
-  <script src="js/editor.js?v=20260911i"></script>
-  <script src="js/file-tree.js?v=20260911i"></script>
-  <script src="js/progress.js?v=20260911i"></script>
-  <script src="js/cloud.js?v=20260911i"></script>
-  <script src="js/app.js?v=20260911i"></script>
+  <script src="js/audio-confetti.js?v=20260912a"></script>
+  <script src="js/examples.js?v=20260912a"></script>
+  <script src="js/turtle-canvas.js?v=20260912a"></script>
+  <script src="js/zip-writer.js?v=20260912a"></script>
+  <script src="js/poster.js?v=20260912a"></script>
+  <script src="js/python-runner.js?v=20260912a"></script>
+  <script src="js/editor.js?v=20260912a"></script>
+  <script src="js/file-tree.js?v=20260912a"></script>
+  <script src="js/progress.js?v=20260912a"></script>
+  <script src="js/cloud.js?v=20260912a"></script>
+  <script src="js/app.js?v=20260912a"></script>
 
 </body>
 </html>

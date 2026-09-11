@@ -355,13 +355,15 @@ const Progress = (() => {
   function openPanel() {
     renderAll();
     closeEditor();
-    const modal = el("progressModal");
+    if (window.App && window.App.openMyPanel) { window.App.openMyPanel("profile"); return; }
+    const modal = el("myPanel");
     if (modal) modal.classList.add("active");
     try { SoundEffects.playPop(); } catch (e) {}
   }
 
   function closePanel() {
-    const modal = el("progressModal");
+    if (window.App && window.App.closeMyPanel) { window.App.closeMyPanel(); return; }
+    const modal = el("myPanel");
     if (modal) modal.classList.remove("active");
   }
 
@@ -431,6 +433,7 @@ const Progress = (() => {
     recordRun,
     recordVfs,
     getMissions: () => MISSIONS.map(m => ({ id: m.id, title: m.title, hint: m.hint, emoji: m.emoji, done: !!stats.missions[m.id] })),
+    getBadges: () => BADGES.map(b => ({ id: b.id, title: b.title, emoji: b.emoji, got: stats.badges.indexOf(b.id) !== -1 })),
     getStats: () => stats,
     getCurrentProfile: () => profiles.find(p => p.id === currentId) || profiles[0],
     switchTo,

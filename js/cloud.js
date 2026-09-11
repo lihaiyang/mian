@@ -390,6 +390,15 @@ const CloudSync = (() => {
             : (lastSyncAt ? ("上次同步 " + new Date(lastSyncAt).toLocaleTimeString("zh-CN")) : "还没同步过"))
         : "还没有开启云同步，点我看看";
     }
+    const pa = document.getElementById("panelAvatar");
+    const pn = document.getElementById("panelName");
+    const pd = document.getElementById("panelCloudDot");
+    if (pa) pa.textContent = prof ? prof.emoji : "🐼";
+    if (pn) pn.textContent = prof ? prof.name : "小朋友";
+    if (pd) {
+      const map2 = { idle: "⚪", syncing: "🟡", ok: "🟢", error: "🔴" };
+      pd.textContent = isSignedIn() ? (map2[status] || "⚪") : "☁️";
+    }
     const chip = document.getElementById("btnUserChip");
     if (chip) {
       chip.title = (prof ? prof.name : "小朋友") + " · " + (isSignedIn() ? "已开启云同步" : "未开启云同步") + " · 点我打开云同步";
@@ -526,6 +535,92 @@ const CloudSync = (() => {
     });
   }
 
+  // ================= 分享（作品短链 / 学习进度只读页） =================
+  async function shareCurrentFile() {
+    if (!isSignedIn()) throw new Error("先开启云同步才能生成短链哦");
+    const file = (typeof FileManager !== "undefined") ? FileManager.getActiveFile() : null;
+    if (!file) throw new Error("先打开一个作品吧");
+    const content = (typeof CodeEditor !== "undefined" && CodeEditor.getValue) ? CodeEditor.getValue() : (file.content || "");
+    const data = await apiCall("/share", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: state.code, pin: state.pin, kind: "code", title: file.name.replace(/\.py$/, ""), content: content, profileId: currentProfileId() })
+    });
+    return data.url;
+  }
+
+  async function shareProgress() {
+    if (!isSignedIn()) throw new Error("先开启云同步才能分享进度哦");
+    const prof = (typeof Progress !== "undefined" && Progress.getCurrentProfile) ? Progress.getCurrentProfile() : null;
+    const stats = (typeof Progress !== "undefined" && Progress.getStats) ? Progress.getStats() : {};
+    const missions = (typeof Progress !== "undefined" && Progress.getMissions) ? Progress.getMissions() : [];
+    const badges = (typeof Progress !== "undefined" && Progress.getBadges) ? Progress.getBadges() : [];
+    const data = await apiCall("/share", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        code: state.code, pin: state.pin, kind: "progress", profileId: currentProfileId(),
+        title: (prof ? prof.name : "小朋友") + " 的学习进度",
+        progress: { nickname: prof ? prof.name : "小朋友", avatar: prof ? prof.emoji : "🐼", stats: stats, missions: missions, badges: badges }
+      })
+    });
+    return data.url;
+  }
+
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); return true; }
+    } catch (e) {}
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) { return false; }
+  }
+
+  function renderShareTab() {
+    const box = document.getElementById("shareBody");
+    if (!box) return;
+    const toast = (msg, icon) => { if (window.App && window.App.showToast) window.App.showToast(msg, icon); };
+
+    box.innerHTML =
+      '<div class="share-block"><div class="share-block-title">📤 分享我的作品</div>' +
+      '<div class="share-block-sub">生成一条短链接（<code>/s/xxxx</code>），同学打开就能看代码，还能一键在萌码里打开继续改。</div>' +
+      '<div class="cloud-row"><button class="btn-run-magic" id="shareFileBtn" style="padding:7px 16px;font-size:13px;">生成作品短链</button></div>' +
+      '<div id="shareFileResult"></div></div>' +
+      '<div class="share-block"><div class="share-block-title">🎓 把学习进度给家长 / 老师看</div>' +
+      '<div class="share-block-sub">生成一个<b>只读</b>页面：能看到运行次数、完成任务、获得的徽章，不能修改作品。</div>' +
+      '<div class="cloud-row"><button class="header-btn" id="shareProgressBtn">生成进度链接</button></div>' +
+      '<div id="shareProgressResult"></div></div>' +
+      (isSignedIn() ? "" : '<div class="share-empty">💡 分享需要先开启云同步（在「☁️ 云同步」标签页里一键开启）</div>');
+
+    const fileBtn = document.getElementById("shareFileBtn");
+    if (fileBtn) {
+      fileBtn.addEventListener("click", async () => {
+        try {
+          const url = await shareCurrentFile();
+          const ok = await copyText(url);
+          document.getElementById("shareFileResult").innerHTML = '<div class="share-link-box">' + esc(url) + '</div>';
+          toast(ok ? "作品短链已复制，发给同学吧！" : "短链已生成，请手动复制", "🔗");
+        } catch (e) { toast(e.message, "⚠️"); }
+      });
+    }
+    const progBtn = document.getElementById("shareProgressBtn");
+    if (progBtn) {
+      progBtn.addEventListener("click", async () => {
+        try {
+          const url = await shareProgress();
+          const ok = await copyText(url);
+          document.getElementById("shareProgressResult").innerHTML = '<div class="share-link-box">' + esc(url) + '</div>';
+          toast(ok ? "进度链接已复制，发给家长看看！" : "进度链接已生成，请手动复制", "🎓");
+        } catch (e) { toast(e.message, "⚠️"); }
+      });
+    }
+  }
+
   return {
     init() {
       load();
@@ -535,7 +630,8 @@ const CloudSync = (() => {
       window.addEventListener("online", () => { if (isSignedIn()) syncNow(true); });
     },
     isSignedIn, getStatus, createAccount, login, setPin, rotateCode, signOutLocal,
-    syncNow, noteDirty, openPanel, closePanel, renderPanel, renderChip,
+    syncNow, noteDirty, openPanel, closePanel, renderPanel, renderChip, renderShareTab,
+    shareCurrentFile, shareProgress, copyText,
     onStatus(fn) { listeners.push(fn); },
     getCode() { return state.code; }
   };

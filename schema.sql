@@ -86,3 +86,16 @@ CREATE TABLE IF NOT EXISTS vfs (
   rev         INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (account_id, profile_id, path)
 );
+-- 公开分享（作品短链 / 学习进度只读页）
+CREATE TABLE IF NOT EXISTS shares (
+  id          TEXT PRIMARY KEY,
+  account_id  TEXT NOT NULL,
+  kind        TEXT NOT NULL,          -- code | progress
+  profile_id  TEXT,
+  title       TEXT,
+  content     TEXT,                   -- kind=code 存代码；kind=progress 存 JSON
+  created_at  INTEGER NOT NULL,
+  views       INTEGER NOT NULL DEFAULT 0,
+  revoked     INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_shares_account ON shares(account_id, created_at);
