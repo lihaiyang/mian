@@ -80,7 +80,8 @@ const PythonRunner = (() => {
   }
 
   function startWorker() {
-    worker = new Worker('js/python-worker.js');
+    // 版本号要和 index.html 里的 ?v= 保持一致：CDN 会缓存 /js/*，换版本号才能真正刷新
+    worker = new Worker('js/python-worker.js?v=20260911b');
     worker.addEventListener('message', handleWorkerMessage);
     worker.addEventListener('error', (e) => {
       console.error('Worker error:', e);
