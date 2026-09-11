@@ -39,6 +39,25 @@ tools/fetch-vendor.sh   重新拉取 Pyodide 并把 lockfile 指向 CDN
 _headers                COOP/COEP（SharedArrayBuffer 必需）与缓存策略
 ```
 
+## ⚠️ 改完 css/js 后必须做的一件事：改版本号
+
+`mian.lihaiyang.net` 上 CDN 对 `/css/*`、`/js/*` 用的是 **4 小时**默认缓存（实测 `cache-control: public, max-age=14400`，会盖掉 `_headers` 里的设置）。
+如果只改文件不改 URL，浏览器最长 4 小时内仍会用旧文件，于是出现**新 HTML + 旧 CSS** 的错版（例如工具按钮竖着堆成一列）。
+
+所以每次改 `css/style.css` 或 `js/*.js` 之后，把这两处的版本号一起改掉再部署：
+
+1. `index.html` 里所有 `css/....css?v=xxxxxxxx` 和 `js/....js?v=xxxxxxxx`
+2. `js/python-runner.js` 里 `new Worker("js/python-worker.js?v=xxxxxxxx")`
+
+命令（把版本号换成当天，例如 `20260912a`）：
+
+```bash
+OLD=20260911b; NEW=20260912a
+sed -i "" "s/$OLD/$NEW/g" index.html js/python-runner.js
+```
+
+`vendor/*` 不需要版本号（它是 `immutable` 长期缓存；内容变了要改自己的路径，例如 `pyodide-lock.json?v=2`）。
+
 ## 本地调试
 
 因为要用 `SharedArrayBuffer`，必须带 COOP/COEP 响应头，**不能直接双击 index.html**。最简做法：
