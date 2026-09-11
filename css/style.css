@@ -1626,6 +1626,29 @@ body.dark-mode .tab-action-btn { background: #1E293B; border-color: #334155; }
 #terminalLogs.hide-system .term-line.system,
 #terminalLogs.hide-system .term-line.success { display: none; }
 
+/* ================= 代码宝箱：带汉字的工具按钮 ================= */
+.filetree-panel .panel-tools {
+  justify-content: flex-start;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+.file-tool-btn {
+  width: auto !important;
+  height: 26px;
+  padding: 0 4px;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--panel-bg);
+}
+.file-tool-btn .tool-ico { font-size: 12px; line-height: 1; }
+.file-tool-btn .tool-label { font-size: 11px; line-height: 1; }
+.file-tool-btn:hover { background: var(--primary-light); border-color: rgba(91, 95, 237, .35); }
+body.dark-mode .file-tool-btn { background: #1E293B; border-color: #334155; }
+
 /* 文件夹面板工具行允许换行（按钮变多了） */
 .filetree-panel .panel-tools { flex-wrap: wrap; }
 .filetree-panel .panel-tools .icon-btn { width: 28px; height: 28px; }
@@ -1638,7 +1661,7 @@ body.dark-mode .tab-action-btn { background: #1E293B; border-color: #334155; }
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
-  padding: 10px 12px 8px;
+  padding: 10px 10px 8px;
 }
 .filetree-panel .panel-title {
   min-width: 0;
