@@ -1714,6 +1714,37 @@ body.dark-mode .my-tab.active { background: rgba(91, 95, 237, .18); }
 }
 .share-empty { font-size: 12px; color: var(--text-light); text-align: center; padding: 14px; }
 
+/* ================= 左侧代码宝箱：更轻的样式 ================= */
+.filetree-panel .panel-tools { gap: 4px; }
+.file-tool-btn {
+  border: none !important;
+  background: #F4F6FB !important;
+  color: #475569;
+  border-radius: 9px;
+  font-weight: 700;
+  padding: 0 7px;
+}
+.file-tool-btn:hover { background: var(--primary-light) !important; color: var(--primary); }
+body.dark-mode .file-tool-btn { background: #232838 !important; color: #CBD5E1; }
+.file-section-label { padding: 8px 2px 6px; font-size: 11.5px; color: var(--text-muted); }
+.folder-head {
+  background: transparent;
+  border-radius: 8px;
+  padding: 5px 6px;
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--text-main);
+}
+.folder-head:hover { background: #F1F5F9; }
+body.dark-mode .folder-head:hover { background: #232838; }
+.folder-head .folder-count { background: #EEF2F7; color: #7C8698; }
+.folder-head .folder-emoji { font-size: 13px; }
+.file-item { border: none; padding: 6px 8px 6px 22px; border-radius: 8px; }
+.file-item.sub { padding-left: 24px; }
+.file-item:hover { background: #F1F5F9; transform: none; }
+.file-item.active { background: var(--primary-light); color: var(--primary); }
+#fileCountBadge { background: #EEF2F7 !important; color: #7C8698; font-weight: 700; }
+
 /* 文件夹面板工具行允许换行（按钮变多了） */
 .filetree-panel .panel-tools { flex-wrap: wrap; }
 .filetree-panel .panel-tools .icon-btn { width: 28px; height: 28px; }

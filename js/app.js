@@ -575,7 +575,7 @@ window.App = (() => {
 
     // 保存按钮
     const btnSave = document.getElementById("btnSaveFile");
-    btnSave.addEventListener("click", saveCurrentFile);
+    if (btnSave) btnSave.addEventListener("click", saveCurrentFile);
 
     // 恢复示例库
     const btnReset = document.getElementById("btnResetDemos");
@@ -836,37 +836,26 @@ window.App = (() => {
         const code = CodeEditor.getValue();
         if (!code.trim()) { showToast("代码是空的，先写点内容再分享吧~", "📝"); return; }
 
-        // 开了云同步就用短链（/s/xxxx），否则退回把代码装进链接的老办法
-        if (typeof CloudSync !== "undefined" && CloudSync.isSignedIn && CloudSync.isSignedIn()) {
-          try {
-            const shortUrl = await CloudSync.shareCurrentFile();
-            const ok = await CloudSync.copyText(shortUrl);
-            showToast(ok ? "🔗 短链已复制，发给同学吧！" : "短链已生成：" + shortUrl, "✨");
-            if (!ok) { switchTab("console"); if (window.PythonRunner && PythonRunner.showShareLink) PythonRunner.showShareLink(shortUrl); }
-            return;
-          } catch (e) {
-            showToast("短链生成失败，改用长链接分享：" + e.message, "⚠️");
-          }
-        }
 
-        const url = buildShareUrl(file.name, code);
-        if (url.length > 8000) {
-          showToast("代码太长啦，分享链接装不下，建议用 📦 打包发送", "😅");
+        // 分享必须开启云同步：生成 /s/xxxx 短链（不再退回超长链接）
+        if (!(typeof CloudSync !== "undefined" && CloudSync.isSignedIn && CloudSync.isSignedIn())) {
+          showToast("分享要先开启云同步哦，正在为你打开…", "☁️");
+          if (typeof CloudSync !== "undefined" && CloudSync.openPanel) CloudSync.openPanel();
           return;
         }
-        copyText(url).then((ok) => {
+        try {
+          const shortUrl = await CloudSync.shareCurrentFile();
+          const ok = await CloudSync.copyText(shortUrl);
           if (ok) {
-            showToast("🔗 分享链接已复制！发给同学就能打开你的代码", "✨");
+            showToast("🔗 短链已复制，发给同学打开就能看代码", "✨");
           } else {
-            // 无法自动复制时，把链接打印到控制台，方便手动选中复制
-            window.App.switchToTab("console");
-            if (window.PythonRunner && window.PythonRunner.showShareLink) {
-              window.PythonRunner.showShareLink(url);
-            }
-            showToast("🔗 链接已显示在控制台，长按或选中复制即可", "📋");
+            switchTab("console");
+            if (window.PythonRunner && PythonRunner.showShareLink) PythonRunner.showShareLink(shortUrl);
+            showToast("🔗 短链已显示在控制台，选中复制即可", "📋");
           }
-          SoundEffects.playSuccess();
-        });
+        } catch (e2) {
+          showToast("分享失败：" + e2.message, "⚠️");
+        }
       });
     }
 
