@@ -158,6 +158,10 @@ const CodeEditor = (() => {
                 cm.showHint({ hint: pythonHint, completeSingle: false });
               }
             },
+            "Ctrl-=": function() { zoomIn(); },
+            "Cmd-=": function() { zoomIn(); },
+            "Ctrl--": function() { zoomOut(); },
+            "Cmd--": function() { zoomOut(); },
             "Ctrl-Enter": function() {
               if (window.App && window.App.runCurrentCode) {
                 window.App.runCurrentCode();
@@ -170,6 +174,16 @@ const CodeEditor = (() => {
             }
           }
         });
+
+        // Ctrl/Cmd + 滚轮也能调字号（孩子最顺手的操作）
+        try {
+          const wrapEl = cmInstance.getWrapperElement();
+          wrapEl.addEventListener("wheel", (e) => {
+            if (!e.ctrlKey && !e.metaKey) return;
+            e.preventDefault();
+            if (e.deltaY < 0) zoomIn(); else zoomOut();
+          }, { passive: false });
+        } catch (e) { /* 滚轮缩放失败也不影响编辑 */ }
 
         cmInstance.on("cursorActivity", updateStatusBar);
         cmInstance.on("change", (cm, change) => {
@@ -334,7 +348,7 @@ const CodeEditor = (() => {
       try {
         punctMarks.push(cmInstance.markText(from, to, {
           className: "cm-punct-warn",
-          title: "这是中文标点，Python 看不懂哦～点右上角【🩺 标点体检】可以一键修复"
+          title: "这是中文标点，Python 看不懂哦～点代码上方的【🩺 标点体检】可以一键修复"
         }));
       } catch (e) {}
       count++;

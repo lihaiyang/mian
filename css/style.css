@@ -706,12 +706,21 @@ body.dark-mode .editor-tab {
   white-space: nowrap;
 }
 
-/* 编辑器快捷工具栏（字体缩放、标点医生、格式化） */
-.editor-quick-tools {
+/* 代码工具行（在文件标签栏下方，专门服务「改代码」） */
+.editor-tool-bar {
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--panel-bg);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  row-gap: 4px;
 }
+
+.editor-tool-bar .tool-spacer { flex: 1 1 auto; }
+.editor-tool-bar .icon-btn { width: 32px; height: 26px; font-size: 12px; }
 
 .magic-fix-btn {
   font-size: 11px;
@@ -1513,9 +1522,53 @@ body.dark-mode .gallery-item-desc { color: #94A3B8; }
 .editor-tabs-list::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
 body.dark-mode .editor-tabs-list::-webkit-scrollbar-thumb { background: #3B4256; }
 .editor-tab { height: 30px; }
-.editor-quick-tools {
+/* ================= 运行控制条（输出面板上方，贴近运行结果） ================= */
+.run-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, rgba(16, 185, 129, .07), rgba(16, 185, 129, 0));
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+.run-bar .btn-run-magic {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+.run-bar .btn-stop-magic { flex: 0 0 auto; }
+.run-bar .icon-btn {
   flex: 0 0 auto;
-  margin-left: auto;
+  border: 1px solid var(--border-soft);
+}
+
+/* 停止按钮常驻：未运行时是灰色禁用态，不再忽隐忽现导致按钮跳位 */
+.btn-stop-magic { display: inline-flex; }
+.btn-stop-magic:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  filter: grayscale(.55);
+  box-shadow: none;
+  animation: none;
+}
+.btn-stop-magic:not(:disabled) {
+  animation: stopPulse 1.4s ease-in-out infinite;
+}
+
+/* 工具按钮搬走之后，文件标签栏恢复紧凑单行 */
+.editor-tabs-bar {
+  height: 42px;
+  min-height: 42px;
+  flex-wrap: nowrap;
+  gap: 0;
+  padding: 0 8px;
+}
+.editor-tabs-list {
+  flex: 1 1 auto;
+  height: 38px;
+  align-items: flex-end;
 }
 
 /* 4. 右侧「运行舞台」头部同理：空间不够时切换标签换行 */

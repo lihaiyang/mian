@@ -609,7 +609,10 @@ const PythonRunner = (() => {
         label.textContent = "运行代码";
       }
     }
-    if (stopBtn) stopBtn.classList.toggle("show", !!running);
+    if (stopBtn) {
+      stopBtn.classList.toggle("show", !!running);
+      stopBtn.disabled = !running;      // 常驻显示，运行中才可点
+    }
   }
 
   function switchTabSafe(name) {

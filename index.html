@@ -59,17 +59,7 @@
         <span id="themeIcon" data-page-node-id="QsA4yp2TkYhFaIhcDS2hi8">🌙</span>
       </button>
 
-      <!-- 核心大按钮：运行代码 -->
-      <button class="btn-run-magic" id="btnRunCode" title="运行你的 Python 代码 (快捷键: Ctrl+Enter)" data-page-node-id="bY3NoA70KghDJlFnotY06Z">
-        <span class="run-icon" data-page-node-id="oitfBo5MdDRckkT14wyduY">🚀</span>
-        <span id="runBtnLabel" data-page-node-id="XqW7vD4GdSu8k1LqChWg3S">运行代码</span>
-      </button>
-
-      <!-- 停止按钮：运行中才出现，用于中断死循环 -->
-      <button class="btn-stop-magic" id="btnStopCode" title="停止运行" aria-label="停止运行">
-        <span>⏹</span>
-        <span>停止</span>
-      </button>
+      <!-- 运行 / 停止 / 清空按钮已移到右侧「运行舞台」面板上方（见 .run-bar），贴近输出结果 -->
     </div>
   </header>
 
@@ -114,20 +104,20 @@
           <!-- 动态渲染标签 -->
         </div>
 
-        <!-- 快捷功能区：字体缩放、标点体检修复 -->
-        <div class="editor-quick-tools" data-page-node-id="b7Vbv52u6k0qvMXIE7Euvq">
-          <!-- 中文全角标点医生（初学者大救星） -->
-          <button class="magic-fix-btn" id="btnFixPunctuation" title="自动把中文引号、括号、冒号改成 Python 能认识的符号！" data-page-node-id="mM6cWpPPFyVR30bql7y32K">
-            <span data-page-node-id="jXTROAQi66cNI2qPaawmmp">🩺</span>
-            <span data-page-node-id="w7mnCawAA6Qzvx6jtdHPer">标点体检</span>
-          </button>
-          
-          <button class="magic-fix-btn" id="btnStepMode" title="单步模式：一行一行运行，看清楚每一步">🐾 单步</button>
-          <button class="magic-fix-btn" id="btnSnapshot" title="回到上一次成功运行时的代码">⏪ 上次成功</button>
-          <button class="icon-btn" id="btnZoomIn" title="放大字体（看得更清楚）" data-page-node-id="TjCRKKfbLb61zyC3EUfXhl">A+</button>
-          <button class="icon-btn" id="btnZoomOut" title="缩小字体" data-page-node-id="KCBTwDtfL5eC0xnVVPdazf">A-</button>
-          <button class="icon-btn" id="btnBigFont" title="护眼大字号模式（一键切换）">🔤</button>
-        </div>
+      </div>
+
+      <!-- 代码工具行：贴紧编辑器，专门服务「改代码」——标点体检 / 单步 / 上次成功 / 字号 -->
+      <div class="editor-tool-bar" id="editorToolBar">
+        <button class="magic-fix-btn" id="btnFixPunctuation" title="自动把中文引号、括号、冒号改成 Python 能认识的符号！">
+          <span>🩺</span>
+          <span>标点体检</span>
+        </button>
+        <button class="magic-fix-btn" id="btnStepMode" title="单步模式：一行一行运行，看清楚每一步">🐾 单步</button>
+        <button class="magic-fix-btn" id="btnSnapshot" title="回到上一次成功运行时的代码">⏪ 上次成功</button>
+        <div class="tool-spacer"></div>
+        <button class="icon-btn" id="btnZoomOut" title="缩小字体（Ctrl 和 - 一起按）" data-page-node-id="KCBTwDtfL5eC0xnVVPdazf">A-</button>
+        <button class="icon-btn" id="btnZoomIn" title="放大字体（Ctrl 和 = 一起按）" data-page-node-id="TjCRKKfbLb61zyC3EUfXhl">A+</button>
+        <button class="icon-btn" id="btnBigFont" title="护眼大字号模式（一键切换）">🔤</button>
       </div>
 
       <!-- 常用魔法积木栏（移到编辑器上方，更方便孩子点击） -->
@@ -187,16 +177,26 @@
           </button>
         </div>
 
-        <div class="panel-tools" data-page-node-id="dfm3mCrPESZGFEOT1a6JAF">
-          <button class="icon-btn" id="btnClearOutput" title="清空内容" data-page-node-id="pDUf6KSgOp8ckhBEZNhgsN">🧹</button>
-        </div>
+      </div>
+
+      <!-- 运行控制条：运行 / 停止 / 清空输出（就在输出面板上方，点完马上看结果） -->
+      <div class="run-bar" id="runBar">
+        <button class="btn-run-magic" id="btnRunCode" title="运行你的 Python 代码 (快捷键: Ctrl+Enter)">
+          <span class="run-icon">🚀</span>
+          <span id="runBtnLabel">运行代码</span>
+        </button>
+        <button class="btn-stop-magic" id="btnStopCode" title="停止运行（中断死循环）" aria-label="停止运行" disabled>
+          <span>⏹</span>
+          <span>停止</span>
+        </button>
+        <button class="icon-btn" id="btnClearOutput" title="清空输出内容">🧹</button>
       </div>
 
       <!-- 3.1 视图 A：控制台终端 -->
       <div class="console-view" id="consoleView" data-page-node-id="cHLtP2OH184hyWt9S72wf0">
         <div class="terminal-logs" id="terminalLogs" aria-live="polite" aria-label="运行输出" data-page-node-id="0nzvzAuHMqYrGcKEdCCuoJ">
           <div class="term-line system" data-page-node-id="unSZEUOqqzycZdNHNBPHI1">🌟 欢迎来到萌码 Python 奇幻工坊！</div>
-          <div class="term-line system" data-page-node-id="T3p1EDdd7HIp6ZQsknYRUt">💡 点击右上角绿色的「🚀 运行代码」按钮，见证奇迹发生吧！</div>
+          <div class="term-line system" data-page-node-id="T3p1EDdd7HIp6ZQsknYRUt">💡 点击本面板上方的绿色「🚀 运行代码」按钮，见证奇迹发生吧！</div>
         </div>
         <!-- 单步调试控制条（打开单步模式后出现） -->
         <div class="step-bar" id="stepBar" style="display:none;">
