@@ -100,8 +100,17 @@ let outBuf = [];
 let outChars = 0;
 let outTimer = null;
 
+// 判题模式：输出不进终端，而是被攒起来交给「批改」比对
+let judgeMode = false;
+let judgeOut = "";
+const JUDGE_OUT_LIMIT = 60000;      // 单个测试点最多攒这么多字符，防止死循环刷爆内存
+
 function enqueueOutput(s) {
   if (!s) return;
+  if (judgeMode) {
+    if (judgeOut.length < JUDGE_OUT_LIMIT) judgeOut += s;
+    return;
+  }
   outBuf.push(s);
   outChars += s.length;
   if (outChars >= OUT_FLUSH_CHARS) {
@@ -141,6 +150,8 @@ self.addEventListener('message', async (event) => {
     await initWorker();
   } else if (data.type === 'run') {
     await runCode(data.code, !!data.stepping);
+  } else if (data.type === 'judge') {
+    await judgeCode(data.code, data.inputs, data.timeoutMs);
   }
 });
 
@@ -239,6 +250,26 @@ const STEP_HELPER_CODE = [
   "    return _kid_tracer",
 ].join(String.fromCharCode(10));
 
+// ================= 判题模式辅助代码 =================
+// 把 input() 换成一个「从预设答案里取一行」的版本：
+//   - 判题时：依次返回题目自带的标准输入，取完了就抛 EOFError（和真实判题机一致）
+//   - 平时：原样交还给孩子的命令行输入
+const JUDGE_HELPER_CODE = [
+  "_kid_judge = {\"on\": False, \"lines\": [], \"i\": 0}",
+  "_kid_input_keep = builtins.input",
+  "",
+  "def _kid_judge_input(prompt_text=\"\"):",
+  "    if _kid_judge[\"on\"]:",
+  "        if _kid_judge[\"i\"] < len(_kid_judge[\"lines\"]):",
+  "            value = _kid_judge[\"lines\"][_kid_judge[\"i\"]]",
+  "            _kid_judge[\"i\"] = _kid_judge[\"i\"] + 1",
+  "            return value",
+  "        raise EOFError(\"题目给的输入已经用完了\")",
+  "    return _kid_input_keep(prompt_text)",
+  "",
+  "builtins.input = _kid_judge_input",
+].join(String.fromCharCode(10));
+
 async function initWorker() {
   try {
     pyodide = await loadPyodide({
@@ -266,6 +297,7 @@ async function initWorker() {
 
     await pyodide.runPythonAsync(ENV_SETUP_CODE);
     await pyodide.runPythonAsync(STEP_HELPER_CODE);
+    await pyodide.runPythonAsync(JUDGE_HELPER_CODE);
 
     // 找回上次保存的数据文件（open() 写过的东西）
     const restored = restoreUserFiles(initVfsFiles);
@@ -321,23 +353,9 @@ function formatPythonError(err) {
   return msg || '未知错误';
 }
 
-async function runCode(code, stepping) {
-  // 每次运行前复位中断信号与停止标志
-  if (self.__interruptBuf) {
-    Atomics.store(self.__interruptBuf, 0, 0);
-    Atomics.store(self.__interruptBuf, 1, 0);
-  }
-
-  const hasTurtle = /import[\s]+turtle|from[\s]+turtle/i.test(code);
-  if (hasTurtle) {
-    self.postMessage({ type: 'turtle-detect' });
-  }
-
-  // 自动安装第三方库（numpy / matplotlib 等）
-  try { await ensurePackages(code); } catch (e) { /* 安装失败不阻塞运行 */ }
-
-  // 用 Python 层捕获异常：可拿到完整可读的 traceback（供儿童友好提示解析）
-  const wrapped = [
+// 把孩子的代码包进 try/except，方便拿到完整、可读的 traceback
+function buildWrapped(code, stepping) {
+  return [
     'import traceback',
     '__kid_src = ' + JSON.stringify(code),
     '__kid_fname = "<学生代码>"',
@@ -360,6 +378,24 @@ async function runCode(code, stepping) {
     '    _kid_step_mode["on"] = False',
     '__kid_err',
   ].join(String.fromCharCode(10));
+}
+
+async function runCode(code, stepping) {
+  // 每次运行前复位中断信号与停止标志
+  if (self.__interruptBuf) {
+    Atomics.store(self.__interruptBuf, 0, 0);
+    Atomics.store(self.__interruptBuf, 1, 0);
+  }
+
+  const hasTurtle = /import[\s]+turtle|from[\s]+turtle/i.test(code);
+  if (hasTurtle) {
+    self.postMessage({ type: 'turtle-detect' });
+  }
+
+  // 自动安装第三方库（numpy / matplotlib 等）
+  try { await ensurePackages(code); } catch (e) { /* 安装失败不阻塞运行 */ }
+
+  const wrapped = buildWrapped(code, stepping);
 
   try {
     const errText = await pyodide.runPythonAsync(wrapped);
@@ -399,4 +435,70 @@ async function runCode(code, stepping) {
   try {
     self.postMessage({ type: 'vfs-save', files: collectUserFiles() });
   } catch (e) { /* 保存失败不影响运行 */ }
+}
+
+// ================= 判题：喂标准输入 → 收输出 → 交给主线程比对 =================
+async function judgeCode(code, inputs, timeoutMs) {
+  const limit = Math.max(800, Math.min(Number(timeoutMs) || 4000, 15000));
+  const started = Date.now();
+
+  // 清掉普通输出缓冲，避免上一次运行的残留混进判题结果
+  flushOutput();
+  if (self.__interruptBuf) {
+    Atomics.store(self.__interruptBuf, 0, 0);
+    Atomics.store(self.__interruptBuf, 1, 0);
+  }
+
+  let stdinText = inputs === null || inputs === undefined ? "" : String(inputs);
+  let lines = [];
+  if (stdinText !== "") {
+    if (stdinText.charAt(stdinText.length - 1) === "\n") stdinText = stdinText.slice(0, -1);
+    lines = stdinText.split(String.fromCharCode(10));
+  }
+
+  judgeOut = "";
+  judgeMode = true;
+  let errText = "";
+  let timedOut = false;
+
+  // 超时保护：到点往中断缓冲写 SIGINT，Python 侧会抛 KeyboardInterrupt
+  const killer = setTimeout(function () {
+    if (self.__interruptBuf) {
+      Atomics.store(self.__interruptBuf, 0, 2);
+      Atomics.store(self.__interruptBuf, 1, 1);
+    }
+  }, limit);
+
+  try {
+    try { await ensurePackages(code); } catch (e) { /* 缺包不算致命，交给下面的报错 */ }
+    await pyodide.runPythonAsync(
+      '_kid_judge["on"] = True' + String.fromCharCode(10) +
+      '_kid_judge["lines"] = ' + JSON.stringify(lines) + String.fromCharCode(10) +
+      '_kid_judge["i"] = 0'
+    );
+    errText = await pyodide.runPythonAsync(buildWrapped(code, false));
+    if (errText && String(errText).indexOf("KeyboardInterrupt") !== -1 && Date.now() - started >= limit - 120) {
+      timedOut = true;
+    }
+  } catch (err) {
+    errText = formatPythonError(err);
+    if (String(errText).indexOf("KeyboardInterrupt") !== -1) timedOut = true;
+  } finally {
+    clearTimeout(killer);
+    try { await pyodide.runPythonAsync('_kid_judge["on"] = False'); } catch (e) { /* 复位失败不影响判题 */ }
+    judgeMode = false;
+    if (self.__interruptBuf) {
+      Atomics.store(self.__interruptBuf, 0, 0);
+      Atomics.store(self.__interruptBuf, 1, 0);
+    }
+  }
+
+  self.postMessage({
+    type: 'judge-result',
+    out: judgeOut,
+    err: errText ? String(errText) : "",
+    line: errText ? extractErrorLine(String(errText)) : 0,
+    timedOut: timedOut,
+    ms: Date.now() - started
+  });
 }

@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="vendor/codemirror/show-hint.min.css">
   
   <!-- 全局自定义少儿样式 -->
-  <link rel="stylesheet" href="css/style.css?v=20260912f" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
+  <link rel="stylesheet" href="css/style.css?v=20260913a" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
 </head>
 <body data-page-node-id="MABBDhhrP5uEOfEzmMJlsw">
 
@@ -42,6 +42,12 @@
         <span class="status-dot loading" id="statusDot" data-page-node-id="CdKCpnLEI76036Kv5bckhp"></span>
         <span id="statusText" data-page-node-id="tyni87kGQ4mvx6hGjBH9r1">魔法引擎加载中...</span>
       </div>
+
+      <!-- 学习中心：教程 / 示例 / 练习 / 模拟考，一键进入 -->
+      <button class="header-btn learn-top-btn" id="btnOpenLearnTop" title="打开学习中心：跟着教程学、做练习、模拟考">
+        <span>🎓</span>
+        <span>学习中心</span>
+      </button>
 
       <!-- 示例库重置 -->
       <button class="header-btn" id="btnResetDemos" title="恢复所有好玩的初始示例代码" data-page-node-id="98KQCKeXC37G73yST2L2YO">
@@ -335,11 +341,30 @@
               <button class="btn-run-magic" id="btnProfileSave" style="padding:6px 16px; font-size:13px;">保存</button>
             </div>
           </div>
+
+          <!-- 等级与经验 -->
+          <div class="level-card" id="levelCard"></div>
+
+          <!-- 学习中心入口 -->
+          <button class="learn-entry-btn" id="btnOpenLearn">
+            <span class="learn-entry-emoji">🎓</span>
+            <span class="learn-entry-text">
+              <span class="learn-entry-title">进入学习中心</span>
+              <span class="learn-entry-sub">教程 · 示例 · 练习题 · 模拟考 · 奖牌，全都在这儿</span>
+            </span>
+            <span class="learn-entry-go">▶</span>
+          </button>
+
+          <!-- 今日任务 -->
+          <div class="daily-box" id="dailyBox"></div>
+
           <div class="progress-stats" id="progressStats"></div>
           <div class="progress-section-title"><span>🎯 闯关任务</span><span class="progress-section-count" id="missionProgress"></span></div>
           <div class="mission-list" id="missionList"></div>
+          <div class="progress-section-title"><span>🥇 奖牌墙</span></div>
+          <div class="medal-list" id="medalList"></div>
           <div class="progress-section-title"><span>🏅 成就徽章</span></div>
-          <div class="badge-list" id="badgeList"></div>
+          <div class="badge-list-wrap" id="badgeList"></div>
           <div class="modal-footer">
             <button class="header-btn" id="btnNewProfile">➕ 新伙伴</button>
             <button class="header-btn" id="btnEditProfile">✏️ 改名字</button>
@@ -351,6 +376,30 @@
       <div class="modal-footer">
         <button class="btn-run-magic" id="myPanelClose" style="padding:6px 18px; font-size:13px;">关闭</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ================= 弹窗：学习中心（教程 / 示例 / 练习 / 模拟考 / 成就） ================= -->
+  <div class="modal-overlay" id="learnModal">
+    <div class="modal-card learn-card">
+      <div class="learn-head">
+        <div class="learn-head-title">
+          <span class="learn-head-emoji">🎓</span>
+          <span>萌码学习中心</span>
+          <span class="learn-head-tip">自己学 Python，为 GESP 做准备</span>
+        </div>
+        <div class="learn-hud" id="learnHud"></div>
+        <button class="learn-close" id="learnClose" title="关闭学习中心">✕</button>
+      </div>
+      <div class="learn-tabs" id="learnTabs">
+        <button class="learn-tab active" data-tab="path">🗺️ 学习地图</button>
+        <button class="learn-tab" data-tab="lesson">📚 教程</button>
+        <button class="learn-tab" data-tab="example">🎁 示例</button>
+        <button class="learn-tab" data-tab="exercise">✏️ 练习</button>
+        <button class="learn-tab" data-tab="exam">📝 模拟考</button>
+        <button class="learn-tab" data-tab="award">🏆 成就</button>
+      </div>
+      <div class="learn-body" id="learnBody"></div>
     </div>
   </div>
 
@@ -371,17 +420,18 @@
   <script src="vendor/confetti.min.js"></script>
 
   <!-- ================= 自定义业务脚本模块 ================= -->
-  <script src="js/audio-confetti.js?v=20260912f"></script>
-  <script src="js/examples.js?v=20260912f"></script>
-  <script src="js/turtle-canvas.js?v=20260912f"></script>
-  <script src="js/zip-writer.js?v=20260912f"></script>
-  <script src="js/poster.js?v=20260912f"></script>
-  <script src="js/python-runner.js?v=20260912f"></script>
-  <script src="js/editor.js?v=20260912f"></script>
-  <script src="js/file-tree.js?v=20260912f"></script>
-  <script src="js/progress.js?v=20260912f"></script>
-  <script src="js/cloud.js?v=20260912f"></script>
-  <script src="js/app.js?v=20260912f"></script>
+  <script src="js/audio-confetti.js?v=20260913a"></script>
+  <script src="js/examples.js?v=20260913a"></script>
+  <script src="js/turtle-canvas.js?v=20260913a"></script>
+  <script src="js/zip-writer.js?v=20260913a"></script>
+  <script src="js/poster.js?v=20260913a"></script>
+  <script src="js/python-runner.js?v=20260913a"></script>
+  <script src="js/editor.js?v=20260913a"></script>
+  <script src="js/file-tree.js?v=20260913a"></script>
+  <script src="js/progress.js?v=20260913a"></script>
+  <script src="js/cloud.js?v=20260913a"></script>
+  <script src="js/learn.js?v=20260913a"></script>
+  <script src="js/app.js?v=20260913a"></script>
 
 </body>
 </html>

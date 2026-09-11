@@ -35,6 +35,11 @@ const PythonRunner = (() => {
   const LONG_RUN_MS = 12000;    // 超过 12 秒提醒一次
   let suppressOutput = false;   // 停止后抑制残留输出（例如 Python traceback）
 
+  // ================= 判题（自动批改练习题） =================
+  let judgeActive = false;          // 判题中：屏蔽一切会打扰界面的消息
+  let judgePending = null;          // { resolve, reject, timer }
+  const JUDGE_READY_TIMEOUT_MS = 30000;
+
   // ================= 虚拟文件系统（open() 写出的数据文件）=================
   const VFS_KEY = "codepanda_vfs_v1";
   let lastVfsSignature = "";
@@ -82,7 +87,7 @@ const PythonRunner = (() => {
 
   function startWorker() {
     // 版本号要和 index.html 里的 ?v= 保持一致：CDN 会缓存 /js/*，换版本号才能真正刷新
-    worker = new Worker('js/python-worker.js?v=20260912f');
+    worker = new Worker('js/python-worker.js?v=20260913a');
     worker.addEventListener('message', handleWorkerMessage);
     worker.addEventListener('error', (e) => {
       console.error('Worker error:', e);
@@ -250,11 +255,35 @@ const PythonRunner = (() => {
   }
 
   function handleTypedMessage(data) {
+    // 判题期间：只处理 ready / judge-result，其它消息（海龟、输入请求、变量望远镜…）
+    // 都不能影响孩子眼前的界面
+    if (judgeActive &&
+        data.type !== 'judge-result' &&
+        data.type !== 'ready') {
+      return;
+    }
     switch (data.type) {
       case 'ready':
         isReady = true;
         updateStatus("ready", "🟢 Python 3.12 魔法就绪！");
         break;
+
+      case 'judge-result': {
+        judgeActive = false;
+        const pending = judgePending;
+        judgePending = null;
+        if (pending) {
+          clearTimeout(pending.timer);
+          pending.resolve({
+            out: data.out || "",
+            err: data.err || "",
+            line: data.line || 0,
+            timedOut: !!data.timedOut,
+            ms: data.ms || 0
+          });
+        }
+        break;
+      }
 
       case 'stdout-batch':
         if (suppressOutput) { stdoutLineBuf = ""; break; }
@@ -386,6 +415,50 @@ const PythonRunner = (() => {
     }
   }
 
+  // ================= 判题入口：给一段标准输入，跑一遍，把输出交回来 =================
+  // 不做任何界面渲染（不切标签、不打印到终端），纯函数式调用，供「学习中心」批改练习用
+  function judge(code, stdinText, timeoutMs) {
+    return new Promise((resolve, reject) => {
+      if (isRunning || judgeActive) {
+        reject(new Error("Python 正在忙，等这一次运行结束再批改吧~"));
+        return;
+      }
+      if (!worker) init();
+
+      const limit = Math.max(800, Math.min(Number(timeoutMs) || 4000, 15000));
+      const send = () => {
+        judgeActive = true;
+        const timer = setTimeout(() => {
+          // 兜底：Worker 万一没回话，不能让「批改」按钮永远转圈
+          if (judgePending) {
+            const p = judgePending;
+            judgePending = null;
+            judgeActive = false;
+            clearInterrupt();
+            reject(new Error("批改超时了，可能是代码里有停不下来的循环"));
+          }
+        }, limit + 6000);
+        judgePending = { resolve, reject, timer };
+        worker.postMessage({ type: 'judge', code: code, inputs: stdinText, timeoutMs: limit });
+      };
+
+      if (isReady && worker) { send(); return; }
+
+      // 引擎还没就绪（首次打开页面时常见）：等它准备好再判
+      const deadline = Date.now() + JUDGE_READY_TIMEOUT_MS;
+      const waitReady = () => {
+        if (isReady && worker) { send(); return; }
+        if (Date.now() > deadline) {
+          reject(new Error("Python 引擎还在加载，稍等一下再点「批改」吧~"));
+          return;
+        }
+        setTimeout(waitReady, 200);
+      };
+      updateStatus("loading", "正在准备 Python 引擎，马上就能批改…");
+      waitReady();
+    });
+  }
+
   // ================= 停止 / 中断 =================
   function stopCode() {
     if (!isRunning) return;
@@ -464,6 +537,12 @@ const PythonRunner = (() => {
     if (isRunning) {
       if (window.App && window.App.showToast) {
         window.App.showToast("⏳ 代码还在运行中，先等一下或点「停止」哦~", "🐢");
+      }
+      return;
+    }
+    if (judgeActive) {
+      if (window.App && window.App.showToast) {
+        window.App.showToast("⏳ 正在批改练习，稍等一下下~", "✏️");
       }
       return;
     }
@@ -832,6 +911,8 @@ const PythonRunner = (() => {
     showShareLink,
     run: runCode,
     stop: stopCode,
+    judge,
+    isBusy: () => isRunning || judgeActive,
     submitTerminalInput,
     hideTerminalInput
   };

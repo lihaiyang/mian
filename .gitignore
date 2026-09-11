@@ -20,3 +20,6 @@ Thumbs.db
 
 # 例外：Pyodide 运行所需的 Python 标准库 zip
 !vendor/pyodide/python_stdlib.zip
+# Python 工具脚本产生的缓存
+__pycache__/
+*.pyc

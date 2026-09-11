@@ -35,6 +35,25 @@ window.App = (() => {
       Progress.init();
     }
 
+    // 1.11 学习中心（教程 / 示例 / 练习 / 模拟考）：只绑定事件，内容按需懒加载
+    if (typeof Learn !== "undefined") {
+      Learn.init();
+      const btnLearn = document.getElementById("btnOpenLearn");
+      if (btnLearn) {
+        btnLearn.addEventListener("click", () => {
+          closeMyPanel();
+          Learn.open("path");
+        });
+      }
+      const btnLearnTop = document.getElementById("btnOpenLearnTop");
+      if (btnLearnTop) {
+        btnLearnTop.addEventListener("click", () => {
+          closeMyPanel();
+          Learn.open("path");
+        });
+      }
+    }
+
     // 1.15 通过分享短链打开（/?share=xxxxxxxx）
     (function importShared() {
       try {
@@ -736,6 +755,10 @@ window.App = (() => {
     document.getElementById("btnDownloadDrawing").addEventListener("click", () => {
       TurtleEngine.exportImage();
       showToast("📸 海龟画作已保存为图片！", "🎨");
+      if (typeof Progress !== "undefined" && Progress.recordTurtleSave) {
+        const res = Progress.recordTurtleSave() || {};
+        (res.newBadges || []).forEach(b => showToast("🏅 新徽章【" + b.title + "】" + b.emoji, "🌟"));
+      }
     });
 
     // 文件模态弹窗事件
