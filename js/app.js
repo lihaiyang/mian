@@ -837,23 +837,18 @@ window.App = (() => {
         if (!code.trim()) { showToast("代码是空的，先写点内容再分享吧~", "📝"); return; }
 
 
-        // 分享必须开启云同步：生成 /s/xxxx 短链（不再退回超长链接）
+        // 分享必须开启云同步：直接打开云同步面板，面板里有醒目提示与「生成同步码」按钮
         if (!(typeof CloudSync !== "undefined" && CloudSync.isSignedIn && CloudSync.isSignedIn())) {
-          showToast("分享要先开启云同步哦，正在为你打开…", "☁️");
           if (typeof CloudSync !== "undefined" && CloudSync.openPanel) CloudSync.openPanel();
           return;
         }
         try {
           const shortUrl = await CloudSync.shareCurrentFile();
           const ok = await CloudSync.copyText(shortUrl);
-          if (ok) {
-            showToast("🔗 短链已复制，发给同学打开就能看代码", "✨");
-          } else {
-            switchTab("console");
-            if (window.PythonRunner && PythonRunner.showShareLink) PythonRunner.showShareLink(shortUrl);
-            showToast("🔗 短链已显示在控制台，选中复制即可", "📋");
-          }
+          if (!ok) { switchToTab("console"); if (window.PythonRunner && PythonRunner.showShareLink) PythonRunner.showShareLink(shortUrl); }
+          showToast(ok ? "🔗 短链已复制，发给同学打开就能看代码" : "🔗 短链已显示在控制台，选中复制即可", ok ? "✨" : "📋");
         } catch (e2) {
+          if (typeof CloudSync !== "undefined" && CloudSync.openPanel) CloudSync.openPanel();
           showToast("分享失败：" + e2.message, "⚠️");
         }
       });
@@ -1080,8 +1075,9 @@ window.App = (() => {
   function openMyPanel(tab) {
     const panel = document.getElementById("myPanel");
     if (!panel) return;
-    switchPanelTab(tab || "profile");
+    // 先把面板打开，再做任何渲染：渲染出错也绝不能挡住用户看到面板
     panel.classList.add("active");
+    try { switchPanelTab(tab || "profile"); } catch (e) { console.warn("切换标签失败", e); }
     try { if (typeof CloudSync !== "undefined" && CloudSync.renderChip) CloudSync.renderChip(); } catch (e) {}
     try { SoundEffects.playPop(); } catch (e) {}
   }

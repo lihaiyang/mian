@@ -437,6 +437,7 @@ const CloudSync = (() => {
 
     if (!isSignedIn()) {
       body.innerHTML =
+        '<div class="cloud-alert">👋 还没有开启云同步：点下面的「生成同步码」一下就搞定，作品会自动传到云端，换电脑也能找回。</div>' +
         '<div class="cloud-hero"><div class="cloud-emoji">☁️</div><div>' +
         '<div class="cloud-title">把作品存到云端</div>' +
         '<div class="cloud-sub">换电脑、换浏览器，输入同步码就能找回全部作品和学习记录。不需要手机号，也不需要邮箱。</div></div></div>' +

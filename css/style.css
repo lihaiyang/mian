@@ -1769,6 +1769,19 @@ body.dark-mode .folder-head:hover { background: #232838; }
 .file-tool-btn:hover { background: var(--primary-light) !important; color: var(--primary); }
 body.dark-mode .file-tool-btn { background: #232838 !important; }
 
+/* 云同步面板的醒目提示条 */
+.cloud-alert {
+  background: #FFF7E6;
+  border: 2px solid #FCD34D;
+  color: #92400E;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.7;
+  margin-bottom: 12px;
+}
+body.dark-mode .cloud-alert { background: #2A2416; border-color: #8A6D1F; color: #FDE68A; }
 /* 文件夹面板工具行允许换行（按钮变多了） */
 .filetree-panel .panel-tools { flex-wrap: wrap; }
 .filetree-panel .panel-tools .icon-btn { width: 28px; height: 28px; }
