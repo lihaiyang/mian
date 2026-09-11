@@ -66,6 +66,7 @@ tools/check_examples.py 校验每一个示例能跑通
 tools/fix_families.py   批量修「% 占位符个数不匹配」的小毛病（生成题库时的辅助工具）
 tools/dev_server.py     本地预览服务器（自动带上 COOP/COEP 响应头）
 tools/e2e_learn.mjs     学习中心端到端冒烟测试（Playwright，31 项断言）
+tools/e2e_judge.mjs     判题引擎边界测试（判题/超时中断/EOF，8 项断言）
 tools/fetch-vendor.sh   重新拉取 Pyodide 并把 lockfile 指向 CDN
 _headers                COOP/COEP（SharedArrayBuffer 必需）与缓存策略
 ```
@@ -94,7 +95,9 @@ python3 tools/check_examples.py                   # 120 个示例能否跑通
 python3 tools/gen_exercises.py --check            # 题库校验（不写文件）
 python3 tools/dev_server.py 8791                  # 本地预览（自动带 COOP/COEP）
 PLAYWRIGHT_PATH=$(ls -d ~/.npm/_npx/*/node_modules/playwright | head -1) \
-  node tools/e2e_learn.mjs http://127.0.0.1:8791  # 浏览器端到端测试（31 项）
+  node tools/e2e_learn.mjs http://127.0.0.1:8791  # 学习中心端到端测试（31 项）
+PLAYWRIGHT_PATH=$(ls -d ~/.npm/_npx/*/node_modules/playwright | head -1) \
+  node tools/e2e_judge.mjs http://127.0.0.1:8791  # 判题引擎边界测试（8 项）
 ```
 
 

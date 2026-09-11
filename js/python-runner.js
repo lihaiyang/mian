@@ -87,7 +87,7 @@ const PythonRunner = (() => {
 
   function startWorker() {
     // 版本号要和 index.html 里的 ?v= 保持一致：CDN 会缓存 /js/*，换版本号才能真正刷新
-    worker = new Worker('js/python-worker.js?v=20260913a');
+    worker = new Worker('js/python-worker.js?v=20260913b');
     worker.addEventListener('message', handleWorkerMessage);
     worker.addEventListener('error', (e) => {
       console.error('Worker error:', e);
@@ -428,17 +428,26 @@ const PythonRunner = (() => {
       const limit = Math.max(800, Math.min(Number(timeoutMs) || 4000, 15000));
       const send = () => {
         judgeActive = true;
+        // 超时保护：必须由主线程往中断缓冲写 SIGINT —— Worker 里 Python 一旦跑起来，
+        // Worker 自己的定时器就没机会执行了（事件循环被占住），写在那儿等于没有。
+        const killer = setTimeout(() => {
+          if (interruptBuf) Atomics.store(interruptBuf, 0, 2);
+        }, limit);
+        // 兜底：Worker 万一连中断都不回话，不能让「批改」按钮永远转圈
         const timer = setTimeout(() => {
-          // 兜底：Worker 万一没回话，不能让「批改」按钮永远转圈
           if (judgePending) {
-            const p = judgePending;
             judgePending = null;
             judgeActive = false;
             clearInterrupt();
-            reject(new Error("批改超时了，可能是代码里有停不下来的循环"));
+            resetWorker();   // 引擎可能真的卡死了，重启一次，别让孩子一直等
+            reject(new Error("批改超时了，可能是代码里有停不下来的循环。已经帮你重启了 Python 引擎，再试一次吧~"));
           }
         }, limit + 6000);
-        judgePending = { resolve, reject, timer };
+        judgePending = {
+          resolve: (r) => { clearTimeout(killer); resolve(r); },
+          reject: (e) => { clearTimeout(killer); reject(e); },
+          timer: timer
+        };
         worker.postMessage({ type: 'judge', code: code, inputs: stdinText, timeoutMs: limit });
       };
 

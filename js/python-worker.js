@@ -461,14 +461,10 @@ async function judgeCode(code, inputs, timeoutMs) {
   let errText = "";
   let timedOut = false;
 
-  // 超时保护：到点往中断缓冲写 SIGINT，Python 侧会抛 KeyboardInterrupt
-  const killer = setTimeout(function () {
-    if (self.__interruptBuf) {
-      Atomics.store(self.__interruptBuf, 0, 2);
-      Atomics.store(self.__interruptBuf, 1, 1);
-    }
-  }, limit);
-
+  // 注意：超时不能靠 Worker 自己的 setTimeout —— Python 一旦开始跑，
+  // Worker 的事件循环就被占住了，定时器根本轮不到执行。
+  // 所以真正的 SIGINT 由主线程写进中断缓冲（见 python-runner.js 的 judge()），
+  // 这里只负责在跑完后判断「是不是被超时打断的」。
   try {
     try { await ensurePackages(code); } catch (e) { /* 缺包不算致命，交给下面的报错 */ }
     await pyodide.runPythonAsync(
@@ -477,14 +473,13 @@ async function judgeCode(code, inputs, timeoutMs) {
       '_kid_judge["i"] = 0'
     );
     errText = await pyodide.runPythonAsync(buildWrapped(code, false));
-    if (errText && String(errText).indexOf("KeyboardInterrupt") !== -1 && Date.now() - started >= limit - 120) {
+    if (errText && String(errText).indexOf("KeyboardInterrupt") !== -1 && Date.now() - started >= limit - 200) {
       timedOut = true;
     }
   } catch (err) {
     errText = formatPythonError(err);
     if (String(errText).indexOf("KeyboardInterrupt") !== -1) timedOut = true;
   } finally {
-    clearTimeout(killer);
     try { await pyodide.runPythonAsync('_kid_judge["on"] = False'); } catch (e) { /* 复位失败不影响判题 */ }
     judgeMode = false;
     if (self.__interruptBuf) {
