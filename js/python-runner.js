@@ -17,6 +17,7 @@ const PythonRunner = (() => {
   let worker = null;
   let isReady = false;
   let isRunning = false;
+  let runSeq = 0;                // 本次打开页面跑了几次（用于输出分隔线）
   let runOutputText = "";        // 本轮运行的输出（成长档案要用）
   let runTurtle = false;         // 本轮是否用了海龟
   let runPackages = [];          // 本轮加载过的第三方库
@@ -81,7 +82,7 @@ const PythonRunner = (() => {
 
   function startWorker() {
     // 版本号要和 index.html 里的 ?v= 保持一致：CDN 会缓存 /js/*，换版本号才能真正刷新
-    worker = new Worker('js/python-worker.js?v=20260911c');
+    worker = new Worker('js/python-worker.js?v=20260911d');
     worker.addEventListener('message', handleWorkerMessage);
     worker.addEventListener('error', (e) => {
       console.error('Worker error:', e);
@@ -168,6 +169,31 @@ const PythonRunner = (() => {
     }
   }
 
+  // ================= 终端：只看程序输出（隐藏平台提示） =================
+  const HIDE_SYSTEM_KEY = "codepanda_hide_system";
+
+  function applySystemVisibility() {
+    const terminal = document.getElementById("terminalLogs");
+    if (!terminal) return;
+    let hide = false;
+    try { hide = localStorage.getItem(HIDE_SYSTEM_KEY) === "1"; } catch (e) {}
+    terminal.classList.toggle("hide-system", hide);
+    const btn = document.getElementById("btnToggleSystem");
+    if (btn) {
+      btn.textContent = hide ? "👀" : "🙈";
+      btn.classList.toggle("active", hide);
+      btn.title = hide ? "现在只显示程序输出，点一下恢复平台提示" : "隐藏平台提示，只看程序输出";
+    }
+  }
+
+  function toggleSystemVisibility() {
+    let hide = false;
+    try { hide = localStorage.getItem(HIDE_SYSTEM_KEY) === "1"; } catch (e) {}
+    try { localStorage.setItem(HIDE_SYSTEM_KEY, hide ? "0" : "1"); } catch (e) {}
+    applySystemVisibility();
+    appendLog("system", hide ? "👀 已恢复显示平台提示" : "🙈 平台提示已收起，只显示程序输出（报错和警告仍会保留）");
+  }
+
   function bindStepButtons() {
     const btnMode = document.getElementById("btnStepMode");
     if (btnMode) {
@@ -186,6 +212,12 @@ const PythonRunner = (() => {
     }
     const bar = document.getElementById("stepBar");
     if (bar) bar.style.display = "none";
+
+    const btnToggleSystem = document.getElementById("btnToggleSystem");
+    if (btnToggleSystem) {
+      btnToggleSystem.addEventListener("click", toggleSystemVisibility);
+    }
+    applySystemVisibility();
   }
 
   function bindStopButton() {
@@ -246,7 +278,7 @@ const PythonRunner = (() => {
 
       case 'input':
         // Python 请求输入 — 显示终端输入行（命令行式，不弹窗）
-        if (data.prompt) appendLog("stdout", "👉 " + data.prompt);
+        if (data.prompt) appendLog("prompt", "👉 " + data.prompt);
         showTerminalInput();
         break;
 
@@ -414,7 +446,7 @@ const PythonRunner = (() => {
     if (!input) return;
     const val = input.value;
     hideTerminalInput();
-    appendLog("stdout", "❯ " + val);
+    appendLog("echo", "❯ " + val);
 
     if (inputBuf) {
       const len = Math.min(val.length, 256);
@@ -460,7 +492,8 @@ const PythonRunner = (() => {
     const terminal = document.getElementById("terminalLogs");
     if (terminal) terminal.innerHTML = "";
     hideTerminalInput();
-    appendLog("system", "🚀 开始运行 Python 代码...");
+    runSeq += 1;
+    appendLog("run", "🚀 第 " + runSeq + " 次运行");
 
     // 每次运行前清空海龟画布，避免上一次的画作残留
     if (typeof TurtleEngine !== 'undefined') TurtleEngine.reset();

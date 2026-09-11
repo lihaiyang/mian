@@ -1561,6 +1561,71 @@ body.dark-mode .folder-head .folder-count { background: #1E293B; }
 body.dark-mode .floating-menu { background: #1E293B; border-color: #334155; }
 body.dark-mode .tab-action-btn { background: #1E293B; border-color: #334155; }
 
+/* ================= 终端：程序输出 vs 平台提示 ================= */
+
+/* 程序自己的输出：纯终端的样子（等宽、无修饰） */
+.term-line.stdout { color: var(--term-text); }
+
+/* 程序在等输入 / 用户输入的回显 */
+.term-line.prompt { color: #89B4FA; font-weight: 700; margin-top: 6px; }
+.term-line.echo { color: var(--term-prompt); font-weight: 700; }
+
+/* 平台提示：统一做成「左侧色条 + 浅色底 + 平台小标签」的卡片，和程序输出一眼区分 */
+.term-line.system,
+.term-line.success,
+.term-line.warning {
+  border-left: 3px solid #7AA2F7;
+  background: rgba(122, 162, 247, .13);
+  border-radius: 8px;
+  padding: 5px 10px 5px 8px;
+  margin: 6px 0;
+  font-style: normal;
+  font-size: 12.5px;
+  color: #AFC6F2;
+}
+.term-line.system::before,
+.term-line.success::before,
+.term-line.warning::before {
+  content: "平台";
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.6;
+  padding: 0 5px;
+  margin-right: 6px;
+  border-radius: 6px;
+  background: rgba(122, 162, 247, .3);
+  color: #DCE7FB;
+  vertical-align: 1px;
+}
+.term-line.success { border-left-color: #A6E3A1; background: rgba(166, 227, 161, .13); color: #BDE9B8; }
+.term-line.success::before { background: rgba(166, 227, 161, .28); color: #E4F8E1; }
+.term-line.warning { border-left-color: #F9E2AF; background: rgba(249, 226, 175, .13); color: #F4E0A6; }
+.term-line.warning::before { background: rgba(249, 226, 175, .28); color: #FCF3D2; }
+
+/* 每次运行的分隔线：一眼看出这次的输出从哪里开始 */
+.term-line.run {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #89B4FA;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .5px;
+  margin: 12px 0 8px;
+}
+.term-line.run::before,
+.term-line.run::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: rgba(137, 180, 250, .35);
+}
+
+/* 「只看程序输出」模式：收起平台提示（报错 / 警告 / 分隔线仍保留） */
+#terminalLogs.hide-system .term-line.system,
+#terminalLogs.hide-system .term-line.success { display: none; }
+
 /* 文件夹面板工具行允许换行（按钮变多了） */
 .filetree-panel .panel-tools { flex-wrap: wrap; }
 .filetree-panel .panel-tools .icon-btn { width: 28px; height: 28px; }
