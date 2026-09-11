@@ -1452,3 +1452,134 @@ body.dark-mode .gallery-tab.active { background: linear-gradient(135deg, #34D399
 body.dark-mode .gallery-item { background: #1E293B; border-color: #334155; }
 body.dark-mode .gallery-item-name { color: #F1F5F9; }
 body.dark-mode .gallery-item-desc { color: #94A3B8; }
+/* ================= 排版优化：面板头部与标签栏不再互相挤压 ================= */
+
+/* 1. 左侧「代码宝箱」：标题独占一行，工具按钮另起一行平分宽度（此前 5 个图标把标题挤成竖排） */
+.filetree-panel .panel-header {
+  height: auto;
+  min-height: 40px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 12px 8px;
+}
+.filetree-panel .panel-title {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.filetree-panel .panel-tools {
+  justify-content: space-between;
+  gap: 4px;
+}
+.filetree-panel .panel-tools .icon-btn {
+  width: 30px;
+  height: 30px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border-soft);
+}
+
+/* 2. 「我的作品库 (.py)」与文件数徽章保持同一行 */
+.file-section-label {
+  gap: 8px;
+  white-space: nowrap;
+}
+#fileCountBadge {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* 3. 编辑器标签栏：一行放不下时，快捷工具自动换到第二行；标签自己横向滚动 */
+.editor-tabs-bar {
+  height: auto;
+  min-height: 44px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 5px 8px;
+  overflow: visible;
+}
+.editor-tabs-list {
+  flex: 1 1 240px;
+  min-width: 0;
+  height: 34px;
+  align-items: flex-end;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.editor-tabs-list::-webkit-scrollbar { height: 4px; }
+.editor-tabs-list::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+body.dark-mode .editor-tabs-list::-webkit-scrollbar-thumb { background: #3B4256; }
+.editor-tab { height: 30px; }
+.editor-quick-tools {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* 4. 右侧「运行舞台」头部同理：空间不够时切换标签换行 */
+.output-panel .panel-header {
+  height: auto;
+  min-height: 40px;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  padding: 6px 10px;
+}
+.output-panel .panel-title { white-space: nowrap; }
+.output-tabs { flex-wrap: wrap; max-width: 100%; }
+
+/* 5. 顶栏按钮不换行、不被压扁 */
+.header-btn, .btn-run-magic, .btn-stop-magic { white-space: nowrap; }
+.header-actions { flex-wrap: wrap; row-gap: 6px; }
+/* 6. 窄屏细节：文件库标题用省略号（别把文件数徽章挤掉），左侧面板与工具按钮同步收一点 */
+@media (max-width: 1024px) {
+  .file-section-label { padding: 6px 4px 4px 4px; }
+  #fileCountBadge { font-size: 9.5px !important; padding: 1px 5px !important; }
+}
+
+
+/* 7. 魔法积木栏：不再把溢出的一行悄悄裁掉（展开时最多三行，再多就内部滚动） */
+.snippets-bar {
+  max-height: 116px;
+}
+.snippets-bar .snippet-chip-list {
+  max-height: 76px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.snippets-bar .snippet-chip-list::-webkit-scrollbar { width: 4px; }
+.snippets-bar .snippet-chip-list::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+body.dark-mode .snippets-bar .snippet-chip-list::-webkit-scrollbar-thumb { background: #3B4256; }
+.snippets-bar.collapsed .snippet-chip-list { display: none; }
+
+/* 8. 编辑器容器允许收缩，避免底部状态栏被挤出 1~3px */
+.editor-body-wrapper { min-height: 0; }
+.snippets-bar {
+  max-height: 116px;
+}
+.editor-status-bar {
+  height: auto;
+  min-height: 26px;
+  flex-wrap: wrap;
+  row-gap: 2px;
+  padding: 4px 10px;
+}
+.editor-status-bar > div { white-space: nowrap; }
+
+/* 9. 文件标签宽一点，长文件名少截断一些 */
+.editor-tab { max-width: 186px; }
+.editor-tab span { max-width: 146px; }
+.file-section-label > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 1024px) {
+  .app-workspace {
+    grid-template-columns: 190px 1fr 280px;
+  }
+  .filetree-panel .panel-header { padding: 8px 10px 6px; }
+  .filetree-panel .panel-tools .icon-btn { width: 28px; height: 28px; }
+}
