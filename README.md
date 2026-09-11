@@ -59,6 +59,35 @@ sed -i "" "s/$OLD/$NEW/g" index.html js/python-runner.js
 
 `vendor/*` 不需要版本号（它是 `immutable` 长期缓存；内容变了要改自己的路径，例如 `pyodide-lock.json?v=2`）。
 
+## ☁️ 云同步（Cloudflare D1 后端）
+
+- **账号 = 匿名同步码**：服务端只存 `code_hash`（SHA-256 + 服务端 pepper），不收集姓名、邮箱、手机号；码由 8 位易辨认字符组成（去掉 0/O/1/I/L）。
+- **数据表**：`accounts` / `profiles` / `folders` / `files` / `progress` / `vfs` / `rate`（限流）。
+  所有数据行都带 `account_id`：本地 id（`p_default`、`ex_1`…）在不同账号间可以重复，互不干扰。
+- **同步协议**：
+  - `GET  /api/sync?code=&pin=&since=<rev>` → 增量拉取（`rev` 是账号级单调版本号，不受设备时钟影响）
+  - `POST /api/sync` → 批量推送（按行 `updated_at` 做 last-write-wins，删除用软删除墓碑同步）
+  - `POST /api/account` → `create` / `login` / `setpin` / `rotate`
+- **离线优先**：本地 `localStorage` 仍是主存储，没网照常写代码；联网后 3 秒防抖自动增量上传。
+
+首次部署：
+
+```bash
+wrangler d1 create mian-db                     # 把返回的 database_id 填进 wrangler.toml
+wrangler d1 execute mian-db --remote --file=./schema.sql
+wrangler pages secret put CODE_PEPPER --project-name mian
+wrangler pages deploy . --project-name mian --branch main
+```
+
+本地联调（自带本地 D1，接口与线上一致）：
+
+```bash
+wrangler d1 execute mian-db --local --file=./schema.sql
+wrangler pages dev . --port 8788
+```
+
+免费额度参考：D1 每天 500 万行读 / 10 万行写、5 GB 存储（按一个孩子一次会话约 30 行写入估算，够数千会话/天）。
+
 ## 本地调试
 
 因为要用 `SharedArrayBuffer`，必须带 COOP/COEP 响应头，**不能直接双击 index.html**。最简做法：
