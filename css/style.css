@@ -1745,6 +1745,30 @@ body.dark-mode .folder-head:hover { background: #232838; }
 .file-item.active { background: var(--primary-light); color: var(--primary); }
 #fileCountBadge { background: #EEF2F7 !important; color: #7C8698; font-weight: 700; }
 
+/* 代码宝箱工具：固定 3 列 × 2 行网格（图标在上、文字在下），宽度对齐不再参差 */
+.filetree-panel .panel-tools {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+}
+.file-tool-btn {
+  width: auto !important;
+  height: auto !important;
+  min-height: 44px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 5px 2px !important;
+  border: none !important;
+  background: #F4F6FB !important;
+  border-radius: 11px !important;
+}
+.file-tool-btn .tool-ico { font-size: 15px; line-height: 1.1; }
+.file-tool-btn .tool-label { font-size: 10.5px; line-height: 1.1; }
+.file-tool-btn:hover { background: var(--primary-light) !important; color: var(--primary); }
+body.dark-mode .file-tool-btn { background: #232838 !important; }
+
 /* 文件夹面板工具行允许换行（按钮变多了） */
 .filetree-panel .panel-tools { flex-wrap: wrap; }
 .filetree-panel .panel-tools .icon-btn { width: 28px; height: 28px; }
