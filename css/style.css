@@ -1989,3 +1989,20 @@ body.dark-mode .snippets-bar .snippet-chip-list::-webkit-scrollbar-thumb { backg
 .filetree-panel .panel-tools .file-tool-btn .tool-label { font-size: 10.5px !important; line-height: 1 !important; }
 .filetree-panel .panel-tools .file-tool-btn:hover { background: var(--primary-light) !important; color: var(--primary) !important; }
 body.dark-mode .filetree-panel .panel-tools .file-tool-btn { background: #232838 !important; }
+/* 未开启云同步的就地提示条 */
+.need-sync-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 10px 0;
+  padding: 8px 10px;
+  background: #FFF7E6;
+  border: 2px solid #FCD34D;
+  border-radius: 12px;
+  color: #92400E;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.need-sync-notice button { margin-left: auto; flex-shrink: 0; }
+body.dark-mode .need-sync-notice { background: #2A2416; border-color: #8A6D1F; color: #FDE68A; }

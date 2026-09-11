@@ -839,6 +839,7 @@ window.App = (() => {
 
         // 分享需要云同步：给一句明确提示就够了（不再依赖自动打开面板）
         if (!(typeof CloudSync !== "undefined" && CloudSync.isSignedIn && CloudSync.isSignedIn())) {
+          if (typeof CloudSync !== "undefined" && CloudSync.showNeedSyncNotice) CloudSync.showNeedSyncNotice();
           showToast("分享要先开启云同步哦：点顶栏头像 → ☁️ 云同步 → 生成同步码", "☁️");
           return;
         }

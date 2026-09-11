@@ -582,6 +582,25 @@ const CloudSync = (() => {
     } catch (e) { return false; }
   }
 
+  // 未开启云同步时的就地提示条（比底部 toast 更显眼）
+  function showNeedSyncNotice() {
+    let el = document.getElementById("needSyncNotice");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "needSyncNotice";
+      el.className = "need-sync-notice";
+      const head = document.querySelector(".filetree-panel .panel-header");
+      if (head && head.parentNode) head.parentNode.insertBefore(el, head.nextSibling);
+      else document.body.appendChild(el);
+    }
+    el.innerHTML = "<span>☁️ 分享要先开启云同步</span><button class=\"header-btn\" id=\"needSyncGo\" style=\"height:24px;padding:0 10px;font-size:12px;\">去开启</button>";
+    el.style.display = "flex";
+    const go = document.getElementById("needSyncGo");
+    if (go) go.addEventListener("click", () => { el.style.display = "none"; openPanel(); });
+    clearTimeout(showNeedSyncNotice._t);
+    showNeedSyncNotice._t = setTimeout(() => { el.style.display = "none"; }, 12000);
+  }
+
   function renderShareTab() {
     const box = document.getElementById("shareBody");
     if (!box) return;
@@ -631,7 +650,7 @@ const CloudSync = (() => {
       window.addEventListener("online", () => { if (isSignedIn()) syncNow(true); });
     },
     isSignedIn, getStatus, createAccount, login, setPin, rotateCode, signOutLocal,
-    syncNow, noteDirty, openPanel, closePanel, renderPanel, renderChip, renderShareTab,
+    syncNow, noteDirty, openPanel, closePanel, renderPanel, renderChip, renderShareTab, showNeedSyncNotice,
     shareCurrentFile, shareProgress, copyText,
     onStatus(fn) { listeners.push(fn); },
     getCode() { return state.code; }
