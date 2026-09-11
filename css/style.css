@@ -1960,3 +1960,32 @@ body.dark-mode .snippets-bar .snippet-chip-list::-webkit-scrollbar-thumb { backg
   .filetree-panel .panel-header { padding: 8px 10px 6px; }
   .filetree-panel .panel-tools .icon-btn { width: 28px; height: 28px; }
 }
+
+/* ================= 代码宝箱工具按钮（最终版：3 列网格，末尾优先） ================= */
+.filetree-panel .panel-tools {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+  width: 100% !important;
+  flex-wrap: nowrap !important;
+}
+.filetree-panel .panel-tools .file-tool-btn {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center;
+  justify-content: center;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  min-height: 46px;
+  padding: 6px 2px !important;
+  gap: 3px !important;
+  border: none !important;
+  border-radius: 11px !important;
+  background: #F4F6FB !important;
+  font-size: 10.5px !important;
+}
+.filetree-panel .panel-tools .file-tool-btn .tool-ico { font-size: 16px !important; line-height: 1 !important; }
+.filetree-panel .panel-tools .file-tool-btn .tool-label { font-size: 10.5px !important; line-height: 1 !important; }
+.filetree-panel .panel-tools .file-tool-btn:hover { background: var(--primary-light) !important; color: var(--primary) !important; }
+body.dark-mode .filetree-panel .panel-tools .file-tool-btn { background: #232838 !important; }
