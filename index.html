@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="vendor/codemirror/show-hint.min.css">
   
   <!-- 全局自定义少儿样式 -->
-  <link rel="stylesheet" href="css/style.css?v=20260911b" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
+  <link rel="stylesheet" href="css/style.css?v=20260911c" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
 </head>
 <body data-page-node-id="MABBDhhrP5uEOfEzmMJlsw">
 
@@ -75,6 +75,7 @@
         </div>
         <div class="panel-tools" data-page-node-id="rP8l99yI16iWzsRoZi7569">
           <button class="icon-btn" id="btnNewFile" title="新建 Python 文件" data-page-node-id="br9CpLxXrjeQ6G1zZGsaSH">➕</button>
+          <button class="icon-btn" id="btnNewFolder" title="新建文件夹（把作品分门别类）">📁</button>
           <button class="icon-btn" id="btnImportFile" title="导入电脑里的 .py 文件">📂</button>
           <button class="icon-btn" id="btnExportZip" title="下载当前文件到电脑 (.py)" data-page-node-id="u10TZGXuTENGTp7Y1zHBbl">⬇️</button>
           <button class="icon-btn" id="btnExportAll" title="打包下载全部作品 (zip)">📦</button>
@@ -102,6 +103,12 @@
       <div class="editor-tabs-bar" data-page-node-id="obdF8mTs2l523HROhzQ6yI">
         <div class="editor-tabs-list" id="editorTabsList" data-page-node-id="emzM7mGJQgBEMOJzggaXuw">
           <!-- 动态渲染标签 -->
+        </div>
+
+        <!-- 标签批量关闭（只关标签，不会删文件） -->
+        <div class="editor-tabs-actions">
+          <button class="tab-action-btn" id="btnCloseOtherTabs" title="关闭其他标签（文件不会被删掉）">✕ 其他</button>
+          <button class="tab-action-btn" id="btnCloseAllTabs" title="关闭全部标签（文件不会被删掉）">✕ 全部</button>
         </div>
 
       </div>
@@ -351,16 +358,16 @@
   <script src="vendor/confetti.min.js"></script>
 
   <!-- ================= 自定义业务脚本模块 ================= -->
-  <script src="js/audio-confetti.js?v=20260911b"></script>
-  <script src="js/examples.js?v=20260911b"></script>
-  <script src="js/turtle-canvas.js?v=20260911b"></script>
-  <script src="js/zip-writer.js?v=20260911b"></script>
-  <script src="js/poster.js?v=20260911b"></script>
-  <script src="js/python-runner.js?v=20260911b"></script>
-  <script src="js/editor.js?v=20260911b"></script>
-  <script src="js/file-tree.js?v=20260911b"></script>
-  <script src="js/progress.js?v=20260911b"></script>
-  <script src="js/app.js?v=20260911b"></script>
+  <script src="js/audio-confetti.js?v=20260911c"></script>
+  <script src="js/examples.js?v=20260911c"></script>
+  <script src="js/turtle-canvas.js?v=20260911c"></script>
+  <script src="js/zip-writer.js?v=20260911c"></script>
+  <script src="js/poster.js?v=20260911c"></script>
+  <script src="js/python-runner.js?v=20260911c"></script>
+  <script src="js/editor.js?v=20260911c"></script>
+  <script src="js/file-tree.js?v=20260911c"></script>
+  <script src="js/progress.js?v=20260911c"></script>
+  <script src="js/app.js?v=20260911c"></script>
 
 </body>
 </html>

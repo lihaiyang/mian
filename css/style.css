@@ -1461,6 +1461,109 @@ body.dark-mode .gallery-tab.active { background: linear-gradient(135deg, #34D399
 body.dark-mode .gallery-item { background: #1E293B; border-color: #334155; }
 body.dark-mode .gallery-item-name { color: #F1F5F9; }
 body.dark-mode .gallery-item-desc { color: #94A3B8; }
+/* ================= 文件夹与浮动菜单 ================= */
+.folder-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin-top: 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-main);
+  background: linear-gradient(90deg, rgba(91, 95, 237, .10), rgba(91, 95, 237, .02));
+  transition: background .18s ease;
+}
+.folder-head:first-child { margin-top: 0; }
+.folder-head:hover { background: rgba(91, 95, 237, .16); }
+.folder-head .folder-arrow {
+  font-size: 10px;
+  color: var(--text-light);
+  transition: transform .2s ease;
+  flex-shrink: 0;
+}
+.folder-head.collapsed .folder-arrow { transform: rotate(-90deg); }
+.folder-head .folder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.folder-head .folder-count {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-light);
+  background: var(--panel-bg);
+  border-radius: 10px;
+  padding: 1px 6px;
+}
+.folder-head .folder-actions { display: none; gap: 2px; flex-shrink: 0; }
+.folder-head:hover .folder-actions { display: flex; }
+.folder-head:hover .folder-count { display: none; }
+.folder-head .file-action-btn { width: 20px; height: 20px; font-size: 11px; }
+.folder-empty { font-size: 11px; color: var(--text-light); padding: 4px 8px 6px 24px; }
+.file-item.sub { padding-left: 14px; }
+
+/* 浮动小菜单（移动文件 / 标签右键） */
+.floating-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 140px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, .18);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.floating-menu-item {
+  text-align: left;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.floating-menu-item:hover { background: var(--primary-light); color: var(--primary); }
+.floating-menu-item.disabled { opacity: .45; cursor: default; }
+
+/* 标签栏批量关闭按钮 */
+.editor-tabs-actions { display: flex; gap: 4px; flex: 0 0 auto; padding-left: 4px; }
+.tab-action-btn {
+  border: 1px solid var(--border-soft);
+  background: var(--panel-bg);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .18s ease;
+}
+.tab-action-btn:hover:not(:disabled) { color: var(--primary); border-color: var(--primary); }
+.tab-action-btn:disabled { opacity: .38; cursor: not-allowed; }
+
+body.dark-mode .folder-head { background: linear-gradient(90deg, rgba(129, 140, 248, .18), rgba(129, 140, 248, .04)); }
+body.dark-mode .folder-head .folder-count { background: #1E293B; }
+body.dark-mode .floating-menu { background: #1E293B; border-color: #334155; }
+body.dark-mode .tab-action-btn { background: #1E293B; border-color: #334155; }
+
+/* 文件夹面板工具行允许换行（按钮变多了） */
+.filetree-panel .panel-tools { flex-wrap: wrap; }
+.filetree-panel .panel-tools .icon-btn { width: 28px; height: 28px; }
 /* ================= 排版优化：面板头部与标签栏不再互相挤压 ================= */
 
 /* 1. 左侧「代码宝箱」：标题独占一行，工具按钮另起一行平分宽度（此前 5 个图标把标题挤成竖排） */

@@ -4,8 +4,9 @@
  */
 window.App = (() => {
   let activeTab = "console"; // "console" | "turtle"
-  let modalMode = "create";  // "create" | "rename"
+  let modalMode = "create";  // create | rename | createFolder | renameFolder
   let modalTargetId = null;
+  let modalFolderId = null;  // 新建文件时放进哪个文件夹
 
   // 确认弹窗回调
   let confirmCallback = null;
@@ -229,66 +230,114 @@ window.App = (() => {
   }
 
   // 渲染左侧文件树列表
+  // 渲染左侧文件列表（按文件夹分组）
   function renderFileList(files, activeId) {
     const listElem = document.getElementById("fileList");
     const badge = document.getElementById("fileCountBadge");
     if (!listElem) return;
 
-    if (badge) {
-      badge.textContent = `${files.length} 个文件`;
-    }
+    if (badge) badge.textContent = `${files.length} 个文件`;
+
+    const folders = FileManager.getFolders();
+    const collapsedMap = FileManager.getCollapsed();
+    const myFolderId = FileManager.getMyFolderId();
 
     listElem.innerHTML = "";
-    files.forEach(file => {
-      const isExample = FileManager.isExampleFile(file.id);
-      const isClosed = closedTabIds.has(file.id);
-      const item = document.createElement("div");
-      item.className = `file-item ${file.id === activeId ? "active" : ""} ${isClosed ? "closed-tab" : ""}`;
 
-      // 文件图标与名称
-      const info = document.createElement("div");
-      info.className = "file-info";
-      info.title = file.name;
-      info.innerHTML = `<span class="file-icon">${isExample ? '🎁' : '🐍'}</span><span class="file-name">${escapeHtml(file.name)}</span>`;
-      info.addEventListener("click", () => {
-        // 从文件树点击文件时，重新打开标签（如果之前关闭了）
-        closedTabIds.delete(file.id);
-        saveClosedTabs();
-        FileManager.setActiveFile(file.id);
+    folders.forEach(folder => {
+      const inFolder = files.filter(f => (f.folderId || myFolderId) === folder.id);
+      const isCollapsed = !!collapsedMap[folder.id];
+
+      const head = document.createElement("div");
+      head.className = "folder-head" + (isCollapsed ? " collapsed" : "") + (folder.builtin ? " builtin" : "");
+      head.title = (isCollapsed ? "展开" : "收起") + folder.name;
+      head.innerHTML = '<span class="folder-arrow">▾</span><span class="folder-emoji"></span>' +
+        '<span class="folder-name"></span><span class="folder-count"></span>';
+
+      if (folder.builtin) {
+        head.querySelector(".folder-name").textContent = folder.name;
+        head.querySelector(".folder-emoji").textContent = folder.emoji;
+        head.querySelector(".folder-name").title = folder.name;
+      } else {
+        head.querySelector(".folder-name").textContent = folder.name;
+        head.querySelector(".folder-emoji").textContent = folder.emoji;
+      }
+      head.querySelector(".folder-count").textContent = inFolder.length;
+
+      const headActions = document.createElement("div");
+      headActions.className = "folder-actions";
+      headActions.appendChild(makeActionBtn("➕", "在这个文件夹里新建文件", () => openCreateModal(folder.id)));
+      if (!folder.builtin) {
+        headActions.appendChild(makeActionBtn("✏️", "文件夹改名", () => openFolderRenameModal(folder.id, folder.name)));
+        headActions.appendChild(makeActionBtn("🗑️", "删除文件夹（文件会移到「我的作品」）", () => confirmDeleteFolder(folder)));
+      }
+      head.appendChild(headActions);
+
+      head.addEventListener("click", () => {
+        FileManager.toggleFolder(folder.id);
         SoundEffects.playPop();
       });
+      listElem.appendChild(head);
 
-      // 操作小按钮（重命名、删除）- 仅用户文件显示
-      const actions = document.createElement("div");
-      actions.className = "file-actions";
+      if (isCollapsed) return;
 
-      if (!isExample) {
-        const btnRename = document.createElement("button");
-        btnRename.className = "file-action-btn";
-        btnRename.title = "重命名";
-        btnRename.innerHTML = "✏️";
-        btnRename.addEventListener("click", (e) => {
-          e.stopPropagation();
-          openRenameModal(file.id, file.name);
-        });
-
-        const btnDel = document.createElement("button");
-        btnDel.className = "file-action-btn";
-        btnDel.title = "删除";
-        btnDel.innerHTML = "🗑️";
-        btnDel.addEventListener("click", (e) => {
-          e.stopPropagation();
-          confirmDeleteFile(file.id, file.name);
-        });
-
-        actions.appendChild(btnRename);
-        actions.appendChild(btnDel);
+      if (!inFolder.length) {
+        const empty = document.createElement("div");
+        empty.className = "folder-empty";
+        empty.textContent = folder.builtin ? "这里空空的" : "还没有文件，点上面的 ➕ 新建一个吧";
+        listElem.appendChild(empty);
+        return;
       }
 
-      item.appendChild(info);
-      item.appendChild(actions);
-      listElem.appendChild(item);
+      inFolder.forEach(file => listElem.appendChild(buildFileItem(file, activeId, folders)));
     });
+  }
+
+  function makeActionBtn(icon, title, fn) {
+    const btn = document.createElement("button");
+    btn.className = "file-action-btn";
+    btn.title = title;
+    btn.innerHTML = icon;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      fn(e);
+    });
+    return btn;
+  }
+
+  // 单个文件条目
+  function buildFileItem(file, activeId, folders) {
+    const isExample = FileManager.isExampleFile(file.id);
+    const isClosed = closedTabIds.has(file.id);
+    const item = document.createElement("div");
+    item.className = `file-item sub ${file.id === activeId ? "active" : ""} ${isClosed ? "closed-tab" : ""}`;
+
+    const info = document.createElement("div");
+    info.className = "file-info";
+    info.title = file.name;
+    info.innerHTML = `<span class="file-icon">${isExample ? '🎁' : '🐍'}</span><span class="file-name">${escapeHtml(file.name)}</span>`;
+    info.addEventListener("click", () => {
+      // 从文件树点击文件时，重新打开标签（如果之前关闭了）
+      closedTabIds.delete(file.id);
+      saveClosedTabs();
+      FileManager.setActiveFile(file.id);
+      SoundEffects.playPop();
+    });
+
+    const actions = document.createElement("div");
+    actions.className = "file-actions";
+
+    if (folders.length > 1) {
+      actions.appendChild(makeActionBtn("📁", "移动到其他文件夹", (e) => showFolderMenu(e.currentTarget, file)));
+    }
+    if (!isExample) {
+      actions.appendChild(makeActionBtn("✏️", "重命名", () => openRenameModal(file.id, file.name)));
+      actions.appendChild(makeActionBtn("🗑️", "删除", () => confirmDeleteFile(file.id, file.name)));
+    }
+
+    item.appendChild(info);
+    item.appendChild(actions);
+    return item;
   }
 
   // 渲染编辑器上方标签页（过滤已关闭的标签）
@@ -314,6 +363,17 @@ window.App = (() => {
         SoundEffects.playPop();
       });
 
+      // 右键菜单：关闭这个 / 关闭其他 / 关闭全部
+      tab.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        const openCount = FileManager.getFiles().filter(f => !closedTabIds.has(f.id)).length;
+        showFloatingMenu(tab, [
+          { label: "✕ 关闭这个标签", fn: () => closeTab(file.id, isExample) },
+          { label: "✕ 关闭其他标签", disabled: openCount <= 1, fn: () => closeOtherTabs(file.id) },
+          { label: "✕ 关闭全部标签", fn: closeAllTabs }
+        ]);
+      });
+
       // 关闭按钮：仅关闭标签，不删除文件
       const closeBtn = document.createElement("button");
       closeBtn.className = "editor-tab-close";
@@ -332,9 +392,101 @@ window.App = (() => {
     if (tabsList.children.length === 0) {
       const placeholder = document.createElement("div");
       placeholder.className = "editor-tab-placeholder";
-      placeholder.textContent = "💡 点击左侧文件重新打开标签";
+      placeholder.textContent = "💡 点左侧文件重新打开标签";
       tabsList.appendChild(placeholder);
     }
+    updateTabActionButtons();
+  }
+
+  // ================= 浮动小菜单（移动文件 / 标签右键菜单） =================
+  let floatingMenu = null;
+
+  function closeFloatingMenu() {
+    if (floatingMenu && floatingMenu.parentNode) floatingMenu.parentNode.removeChild(floatingMenu);
+    floatingMenu = null;
+  }
+
+  function showFloatingMenu(anchor, items) {
+    closeFloatingMenu();
+    const menu = document.createElement("div");
+    menu.className = "floating-menu";
+    items.forEach(it => {
+      const b = document.createElement("button");
+      b.className = "floating-menu-item" + (it.disabled ? " disabled" : "");
+      b.textContent = it.label;
+      if (it.disabled) {
+        b.disabled = true;
+      } else {
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          closeFloatingMenu();
+          try { it.fn(); } catch (err) { console.warn("菜单操作失败", err); }
+        });
+      }
+      menu.appendChild(b);
+    });
+    document.body.appendChild(menu);
+    const rect = anchor.getBoundingClientRect();
+    const mw = menu.offsetWidth || 150;
+    const mh = menu.offsetHeight || 0;
+    let left = Math.min(rect.left, window.innerWidth - mw - 8);
+    let top = rect.bottom + 4;
+    if (top + mh > window.innerHeight - 8) top = Math.max(8, rect.top - mh - 4);
+    menu.style.left = Math.max(8, left) + "px";
+    menu.style.top = Math.max(8, top) + "px";
+    floatingMenu = menu;
+  }
+
+  document.addEventListener("click", closeFloatingMenu);
+  window.addEventListener("resize", closeFloatingMenu);
+
+  // 移动到文件夹的小选单
+  function showFolderMenu(anchor, file) {
+    showFloatingMenu(anchor, FileManager.getFolders().map(folder => ({
+      label: folder.emoji + " " + folder.name + (folder.id === file.folderId ? "（当前）" : ""),
+      disabled: folder.id === file.folderId,
+      fn: () => {
+        if (FileManager.moveFile(file.id, folder.id)) {
+          showToast("已移动到「" + folder.name + "」", "📁");
+          SoundEffects.playPop();
+        }
+      }
+    })));
+  }
+
+  // 标签栏上的「关闭其他 / 关闭全部」按钮可用状态
+  function updateTabActionButtons() {
+    const openCount = FileManager.getFiles().filter(f => !closedTabIds.has(f.id)).length;
+    const btnOther = document.getElementById("btnCloseOtherTabs");
+    const btnAll = document.getElementById("btnCloseAllTabs");
+    if (btnOther) btnOther.disabled = openCount <= 1;
+    if (btnAll) btnAll.disabled = openCount === 0;
+  }
+
+  // 关闭全部标签（文件不会被删掉）
+  function closeAllTabs() {
+    const allFiles = FileManager.getFiles();
+    if (!allFiles.length) return;
+    allFiles.forEach(f => closedTabIds.add(f.id));
+    saveClosedTabs();
+    CodeEditor.setValue("");
+    renderEditorTabs(allFiles, null);
+    showToast("🧹 标签都关掉了，文件还在左边哦~", "🧹");
+    SoundEffects.playPop();
+  }
+
+  // 关闭其他标签（保留 keepId 或当前标签）
+  function closeOtherTabs(keepId) {
+    const allFiles = FileManager.getFiles();
+    const keep = keepId || (FileManager.getActiveFile() || {}).id;
+    if (!keep) return;
+    allFiles.forEach(f => { if (f.id !== keep) closedTabIds.add(f.id); });
+    closedTabIds.delete(keep);
+    saveClosedTabs();
+    FileManager.setActiveFile(keep);
+    renderEditorTabs(allFiles, keep);
+    showToast("🧹 已关闭其他标签", "🧹");
+    SoundEffects.playPop();
   }
 
   // 关闭标签（不删除文件）
@@ -362,6 +514,7 @@ window.App = (() => {
     const files = FileManager.getFiles();
     const currentActive = FileManager.getActiveFile();
     renderEditorTabs(files, currentActive ? currentActive.id : null);
+    updateTabActionButtons();
   }
 
   // 保存已关闭标签状态到 localStorage
@@ -429,8 +582,24 @@ window.App = (() => {
     // 新建文件按钮
     const btnNew = document.getElementById("btnNewFile");
     btnNew.addEventListener("click", () => {
-      openCreateModal();
+      openCreateModal(FileManager.getMyFolderId());
     });
+
+    // 新建文件夹
+    const btnNewFolder = document.getElementById("btnNewFolder");
+    if (btnNewFolder) {
+      btnNewFolder.addEventListener("click", openFolderCreateModal);
+    }
+
+    // 标签：关闭其他 / 关闭全部
+    const btnCloseOther = document.getElementById("btnCloseOtherTabs");
+    if (btnCloseOther) {
+      btnCloseOther.addEventListener("click", () => closeOtherTabs());
+    }
+    const btnCloseAll = document.getElementById("btnCloseAllTabs");
+    if (btnCloseAll) {
+      btnCloseAll.addEventListener("click", closeAllTabs);
+    }
 
     // 下载当前文件为 .py
     const btnExport = document.getElementById("btnExportZip");
@@ -600,7 +769,11 @@ window.App = (() => {
         const all = FileManager.getAllFiles();
         if (!all.length) { showToast("还没有作品可以打包哦~", "📦"); return; }
         try {
-          const blob = ZipWriter.build(all.map(f => ({ name: f.name, content: f.content })));
+          // 按文件夹分层打包，解压后结构清晰
+          const blob = ZipWriter.build(all.map(f => ({
+            name: f.folderName ? f.folderName + "/" + f.name : f.name,
+            content: f.content
+          })));
           downloadBlob(blob, `我的代码宝箱_${new Date().toISOString().slice(0, 10)}.zip`);
           showToast(`📦 已打包 ${all.length} 个作品，快看看下载文件夹吧！`, "🎉");
           SoundEffects.playSuccess();
@@ -856,28 +1029,47 @@ window.App = (() => {
     confirmCallback = null;
   }
 
-  // ================= 文件弹窗管理 =================
-  function openCreateModal() {
-    modalMode = "create";
-    document.getElementById("fileModalTitle").innerHTML = "<span>✨ 新建 Python 代码文件</span>";
-    document.getElementById("fileModalDesc").textContent = "给你的代码起一个酷酷的名字吧（建议以 .py 结尾）";
+  // ================= 文件 / 文件夹弹窗管理 =================
+  function openFileModal(titleHtml, desc, value, mode, targetId) {
+    modalMode = mode;
+    modalTargetId = targetId || null;
+    document.getElementById("fileModalTitle").innerHTML = titleHtml;
+    document.getElementById("fileModalDesc").textContent = desc;
     const input = document.getElementById("fileModalInput");
-    input.value = `新代码_${FileManager.getFiles().length + 1}.py`;
+    input.value = value;
     document.getElementById("fileModal").classList.add("active");
     input.focus();
     input.select();
   }
 
+  function openCreateModal(folderId) {
+    modalFolderId = folderId || null;
+    const folder = FileManager.getFolders().find(f => f.id === folderId);
+    openFileModal(
+      "<span>✨ 新建 Python 代码文件</span>",
+      folder ? `会放到「${folder.name}」里，给你的代码起个名字吧（建议以 .py 结尾）` : "给你的代码起一个酷酷的名字吧（建议以 .py 结尾）",
+      `新代码_${FileManager.getFiles().length + 1}.py`,
+      "create",
+      null
+    );
+  }
+
   function openRenameModal(fileId, currentName) {
-    modalMode = "rename";
-    modalTargetId = fileId;
-    document.getElementById("fileModalTitle").innerHTML = "<span>✏️ 重命名文件</span>";
-    document.getElementById("fileModalDesc").textContent = "修改一个新名字：";
-    const input = document.getElementById("fileModalInput");
-    input.value = currentName;
-    document.getElementById("fileModal").classList.add("active");
-    input.focus();
-    input.select();
+    openFileModal("<span>✏️ 重命名文件</span>", "修改一个新名字：", currentName, "rename", fileId);
+  }
+
+  function openFolderCreateModal() {
+    openFileModal(
+      "<span>📁 新建文件夹</span>",
+      "给文件夹起个名字吧（例如：我的游戏、练习本）",
+      `新文件夹${FileManager.getFolders().length + 1}`,
+      "createFolder",
+      null
+    );
+  }
+
+  function openFolderRenameModal(folderId, currentName) {
+    openFileModal("<span>✏️ 文件夹改名</span>", "修改一个新名字：", currentName, "renameFolder", folderId);
   }
 
   function closeModal() {
@@ -894,7 +1086,7 @@ window.App = (() => {
     }
 
     if (modalMode === "create") {
-      FileManager.createFile(name);
+      FileManager.createFile(name, undefined, modalFolderId);
       showToast(`🎉 文件 ${name} 创建成功！`, "📄");
       SoundEffects.playSuccess();
     } else if (modalMode === "rename") {
@@ -906,8 +1098,39 @@ window.App = (() => {
         showToast("⚠️ 重命名失败，可能已经有同名文件了哦", "❌");
         return;
       }
+    } else if (modalMode === "createFolder") {
+      const folder = FileManager.createFolder(name);
+      showToast(`📁 文件夹「${folder.name}」建好啦`, "📁");
+      SoundEffects.playSuccess();
+    } else if (modalMode === "renameFolder") {
+      if (FileManager.renameFolder(modalTargetId, name)) {
+        showToast("✏️ 文件夹改名完成！", "✨");
+        SoundEffects.playSuccess();
+      } else {
+        showToast("⚠️ 改名失败，可能已经有同名文件夹了", "❌");
+        return;
+      }
     }
+    modalFolderId = null;
     closeModal();
+  }
+
+  function confirmDeleteFolder(folder) {
+    const count = FileManager.getFilesIn(folder.id).length;
+    showConfirmModal(
+      "🗑️ 删除文件夹",
+      `确定要删除文件夹【${escapeHtml(folder.name)}】吗？<br>` +
+      (count ? `里面的 <b>${count}</b> 个文件会移到「我的作品」，不会丢～` : "这个文件夹是空的。"),
+      () => {
+        const res = FileManager.deleteFolder(folder.id);
+        if (res.success) {
+          showToast(`已删除文件夹 ${folder.name}`, "🗑️");
+          SoundEffects.playPop();
+        } else {
+          showToast(res.reason, "⚠️");
+        }
+      }
+    );
   }
 
   function confirmDeleteFile(fileId, fileName) {
