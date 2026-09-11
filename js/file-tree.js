@@ -158,6 +158,16 @@ const FileManager = (() => {
       return namespace;
     },
 
+    // 从 localStorage 重新载入当前档案（云同步应用远端数据后调用）
+    reload() {
+      files = [];
+      folders = [];
+      collapsed = {};
+      activeFileId = null;
+      init();
+      return files;
+    },
+
     onChange(fn) {
       listeners.push(fn);
     },
@@ -271,6 +281,8 @@ const FileManager = (() => {
       if (file && file.content !== content) {
         file.content = content;
         saveToStorage();
+        // 内容有改动 → 通知云同步（登录后会自动排队上传）
+        if (typeof CloudSync !== "undefined" && CloudSync.noteDirty) CloudSync.noteDirty();
       }
     },
 

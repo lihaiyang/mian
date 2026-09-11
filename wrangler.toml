@@ -1,0 +1,10 @@
+# 萌码 Python —— Cloudflare Pages 配置
+name = "mian"
+compatibility_date = "2025-01-01"
+pages_build_output_dir = "."
+
+# D1：匿名同步码账号 + 作品/配置
+[[d1_databases]]
+binding = "DB"
+database_name = "mian-db"
+database_id = "c716860a-ddc2-4b6c-9236-d105e51bf446"

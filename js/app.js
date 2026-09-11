@@ -35,6 +35,23 @@ window.App = (() => {
       Progress.init();
     }
 
+    // 1.2 云同步：登录后自动同步；同时负责顶栏的头像 / 昵称
+    if (typeof CloudSync !== "undefined") {
+      CloudSync.init();
+      const chip = document.getElementById("btnUserChip");
+      if (chip) chip.addEventListener("click", () => CloudSync.openPanel());
+      const cloudClose = document.getElementById("cloudClose");
+      if (cloudClose) cloudClose.addEventListener("click", () => CloudSync.closePanel());
+      const cloudModal = document.getElementById("cloudModal");
+      if (cloudModal) {
+        cloudModal.addEventListener("click", (e) => { if (e.target === cloudModal) CloudSync.closePanel(); });
+      }
+      if (typeof Progress !== "undefined" && Progress.onChange) {
+        Progress.onChange(() => CloudSync.renderChip());
+      }
+      CloudSync.renderChip();
+    }
+
     // 2. 初始化代码编辑器
     const editorArea = document.getElementById("codeEditorArea");
     CodeEditor.init(editorArea);

@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="vendor/codemirror/show-hint.min.css">
   
   <!-- 全局自定义少儿样式 -->
-  <link rel="stylesheet" href="css/style.css?v=20260911f" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
+  <link rel="stylesheet" href="css/style.css?v=20260911i" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
 </head>
 <body data-page-node-id="MABBDhhrP5uEOfEzmMJlsw">
 
@@ -30,6 +30,13 @@
 
     <!-- 核心运行与主要操作 -->
     <div class="header-actions" data-page-node-id="2E5QH4EX70tCF0wSaRFhpI">
+      <!-- 当前小朋友：头像 + 昵称 + 云同步状态（点开云同步面板） -->
+      <button class="header-btn user-chip" id="btnUserChip" title="云同步 / 我的档案">
+        <span class="user-avatar" id="userAvatar">🐼</span>
+        <span class="user-name" id="userName">小朋友</span>
+        <span class="cloud-dot" id="cloudDot">☁️</span>
+      </button>
+
       <!-- 引擎状态小药丸 -->
       <div class="engine-status-pill" id="engineStatusPill" title="基于 WebAssembly 的完整 Python 3 引擎" data-page-node-id="e5VYOvrETS4CQjE2YDQpU2">
         <span class="status-dot loading" id="statusDot" data-page-node-id="CdKCpnLEI76036Kv5bckhp"></span>
@@ -342,6 +349,17 @@
     </div>
   </div>
 
+  <!-- ================= 弹窗：云同步（匿名同步码） ================= -->
+  <div class="modal-overlay" id="cloudModal">
+    <div class="modal-card cloud-card">
+      <div class="modal-title"><span>☁️ 云同步</span></div>
+      <div id="cloudBody"></div>
+      <div class="modal-footer">
+        <button class="btn-run-magic" id="cloudClose" style="padding:6px 18px; font-size:13px;">关闭</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ================= 炫彩通知小泡泡 ================= -->
   <div class="toast-box" id="toastBox" data-page-node-id="6qIoeipxlRgpMlcnI9x99W">
     <span id="toastIcon" data-page-node-id="daRqEznTKjdg1aIar9ic3v">🎉</span>
@@ -359,16 +377,17 @@
   <script src="vendor/confetti.min.js"></script>
 
   <!-- ================= 自定义业务脚本模块 ================= -->
-  <script src="js/audio-confetti.js?v=20260911f"></script>
-  <script src="js/examples.js?v=20260911f"></script>
-  <script src="js/turtle-canvas.js?v=20260911f"></script>
-  <script src="js/zip-writer.js?v=20260911f"></script>
-  <script src="js/poster.js?v=20260911f"></script>
-  <script src="js/python-runner.js?v=20260911f"></script>
-  <script src="js/editor.js?v=20260911f"></script>
-  <script src="js/file-tree.js?v=20260911f"></script>
-  <script src="js/progress.js?v=20260911f"></script>
-  <script src="js/app.js?v=20260911f"></script>
+  <script src="js/audio-confetti.js?v=20260911i"></script>
+  <script src="js/examples.js?v=20260911i"></script>
+  <script src="js/turtle-canvas.js?v=20260911i"></script>
+  <script src="js/zip-writer.js?v=20260911i"></script>
+  <script src="js/poster.js?v=20260911i"></script>
+  <script src="js/python-runner.js?v=20260911i"></script>
+  <script src="js/editor.js?v=20260911i"></script>
+  <script src="js/file-tree.js?v=20260911i"></script>
+  <script src="js/progress.js?v=20260911i"></script>
+  <script src="js/cloud.js?v=20260911i"></script>
+  <script src="js/app.js?v=20260911i"></script>
 
 </body>
 </html>

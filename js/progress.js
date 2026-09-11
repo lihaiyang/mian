@@ -44,6 +44,7 @@ const Progress = (() => {
   let profiles = [];
   let currentId = "";
   let stats = null;
+  const changeListeners = [];     // 外部订阅（云同步 / 顶栏头像）
 
   // ================= 存储 =================
   function readJson(key, fallback) {
@@ -299,6 +300,7 @@ const Progress = (() => {
     renderStats();
     renderMissions();
     renderBadges();
+    changeListeners.forEach(fn => { try { fn(); } catch (e) {} });
   }
 
   // ================= 面板事件 =================
@@ -413,6 +415,19 @@ const Progress = (() => {
 
   return {
     init,
+
+    // 云同步应用远端数据后重新载入
+    reload() {
+      profiles = loadProfiles();
+      stats = loadStats();
+      renderAll();
+    },
+
+    // 档案 / 学习记录变化时通知外部（云同步、顶栏头像）
+    onChange(fn) {
+      changeListeners.push(fn);
+    },
+
     recordRun,
     recordVfs,
     getMissions: () => MISSIONS.map(m => ({ id: m.id, title: m.title, hint: m.hint, emoji: m.emoji, done: !!stats.missions[m.id] })),
