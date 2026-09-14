@@ -127,6 +127,28 @@ check("点一下同步：新建 + 改内容都传上去了",
   /设备A改过的内容/.test(afterManual.content) && afterManual.status === "ok" && afterManual.label === "已同步",
   JSON.stringify(afterManual).slice(0, 120));
 
+// 左栏文件上的「未同步」黄点
+await A.page.evaluate(() => {
+  const f = FileManager.getFiles().find((x) => x.name === "来自设备A.py");
+  FileManager.setActiveFile(f.id);
+  CodeEditor.setValue("print('再改一次看黄点')\n");
+});
+await sleep(800);
+const dot = await A.page.evaluate(() => {
+  const el = [...document.querySelectorAll(".file-item[data-file-id]")]
+    .find((x) => x.querySelector(".file-name") && x.querySelector(".file-name").textContent.includes("来自设备A.py"));
+  return el ? el.classList.contains("pending-sync") : null;
+});
+check("改了文件后，左栏这个文件出现「未同步」标记", dot === true, String(dot));
+await A.page.click("#btnSyncNow");
+await sleep(3000);
+const dotAfter = await A.page.evaluate(() => {
+  const el = [...document.querySelectorAll(".file-item[data-file-id]")]
+    .find((x) => x.querySelector(".file-name") && x.querySelector(".file-name").textContent.includes("来自设备A.py"));
+  return el ? el.classList.contains("pending-sync") : null;
+});
+check("同步之后黄点消失", dotAfter === false, String(dotAfter));
+
 // ---------- B 用同步码登录，拿到 A 的作品 ----------
 const loginOk = await B.page.evaluate(async (c) => {
   await CloudSync.login(c, "");

@@ -142,7 +142,16 @@ const CloudSync = (() => {
   function sigFolder(f) {
     return JSON.stringify([f.name, f.emoji || "", f.builtin ? 1 : 0, f.keep ? 1 : 0, Number(f.position) || 0]);
   }
-  function sigFile(f) { return JSON.stringify([f.name, f.folderId || f.folder_id || "", f.content || ""]); }
+  // 文件夹要归一化：老数据 / 老客户端推上来的行 folder_id 可能是空的，
+  // 而本地 FileManager 的 ensureFolders() 会把它补成默认文件夹「我的作品」。
+  // 如果两边算出来的签名不一致，这台设备就会永远认为"本地改过"，
+  // 于是云端对这个文件的更新每次都被跳过 —— 表现就是"改了文件在别的设备上永远看不到"。
+  const DEFAULT_FOLDER_ID = "f_mine";
+  function folderOf(f) {
+    const id = f.folderId || f.folder_id || "";
+    return id || DEFAULT_FOLDER_ID;
+  }
+  function sigFile(f) { return JSON.stringify([f.name, folderOf(f), f.content || ""]); }
   function sigStats(st) { return JSON.stringify(st || {}); }
   function sigVfs(text) { return JSON.stringify(text || ""); }
   function sigDraft(code) { return JSON.stringify(code || ""); }
@@ -379,7 +388,7 @@ const CloudSync = (() => {
       if (i !== -1 && localChanged(key, sigFile(ws.files[i]), cloudWins)) { localOnly++; return; }
       if (f.deleted) { if (i !== -1) ws.files.splice(i, 1); }
       else {
-        const row = { id: f.id, name: f.name, content: f.content || "", folderId: f.folder_id || "" };
+        const row = { id: f.id, name: f.name, content: f.content || "", folderId: folderOf(f) };
         if (i === -1) ws.files.push(row); else ws.files[i] = Object.assign({}, ws.files[i], row);
       }
       writeWorkspace(f.profile_id, ws);
@@ -638,8 +647,9 @@ const CloudSync = (() => {
     if (!isSignedIn()) return;
     dirty = true;
     dirtyCount += 1;
-    if (syncing || scheduled) return;
-    setStatus(status === "error" ? "error" : "dirty", lastError);
+    if (syncing) return;
+    // 只在状态「从别的变成未同步」时通知一次，避免每敲一个字都重算一遍
+    if (status !== "dirty") setStatus(status === "error" ? "error" : "dirty", lastError);
   }
 
   // ---------- 顶栏：头像 + 昵称 + 云状态 ----------
@@ -958,6 +968,20 @@ const CloudSync = (() => {
     },
     isSignedIn, getStatus, createAccount, login, setPin, rotateCode, signOutLocal,
     syncNow, noteDirty, whenIdle, isIdle,
+    /** 本机还有哪些内容没同步（给界面打标记用） */
+    getPending() {
+      const out = { files: {}, drafts: {}, count: 0 };
+      if (!isSignedIn()) return out;
+      try {
+        const collected = collectChanges();
+        (collected.changes.files || []).forEach(r => { if (r.id) out.files[r.id] = 1; });
+        (collected.changes.learn || []).forEach(r => { if (r.draft_id) out.drafts[r.draft_id] = 1; });
+        (collected.changes.profiles || []).forEach(r => { out.progress = true; });
+        if ((collected.changes.progress || []).length) out.progress = true;
+        out.count = countRows(collected.changes);
+      } catch (e) { /* 计算失败不影响界面 */ }
+      return out;
+    },
     openPanel, closePanel, renderPanel, renderChip, renderShareTab, showNeedSyncNotice,
     shareCurrentFile, shareProgress, copyText,
     onStatus(fn) { listeners.push(fn); },

@@ -79,6 +79,11 @@ window.App = (() => {
       const chip = document.getElementById("btnUserChip");
       if (chip) chip.addEventListener("click", () => openMyPanel("profile"));
 
+      // 云同步状态变化 → 给左栏文件列表打「未同步」标记
+      if (typeof CloudSync !== "undefined" && CloudSync.onStatus) {
+        CloudSync.onStatus(() => { try { markPendingFiles(); } catch (e) {} });
+      }
+
       // 顶栏「云同步」按钮：没开启就打开面板，已开启就立即同步一次
       const btnSyncNow = document.getElementById("btnSyncNow");
       if (btnSyncNow) {
@@ -368,6 +373,21 @@ window.App = (() => {
 
       inFolder.forEach(file => listElem.appendChild(buildFileItem(file, activeId, folders)));
     });
+
+    markPendingFiles();
+  }
+
+  // 给「有改动还没同步」的文件打一个 🟡 标记，孩子和家长一眼能看出来
+  function markPendingFiles() {
+    let pending = { files: {} };
+    try {
+      if (typeof CloudSync !== "undefined" && CloudSync.getPending) pending = CloudSync.getPending();
+    } catch (e) { return; }
+    Array.prototype.forEach.call(document.querySelectorAll(".file-item[data-file-id]"), el => {
+      const on = !!pending.files[el.dataset.fileId];
+      el.classList.toggle("pending-sync", on);
+      if (on) el.title = (el.title || "") + "（有改动还没同步）";
+    });
   }
 
   function makeActionBtn(icon, title, fn) {
@@ -388,6 +408,7 @@ window.App = (() => {
     const isClosed = closedTabIds.has(file.id);
     const item = document.createElement("div");
     item.className = `file-item sub ${file.id === activeId ? "active" : ""} ${isClosed ? "closed-tab" : ""}`;
+    item.dataset.fileId = file.id;
 
     const info = document.createElement("div");
     info.className = "file-info";

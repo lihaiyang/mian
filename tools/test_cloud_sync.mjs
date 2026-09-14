@@ -303,6 +303,50 @@ async function testPullAndLocalWins() {
 }
 
 // =====================================================================
+// ③b 云端那一行的 folder_id 为空（老客户端推的），本地补过默认文件夹后
+//     仍然要能收到云端更新（否则这台设备永远"收不到别人改的文件"）
+// =====================================================================
+async function testFolderNullStillPulls() {
+  const server = makeServer();
+  const storeA = makeStore();
+  seedProfile(storeA, "p_default", "小熊猫", "🐼");
+  seedWorkspace(storeA, "p_default", [{ id: "file_f", name: "f.py", content: "第一版", folderId: "f_mine" }]);
+  const devA = makeDevice(storeA, server);
+  const code = await devA.CloudSync.createAccount("");
+  await devA.CloudSync.syncNow(true);
+
+  // 模拟「老客户端推上去的行」：folder_id 是空的
+  const acc = server.accounts.get(code.replace(/[^0-9A-Za-z]/g, "").toUpperCase());
+  const row = acc.tables.files.get("file_f");
+  row.folder_id = null;
+  row.content = "云端改过的版本";
+  acc.rev += 1;
+  row.rev = acc.rev;
+
+  // 本机（比如新设备登录后）拿到这一行时，folderId 是 ""，
+  // 之后 FileManager 的 ensureFolders() 会把它补成默认文件夹 "f_mine"
+  const storeB = makeStore();
+  seedProfile(storeB, "p_default", "小熊猫", "🐼");
+  const devB = makeDevice(storeB, server);
+  await devB.CloudSync.login(code, "");
+  let ws = JSON.parse(storeB.getItem("codepanda_python_files_v1__p_default"));
+  check("登录时就能拿到云端内容（folder_id 为空也不影响）",
+    ws.files[0].content === "云端改过的版本", ws.files[0].content);
+  ws.files[0].folderId = "f_mine";     // 模拟 ensureFolders 补上默认文件夹
+  storeB.setItem("codepanda_python_files_v1__p_default", JSON.stringify(ws));
+
+  // 云端再改一次 → 本机应该能收到
+  acc.rev += 1;
+  row.content = "云端又改了一次";
+  row.updated_at = Date.now() + 1000;
+  row.rev = acc.rev;
+  await devB.CloudSync.syncNow(true);
+  ws = JSON.parse(storeB.getItem("codepanda_python_files_v1__p_default"));
+  check("默认文件夹补齐之后，云端更新仍然拉得下来", ws.files[0].content === "云端又改了一次",
+    ws.files[0].content);
+}
+
+// =====================================================================
 // ④ 新设备先做题再登录 → 学习记录并集，谁都不丢
 // =====================================================================
 async function testStatsMergeOnLogin() {
@@ -513,6 +557,7 @@ async function testOfflineThenOnline() {
 (async () => {
   await testRetryAfterFailure();
   await testPullAndLocalWins();
+  await testFolderNullStillPulls();
   await testStatsMergeOnLogin();
   await testBusyDoesNotDrop();
   await testSkippedIsWarned();

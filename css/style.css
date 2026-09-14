@@ -2588,3 +2588,10 @@ body.dark-mode .award-stat { background: #1E293B; border-color: #334155; }
 .sync-btn.is-error { border-color: #FCA5A5; background: var(--danger-light); }
 body.dark-mode .sync-btn.is-error { background: #3B1D1D; }
 @media (max-width: 900px) { .sync-btn .sync-label { display: none; } }
+
+/* 左栏：有改动还没同步的文件打一个黄点 */
+.file-item.pending-sync .file-name::after {
+  content: "🟡";
+  margin-left: 5px;
+  font-size: 10px;
+}

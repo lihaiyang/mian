@@ -14,7 +14,7 @@
  * 依赖：CodeEditor / PythonRunner / Progress / FileManager / App（切换模式与恢复工坊状态）
  */
 const Learn = (() => {
-  const V = "20260914i";
+  const V = "20260914j";
   const PAGE_SIZE = 40;
   const JUDGE_TIMEOUT_MS = 4000;
 
