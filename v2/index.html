@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="/vendor/codemirror/show-hint.min.css">
   
   <!-- 全局自定义少儿样式 -->
-  <link rel="stylesheet" href="css/style.css?v=20260914a" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
+  <link rel="stylesheet" href="css/style.css?v=20260914b" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
 </head>
 <body data-page-node-id="MABBDhhrP5uEOfEzmMJlsw">
 
@@ -120,10 +120,20 @@
     <!-- 2. 中间：代码编辑器 -->
     <section class="workspace-panel editor-panel" data-page-node-id="DtdgelaInDm5rXAV3bkLFr">
       <!-- 顶部文件标签栏 -->
-      <!-- 学堂模式：正在学什么 / 正在做哪一题（工坊模式下隐藏） -->
+      <!-- 学堂模式：正在学什么 / 正在做哪一题 + 布局控制（工坊模式下隐藏） -->
       <div class="learn-task-bar" id="learnTaskBar">
         <span class="learn-task-crumb" id="learnTaskCrumb">✏️ 练习</span>
         <span class="learn-task-progress" id="learnTaskProgress"></span>
+
+        <!-- 教程的三种布局：📖 讲解优先 / ⚖️ 各一半 / ⌨️ 代码优先（也可以直接拖分隔条） -->
+        <span class="learn-layout-group" id="learnLayoutGroup">
+          <button class="learn-layout-btn" data-act="layout" data-mode="read" title="讲解优先：讲解 70%，代码 30%（Alt+1）">📖</button>
+          <button class="learn-layout-btn" data-act="layout" data-mode="half" title="各一半：讲解 50%，代码 50%（Alt+2）">⚖️</button>
+          <button class="learn-layout-btn" data-act="layout" data-mode="code" title="代码优先：讲解收起，编辑器全高（Alt+3）">⌨️</button>
+        </span>
+
+        <button class="learn-mini-btn" id="btnCompare" data-act="compare" title="把原版示例代码并排放在右边，方便对照">↔ 对照原版</button>
+        <button class="learn-mini-btn" id="btnFocus" data-act="focus" title="专注写代码：把其它面板都收起来（Esc 退出）">⛶ 专注</button>
         <button class="learn-mini-btn" id="btnLearnSaveToLib" title="把这段代码存进「我的作品库」">📌 存进作品库</button>
       </div>
 
@@ -436,18 +446,18 @@
   <script src="/vendor/confetti.min.js"></script>
 
   <!-- ================= 自定义业务脚本模块 ================= -->
-  <script src="js/audio-confetti.js?v=20260914a"></script>
-  <script src="js/examples.js?v=20260914a"></script>
-  <script src="js/turtle-canvas.js?v=20260914a"></script>
-  <script src="js/zip-writer.js?v=20260914a"></script>
-  <script src="js/poster.js?v=20260914a"></script>
-  <script src="js/python-runner.js?v=20260914a"></script>
-  <script src="js/editor.js?v=20260914a"></script>
-  <script src="js/file-tree.js?v=20260914a"></script>
-  <script src="js/progress.js?v=20260914a"></script>
-  <script src="js/cloud.js?v=20260914a"></script>
-  <script src="js/learn.js?v=20260914a"></script>
-  <script src="js/app.js?v=20260914a"></script>
+  <script src="js/audio-confetti.js?v=20260914b"></script>
+  <script src="js/examples.js?v=20260914b"></script>
+  <script src="js/turtle-canvas.js?v=20260914b"></script>
+  <script src="js/zip-writer.js?v=20260914b"></script>
+  <script src="js/poster.js?v=20260914b"></script>
+  <script src="js/python-runner.js?v=20260914b"></script>
+  <script src="js/editor.js?v=20260914b"></script>
+  <script src="js/file-tree.js?v=20260914b"></script>
+  <script src="js/progress.js?v=20260914b"></script>
+  <script src="js/cloud.js?v=20260914b"></script>
+  <script src="js/learn.js?v=20260914b"></script>
+  <script src="js/app.js?v=20260914b"></script>
 
 </body>
 </html>

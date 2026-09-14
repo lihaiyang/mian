@@ -14,7 +14,7 @@
  * 依赖：CodeEditor / PythonRunner / Progress / FileManager / App（切换模式与恢复工坊状态）
  */
 const Learn = (() => {
-  const V = "20260914a";
+  const V = "20260914b";
   const PAGE_SIZE = 40;
   const JUDGE_TIMEOUT_MS = 4000;
 
@@ -110,6 +110,48 @@ const Learn = (() => {
   function draftCount() {
     loadDrafts();
     return Object.keys(drafts).length;
+  }
+
+  // ================= 布局：教程的「讲解 / 代码」怎么分 =================
+  // 三种预设：read=讲解优先(70/30)、half=各一半(50/50)、code=代码优先(讲解折叠)
+  const LAYOUT_KEY_PREFIX = "codepanda_learn_layout_v1__";
+  const LESSON_MIN_H = 96;      // 讲解区最小高度
+  const CODE_MIN_H = 300;       // 编辑器最小高度（避免拖到只能看两三行）
+  const FOLDED_H = 46;          // 折叠后只留一条标题栏
+  const SPLITTER_H = 12;        // 分隔条本身占的高度
+  const COLLAPSED_CODE_H = 34;  // 「讲解优先」时代码区收成一条提示栏
+  const LAYOUT_LABEL = { read: "📖 讲解优先", half: "⚖️ 各一半", code: "⌨️ 代码优先" };
+
+  let layoutState = null;       // { lesson: {mode, ratio}, compare: false }
+  let dragState = null;
+  let resizeTimer = null;
+
+  function layoutKey() {
+    return LAYOUT_KEY_PREFIX + currentProfileId();
+  }
+
+  function loadLayout() {
+    if (layoutState) return layoutState;
+    try {
+      const raw = localStorage.getItem(layoutKey());
+      const val = raw ? JSON.parse(raw) : null;
+      layoutState = (val && typeof val === "object") ? val : {};
+    } catch (e) {
+      layoutState = {};
+    }
+    if (!layoutState.lesson) layoutState.lesson = { mode: "half", ratio: 0.5 };
+    if (typeof layoutState.compare !== "boolean") layoutState.compare = false;
+    return layoutState;
+  }
+
+  function persistLayout() {
+    try { localStorage.setItem(layoutKey(), JSON.stringify(loadLayout())); } catch (e) {}
+  }
+
+  function layoutFor(section) {
+    const st = loadLayout();
+    if (!st.lesson) st.lesson = { mode: "half", ratio: 0.5 };
+    return st.lesson;
   }
 
   // ================= 基础工具 =================
@@ -241,6 +283,8 @@ const Learn = (() => {
       if (window.App && App.enterLearnMode) App.enterLearnMode();
       document.body.classList.add("mode-learn");
       loadDrafts();
+      loadLayout();
+      ensureLearnDom();
     }
     goto(sec || section || "path");
     sound("playPop");
@@ -250,8 +294,10 @@ const Learn = (() => {
     flushDraft();
     stopAutoNext();
     stopExamTimer();
+    toggleFocus(false);
     document.body.classList.remove("mode-learn");
     document.body.classList.remove("learn-wide");
+    releaseLearnDom();
     if (window.App && App.exitLearnMode) App.exitLearnMode();
     sound("playPop");
   }
@@ -267,9 +313,14 @@ const Learn = (() => {
     const wide = (section === "path" || section === "award");
     document.body.classList.toggle("learn-wide", wide);
     if (section !== "exam") stopExamTimer();
+    // 只有「教程」才显示讲解区：切到示例/练习/模拟考等要收起来（布局设置会记住，回来还在）
+    if (section !== "lesson") hideLessonHost();
+    if (section !== "example") { /* 对照栏只在示例里用 */ }
     markTab(section);
     renderHud();
     renderPanel();
+    applyLayout();
+    renderCompare();
     updateTaskBar();
     renderActionBar();
   }
@@ -436,7 +487,7 @@ const Learn = (() => {
 
   // 教程正文：放在编辑器上方（左目录 / 上讲下练，示例代码一键送进编辑器）
   function renderLessonMain(lesson) {
-    const host = ensureLessonHost();
+    const host = ensureLearnDom();
     if (!host) return;
     const p = progress();
     const done = p && p.isLessonDone(lesson.id);
@@ -445,7 +496,8 @@ const Learn = (() => {
       '<div class="lesson-head-text"><div class="lesson-head-title">' + esc(lesson.title) + '</div>' +
       '<div class="lesson-head-meta">' + STAGE_INFO[lesson.stage].emoji + ' ' + esc(lesson.unit) +
       ' · 约 ' + (lesson.minutes || 8) + ' 分钟' + (done ? ' · <b class="ok">已学完 ✅</b>' : '') + '</div></div>' +
-      '<button class="learn-mini-btn" data-act="lesson-fold">收起 ▴</button>' +
+      '<button class="learn-mini-btn" data-act="lesson-fold">' +
+      (layoutFor("lesson").mode === "code" ? "📖 展开讲解 ▾" : "收起 ▴") + '</button>' +
       '</div>';
 
     html += '<div class="lesson-main-body">';
@@ -487,29 +539,260 @@ const Learn = (() => {
 
     host.innerHTML = html;
     host.style.display = "flex";
-    host.classList.remove("folded");
+    applyLayout();
+    markerLayoutButtons();
   }
 
-  function ensureLessonHost() {
+  // 学堂模式下把编辑区改造成：讲解区 +（可拖的）分隔条 + [编辑器 | 对照栏]
+  // 注意：只是把 .editor-body-wrapper 挪进一个行容器，离开学堂时原样放回，
+  // CodeMirror 实例不动，挪完调一次 refresh() 即可。
+  function ensureLearnDom() {
+    const wrapper = document.querySelector(".editor-body-wrapper");
+    if (!wrapper || !wrapper.parentNode) return null;
+    const parent = wrapper.parentNode;
+
     let host = el("learnLessonHost");
     if (!host) {
       host = document.createElement("div");
       host.id = "learnLessonHost";
       host.className = "learn-lesson-host";
-      const editorBody = document.querySelector(".editor-body-wrapper");
-      if (editorBody && editorBody.parentNode) editorBody.parentNode.insertBefore(host, editorBody);
+      parent.insertBefore(host, wrapper);
     }
-    // 宿主是懒创建的：点击事件必须在创建时绑定（init 时它还不存在）
     if (!host.dataset.bound) {
       host.dataset.bound = "1";
       host.addEventListener("click", handleAction);
     }
+
+    let splitter = el("learnSplitter");
+    if (!splitter) {
+      splitter = document.createElement("div");
+      splitter.id = "learnSplitter";
+      splitter.className = "learn-splitter";
+      splitter.innerHTML = '<span class="learn-splitter-grip"></span><span class="learn-splitter-badge" id="learnSplitterBadge"></span>';
+      parent.insertBefore(splitter, wrapper);
+      splitter.addEventListener("pointerdown", onSplitterDown);
+    }
+
+    let row = el("learnCodeRow");
+    if (!row) {
+      row = document.createElement("div");
+      row.id = "learnCodeRow";
+      row.className = "learn-code-row";
+      parent.insertBefore(row, wrapper);
+      row.appendChild(wrapper);
+      const cmp = document.createElement("div");
+      cmp.id = "learnCompareHost";
+      cmp.className = "learn-compare-host";
+      cmp.addEventListener("click", handleAction);
+      row.appendChild(cmp);
+      // 「讲解优先」时代码区收成一条提示栏，点它就展开
+      row.addEventListener("click", () => {
+        if (row.classList.contains("collapsed")) setLayout("half");
+      });
+      setTimeout(() => { try { CodeEditor.refresh(); } catch (e) {} }, 40);
+    }
     return host;
+  }
+
+  // 回工坊：把编辑器放回原来的位置，拆掉行容器
+  function releaseLearnDom() {
+    const row = el("learnCodeRow");
+    const wrapper = document.querySelector(".editor-body-wrapper");
+    const actionBar = el("learnActionBar");
+    if (row && wrapper && wrapper.parentNode === row && row.parentNode) {
+      row.parentNode.insertBefore(wrapper, actionBar || row);
+      row.parentNode.removeChild(row);
+      setTimeout(() => { try { CodeEditor.refresh(); } catch (e) {} }, 40);
+    }
+    const host = el("learnLessonHost");
+    if (host) { host.style.display = "none"; host.innerHTML = ""; }
+    const splitter = el("learnSplitter");
+    if (splitter) splitter.classList.remove("show");
+    document.body.classList.remove("learn-focus");
   }
 
   function hideLessonHost() {
     const host = el("learnLessonHost");
     if (host) { host.style.display = "none"; host.innerHTML = ""; }
+    const splitter = el("learnSplitter");
+    if (splitter) splitter.classList.remove("show");
+  }
+
+  // 讲解区 / 编辑器之间的可用高度（不含上下那些工具条）
+  function measureRegion() {
+    const panel = document.querySelector(".editor-panel");
+    if (!panel) return { top: 0, height: 0 };
+    const above = ["#learnTaskBar", ".editor-tool-bar"];
+    const below = [".learn-action-bar", ".editor-status-bar"];
+    const h = (list) => list.reduce((sum, sel) => {
+      const e = document.querySelector(sel);
+      return sum + ((e && e.offsetParent !== null) ? e.offsetHeight : 0);
+    }, 0);
+    const rect = panel.getBoundingClientRect();
+    const aboveH = h(above);
+    const belowH = h(below);
+    return {
+      top: rect.top + aboveH,
+      height: Math.max(0, panel.clientHeight - aboveH - belowH)
+    };
+  }
+
+  // 应用当前布局（教程：讲解区高度；其它小节：讲解区收起来，编辑器全高）
+  function applyLayout() {
+    const host = el("learnLessonHost");
+    const splitter = el("learnSplitter");
+    if (!host || !splitter) return;
+
+    const hasContent = host.innerHTML.trim() !== "";
+    if (!isActive() || section !== "lesson" || !hasContent) {
+      host.style.display = "none";
+      splitter.classList.remove("show");
+      return;
+    }
+
+    const st = layoutFor("lesson");
+    const row = el("learnCodeRow");
+    host.style.display = "flex";
+    host.style.flex = "0 0 auto";
+
+    // ⌨️ 代码优先：讲解收成一条标题栏，编辑器全高
+    if (st.mode === "code") {
+      host.classList.add("folded");
+      host.style.height = FOLDED_H + "px";
+      if (row) row.classList.remove("collapsed");
+      splitter.classList.remove("show");
+      syncFoldButton(true);
+      markerLayoutButtons();
+      return;
+    }
+    syncFoldButton(false);
+
+    host.classList.remove("folded");
+    const region = measureRegion();
+
+    // 📖 讲解优先：代码区收成一条提示栏，讲解铺满（想写代码点「⌨️」或那条提示）
+    if (st.mode === "read") {
+      host.style.height = Math.max(LESSON_MIN_H, region.height - COLLAPSED_CODE_H) + "px";
+      if (row) row.classList.add("collapsed");
+      splitter.classList.remove("show");
+      markerLayoutButtons();
+      return;
+    }
+
+    // ⚖️ 各一半（或拖出来的自定义比例）
+    if (row) row.classList.remove("collapsed");
+    const codeMin = Math.min(CODE_MIN_H, Math.max(160, region.height - LESSON_MIN_H));
+    const maxHost = Math.max(LESSON_MIN_H, region.height - codeMin - SPLITTER_H);
+    const px = Math.max(LESSON_MIN_H, Math.min(maxHost, Math.round(region.height * st.ratio)));
+    host.style.height = px + "px";
+    splitter.classList.add("show");
+    markerLayoutButtons();
+  }
+
+  function syncFoldButton(folded) {
+    const btn = document.querySelector('#learnLessonHost [data-act="lesson-fold"]');
+    if (btn) btn.textContent = folded ? "📖 展开讲解 ▾" : "收起 ▴";
+  }
+
+  function markerLayoutButtons() {
+    const st = layoutFor("lesson");
+    Array.prototype.forEach.call(document.querySelectorAll(".learn-layout-btn"), b => {
+      b.classList.toggle("active", b.dataset.mode === st.mode);
+    });
+  }
+
+  function setLayout(mode, opts) {
+    const st = layoutFor("lesson");
+    st.mode = mode;
+    if (mode === "half") st.ratio = 0.5;      // 「各一半」永远是正正好的一半
+    loadLayout().lesson = st;
+    persistLayout();
+    applyLayout();
+    markerLayoutButtons();
+    if (!opts || !opts.silent) setStatus(LAYOUT_LABEL[mode] || "");
+  }
+
+  // 拖分隔条
+  function onSplitterDown(e) {
+    const host = el("learnLessonHost");
+    const splitter = el("learnSplitter");
+    if (!host || !splitter) return;
+    const region = measureRegion();
+    if (!region.height) return;
+    dragState = { region: region, host: host, splitter: splitter };
+    splitter.classList.add("dragging");
+    document.body.classList.add("learn-dragging");
+    try { splitter.setPointerCapture(e.pointerId); } catch (err) {}
+    e.preventDefault();
+  }
+
+  function onSplitterMove(e) {
+    if (!dragState) return;
+    const region = dragState.region;
+    const codeMin = Math.min(CODE_MIN_H, Math.max(160, region.height - LESSON_MIN_H));
+    const maxHost = Math.max(LESSON_MIN_H, region.height - codeMin - SPLITTER_H);
+    const y = e.clientY - region.top;
+    const px = Math.max(LESSON_MIN_H, Math.min(maxHost, Math.round(y)));
+    dragState.host.classList.remove("folded");
+    dragState.host.style.height = px + "px";
+    const st = layoutFor("lesson");
+    st.ratio = Math.max(0.06, Math.min(0.94, px / region.height));
+    if (st.mode === "code") st.mode = "half";
+    loadLayout().lesson = st;
+    const badge = el("learnSplitterBadge");
+    if (badge) badge.textContent = "讲解 " + Math.round(st.ratio * 100) + "% · 代码 " + Math.round((1 - st.ratio) * 100) + "%";
+    markerLayoutButtons();
+  }
+
+  function onSplitterUp() {
+    if (!dragState) return;
+    dragState.splitter.classList.remove("dragging");
+    document.body.classList.remove("learn-dragging");
+    dragState = null;
+    persistLayout();
+    applyLayout();
+    const badge = el("learnSplitterBadge");
+    if (badge) setTimeout(() => { badge.textContent = ""; }, 900);
+  }
+
+  // 对照原版示例代码（并排放在编辑器右边）
+  function toggleCompare(force) {
+    const st = loadLayout();
+    st.compare = (typeof force === "boolean") ? force : !st.compare;
+    persistLayout();
+    renderCompare();
+    updateTaskBar();
+  }
+
+  function renderCompare() {
+    const host = el("learnCompareHost");
+    if (!host) return;
+    const st = loadLayout();
+    const ex = (cur && cur.kind === "example") ? exampleList().find(e => e.id === cur.id) : null;
+    if (!st.compare || !ex) {
+      host.classList.remove("show");
+      host.innerHTML = "";
+      return;
+    }
+    host.classList.add("show");
+    host.innerHTML = '<div class="compare-head">📄 原版示例代码' +
+      '<button class="learn-mini-btn" data-act="compare-close">✕ 收起</button></div>' +
+      '<pre class="lesson-code small">' + esc(ex.code || "") + '</pre>' +
+      '<div class="compare-tip">右边是原版，左边是你改过的。想一键还原就点操作条上的「↺ 还原示例代码」。</div>';
+    setTimeout(() => { try { CodeEditor.refresh(); } catch (e) {} }, 40);
+  }
+
+  // 专注写代码
+  function toggleFocus(force) {
+    const on = (typeof force === "boolean") ? force : !document.body.classList.contains("learn-focus");
+    document.body.classList.toggle("learn-focus", on);
+    const btn = el("btnFocus");
+    if (btn) {
+      btn.textContent = on ? "⛶ 退出专注" : "⛶ 专注";
+      btn.title = on ? "退出专注模式（Esc）" : "专注写代码：把其它面板都收起来（Esc 退出）";
+    }
+    setTimeout(() => { try { CodeEditor.refresh(); } catch (e) {} }, 80);
+    if (on) toast("⛶ 进入专注模式，按 Esc 或再点一次可以退出", "🧘");
   }
 
   // ================= 🎁 示例 =================
@@ -914,6 +1197,14 @@ const Learn = (() => {
       }
     }
     if (saveBtn) saveBtn.style.display = cur ? "inline-flex" : "none";
+
+    const layoutGroup = el("learnLayoutGroup");
+    if (layoutGroup) layoutGroup.classList.toggle("show", !!(cur && cur.kind === "lesson"));
+    const compareBtn = el("btnCompare");
+    if (compareBtn) compareBtn.classList.toggle("show", !!(cur && cur.kind === "example"));
+    const focusBtn = el("btnFocus");
+    if (focusBtn) focusBtn.classList.toggle("show", !!cur);
+    markerLayoutButtons();
   }
 
   function startExamTimer() {
@@ -1247,6 +1538,8 @@ const Learn = (() => {
     hideLessonHost();
     markTab("example");
     renderPanel();
+    renderCompare();
+    updateTaskBar();
     sound("playPop");
   }
 
@@ -1362,6 +1655,17 @@ const Learn = (() => {
 
   // ================= 事件 =================
   function bindEvents() {
+    const taskBar = el("learnTaskBar");
+    if (taskBar) taskBar.addEventListener("click", handleAction);
+
+    window.addEventListener("pointermove", onSplitterMove);
+    window.addEventListener("pointerup", onSplitterUp);
+    window.addEventListener("pointercancel", onSplitterUp);
+    window.addEventListener("resize", () => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { resizeTimer = null; applyLayout(); }, 150);
+    });
+
     const tabs = el("learnTabs");
     if (tabs) {
       tabs.addEventListener("click", (e) => {
@@ -1396,6 +1700,26 @@ const Learn = (() => {
         e.stopPropagation();
         if (cur && cur.kind === "exercise") judgeCurrent();
         else if (cur && cur.kind === "exam") judgeExamQuestion();
+      } else if (e.altKey && (e.key === "1" || e.key === "2" || e.key === "3")) {
+        if (cur && cur.kind === "lesson") {
+          e.preventDefault();
+          setLayout({ "1": "read", "2": "half", "3": "code" }[e.key]);
+        }
+      } else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+        if (cur && cur.kind === "lesson" && section === "lesson") {
+          e.preventDefault();
+          const st = layoutFor("lesson");
+          const delta = e.key === "ArrowUp" ? 0.05 : -0.05;
+          st.mode = "half";
+          st.ratio = Math.max(0.06, Math.min(0.94, (st.ratio || 0.5) + delta));
+          loadLayout().lesson = st;
+          persistLayout();
+          applyLayout();
+          setStatus("讲解 " + Math.round(st.ratio * 100) + "% · 代码 " + Math.round((1 - st.ratio) * 100) + "%");
+        }
+      } else if (e.key === "Escape" && document.body.classList.contains("learn-focus")) {
+        e.preventDefault();
+        toggleFocus(false);
       } else if (e.altKey && e.key === "ArrowRight") {
         e.preventDefault();
         stopAutoNext();
@@ -1444,15 +1768,35 @@ const Learn = (() => {
         openLesson(btn.dataset.id);
         break;
       case "lesson-fold": {
-        const host = el("learnLessonHost");
-        if (!host) break;
-        host.classList.toggle("folded");
-        btn.textContent = host.classList.contains("folded") ? "展开 ▾" : "收起 ▴";
+        // 老按钮：在「代码优先」和「各一半」之间切换
+        const st = layoutFor("lesson");
+        setLayout(st.mode === "code" ? "half" : "code");
         break;
       }
+      case "layout":
+        setLayout(btn.dataset.mode);
+        break;
+      case "compare":
+        toggleCompare();
+        break;
+      case "compare-close":
+        toggleCompare(false);
+        break;
+      case "focus":
+        toggleFocus();
+        break;
       case "lesson-code-to-editor": {
         const l = lessons().find(x => x.id === cur.id);
-        if (l) { CodeEditor.setValue((l.code || "") + "\n"); toast("↓ 示例代码已经放进编辑器，动手改改看~", "✏️"); }
+        if (l) {
+          CodeEditor.setValue((l.code || "") + "\n");
+          const st = layoutFor("lesson");
+          if (st.mode === "read") {
+            setLayout("code", { silent: true });
+            toast("↓ 代码已放进编辑器，讲解先收起来让你专心写（点「📖」随时翻回去）", "⌨️");
+          } else {
+            toast("↓ 示例代码已经放进编辑器，动手改改看~", "✏️");
+          }
+        }
         break;
       }
       case "lesson-run": {

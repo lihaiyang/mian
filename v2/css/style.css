@@ -2858,3 +2858,107 @@ body.mode-learn .toast-box { bottom: 84px; }
 .learn-lesson-host .lesson-code { font-size: 12px; }
 /* 学习地图在整页模式下留白更舒服 */
 body.learn-wide .learn-panel-body { padding: 16px 22px 28px; }
+
+/* ============================================================
+   13. 布局 v2：可拖拽分隔条 + 三种布局 + 对照原版 + 专注写代码
+   ============================================================ */
+
+/* 讲解区高度改由 JS 按比例设置（不再固定 58%），分隔条可上下拖 */
+.learn-lesson-host {
+  flex: 0 0 auto;
+  max-height: none;
+  min-height: 0;
+  height: 50%;
+}
+.learn-lesson-host.folded { height: 46px !important; min-height: 46px; overflow: hidden; }
+
+/* 讲解区 / 编辑器之间的分隔条 */
+.learn-splitter {
+  display: none;
+  position: relative;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  height: 12px;
+  cursor: ns-resize;
+  background: #EEF2FF;
+  border-top: 1px solid #DDD6FE;
+  border-bottom: 1px solid #DDD6FE;
+  touch-action: none;
+  user-select: none;
+}
+body.mode-learn .learn-splitter.show { display: flex; }
+.learn-splitter:hover, .learn-splitter.dragging { background: #DDD6FE; }
+.learn-splitter-grip { width: 54px; height: 4px; border-radius: 999px; background: #A5B4FC; }
+.learn-splitter-badge { position: absolute; right: 10px; font-size: 10.5px; font-weight: 800; color: #5B21B6; }
+body.dark-mode .learn-splitter { background: #241F3A; border-color: #4338CA; }
+body.dark-mode .learn-splitter-grip { background: #6366F1; }
+body.learn-dragging { cursor: ns-resize; }
+body.learn-dragging * { user-select: none !important; }
+
+/* 代码行：编辑器 +（可选的）原版对照栏 */
+.learn-code-row { display: flex; flex-direction: row; flex: 1 1 auto; min-height: 0; }
+.learn-code-row > .editor-body-wrapper { flex: 1 1 auto; min-width: 0; min-height: 0; }
+body.mode-learn .learn-code-row > .editor-body-wrapper { min-height: 220px; }
+
+.learn-compare-host {
+  display: none;
+  flex: 0 0 min(44%, 520px);
+  flex-direction: column;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 10px 12px;
+  background: #F8FAFC;
+  border-left: 2px solid var(--border-soft);
+}
+.learn-compare-host.show { display: flex; }
+.compare-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; color: var(--text-main); margin-bottom: 7px; }
+.compare-head .learn-mini-btn { margin-left: auto; }
+.compare-tip { font-size: 11px; color: var(--text-muted); margin-top: 9px; line-height: 1.65; }
+.learn-compare-host .lesson-code { font-size: 11.5px; }
+body.dark-mode .learn-compare-host { background: #0F172A; border-color: #334155; }
+body.dark-mode .compare-head { color: #E2E8F0; }
+
+/* 任务条上的三种布局按钮 */
+.learn-layout-group { display: none; gap: 3px; padding: 2px; border-radius: 10px; background: #EDE9FE; }
+body.mode-learn .learn-layout-group.show { display: inline-flex; }
+.learn-layout-btn {
+  border: none; background: transparent; cursor: pointer;
+  width: 28px; height: 22px; border-radius: 7px; font-size: 13px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.learn-layout-btn:hover { background: #DDD6FE; }
+.learn-layout-btn.active { background: #5B5FED; box-shadow: 0 2px 6px rgba(91, 95, 237, .35); }
+body.dark-mode .learn-layout-group { background: #312E81; }
+body.dark-mode .learn-layout-btn.active { background: #6366F1; }
+
+#btnCompare, #btnFocus { display: none; }
+body.mode-learn #btnCompare.show, body.mode-learn #btnFocus.show { display: inline-flex; }
+
+/* 专注写代码：其它面板全部让位 */
+body.learn-focus .app-header { display: none; }
+body.learn-focus .learn-bar { display: none; }
+body.learn-focus .learn-panel { display: none; }
+body.learn-focus .output-panel { display: none; }
+body.learn-focus .app-workspace { grid-template-columns: minmax(0, 1fr); }
+body.learn-focus .learn-task-bar { background: #EEF2FF; border-bottom-color: #A5B4FC; }
+body.learn-focus .learn-lesson-host { border-bottom-color: #A5B4FC; }
+body.dark-mode.learn-focus .learn-task-bar { background: #241F3A; }
+
+/* 「讲解优先」：代码区收成一条可点的提示栏 */
+.learn-code-row.collapsed {
+  flex: 0 0 34px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: #F1F5F9;
+  border-top: 2px dashed var(--border-color);
+}
+.learn-code-row.collapsed > .editor-body-wrapper,
+.learn-code-row.collapsed > .learn-compare-host { display: none; }
+.learn-code-row.collapsed::after {
+  content: "⌨️ 代码区已收起 · 点这里或按 Alt+2 展开编辑器";
+  font-size: 12px; font-weight: 800; color: var(--text-muted);
+}
+.learn-code-row.collapsed:hover::after { color: var(--primary); }
+body.dark-mode .learn-code-row.collapsed { background: #1E293B; border-color: #334155; }

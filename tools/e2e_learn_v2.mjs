@@ -58,6 +58,78 @@ check("教程：讲解显示在编辑器上方", await page.isVisible("#learnLes
 check("教程：讲解里的示例代码", await page.isVisible("#learnLessonHost .lesson-code"));
 check("教程：操作条是「我学会了」", (await page.textContent("#learnActionBar")).includes("我学会了"));
 
+// ---------- 教程布局：三种预设 + 拖拽 + 记忆 ----------
+const editorBox = () => page.evaluate(() => {
+  const w = document.querySelector(".editor-body-wrapper");
+  const cm = document.querySelector(".CodeMirror");
+  const lh = cm && cm.CodeMirror ? cm.CodeMirror.defaultTextHeight() : 20;
+  const h = w ? w.getBoundingClientRect().height : 0;
+  const host = document.getElementById("learnLessonHost");
+  return {
+    editor: Math.round(h),
+    lines: Math.floor(h / lh),
+    lesson: host && host.offsetParent ? Math.round(host.getBoundingClientRect().height) : 0,
+    collapsedCode: !!document.querySelector(".learn-code-row.collapsed"),
+    splitter: !!document.querySelector("#learnSplitter.show")
+  };
+});
+
+let lb = await editorBox();
+check("默认「各一半」：编辑器至少 10 行", lb.lines >= 10, `${lb.lesson}/${lb.editor}px → ${lb.lines} 行`);
+check("「各一半」时有可拖的分隔条", lb.splitter);
+
+await page.click('[data-act="layout"][data-mode="read"]');
+await sleep(350);
+lb = await editorBox();
+check("📖 讲解优先：讲解区铺满（≥500px）", lb.lesson >= 500, `讲解 ${lb.lesson}px`);
+check("📖 讲解优先：代码区收成提示栏", lb.collapsedCode);
+check("📖 讲解优先：提示栏可以点开", await page.isVisible(".learn-code-row.collapsed"));
+
+await page.click(".learn-code-row.collapsed");
+await sleep(350);
+lb = await editorBox();
+check("点提示栏回到「各一半」", !lb.collapsedCode && lb.editor >= 280, `${lb.editor}px`);
+
+await page.keyboard.press("Alt+3");
+await sleep(350);
+lb = await editorBox();
+check("⌨️ 代码优先（Alt+3）：编辑器 ≥20 行", lb.lines >= 20, `${lb.editor}px → ${lb.lines} 行`);
+check("⌨️ 代码优先：讲解收成标题栏", lb.lesson <= 60, `${lb.lesson}px`);
+
+await page.keyboard.press("Alt+2");
+await sleep(350);
+lb = await editorBox();
+check("Alt+2 回到「各一半」", lb.splitter && lb.lines >= 10 && lb.lines <= 18, `${lb.lines} 行`);
+
+// 往上拖分隔条：讲解变小、编辑器变大
+const sp = await page.locator("#learnSplitter").boundingBox();
+await page.mouse.move(sp.x + sp.width / 2, sp.y + sp.height / 2);
+await page.mouse.down();
+await page.mouse.move(sp.x + sp.width / 2, sp.y - 150, { steps: 8 });
+await page.mouse.up();
+await sleep(350);
+const dragged = await editorBox();
+check("拖分隔条可以自己调比例", dragged.editor > lb.editor + 60, `${lb.editor}px → ${dragged.editor}px`);
+
+// 记忆：切到「代码优先」后刷新页面，布局还在
+await page.keyboard.press("Alt+3");
+await sleep(300);
+await page.reload({ waitUntil: "domcontentloaded" });
+await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 60000 });
+await sleep(700);
+if (await page.isVisible("#confirmModal.active")) await page.click("#btnConfirmCancel");
+await page.click("#btnOpenLearnTop");
+await page.waitForSelector("#learnBar", { state: "visible" });
+await page.click('.learn-tab[data-tab="lesson"]');
+await page.waitForSelector(".lesson-main-head", { timeout: 20000 });
+await sleep(500);
+const afterReload = await editorBox();
+check("刷新后布局比例会记住（仍是代码优先）", afterReload.lines >= 18, `${afterReload.lines} 行`);
+
+// 恢复到「各一半」，后面的用例继续
+await page.keyboard.press("Alt+2");
+await sleep(350);
+
 // 小测答对（按数据里的正确答案点，避免依赖渲染出来的 class）
 const quizAnswer = await page.evaluate(() => {
   const all = (typeof LEARN_LESSONS !== "undefined" ? LEARN_LESSONS : []).concat(
@@ -184,6 +256,38 @@ check("示例点开就进沙盒（代码在编辑器里）",
   (await page.evaluate(() => CodeEditor.getValue())).trim().length > 0);
 check("示例也在学堂里运行，不建作品库文件",
   (await page.evaluate(() => FileManager.getFiles().length)) === studioFileBefore.count);
+
+// 示例：对照原版（并排）
+const beforeCompare = await page.evaluate(() => Math.round(document.querySelector(".editor-body-wrapper").getBoundingClientRect().width));
+await page.click("#btnCompare");
+await sleep(400);
+const cmp = await page.evaluate(() => {
+  const c = document.getElementById("learnCompareHost");
+  return { show: c.classList.contains("show"), text: (c.textContent || "").slice(0, 12),
+           editorW: Math.round(document.querySelector(".editor-body-wrapper").getBoundingClientRect().width) };
+});
+check("示例「↔ 对照原版」出现并排的原始代码", cmp.show && cmp.text.includes("原版"), cmp.text);
+check("对照时编辑器自动让出一半宽度", cmp.editorW < beforeCompare - 100, `${beforeCompare}px → ${cmp.editorW}px`);
+await page.click('[data-act="compare-close"]');
+await sleep(300);
+check("可以收起对照栏",
+  !(await page.evaluate(() => document.getElementById("learnCompareHost").classList.contains("show"))));
+
+// 专注写代码
+await page.keyboard.press("Escape");
+await page.click("#btnFocus");
+await sleep(500);
+const focusBox = await page.evaluate(() => ({
+  header: !!(document.querySelector(".app-header") || {}).offsetParent,
+  panel: !!(document.querySelector(".learn-panel") || {}).offsetParent,
+  output: !!(document.querySelector(".output-panel") || {}).offsetParent,
+  editor: Math.round(document.querySelector(".editor-body-wrapper").getBoundingClientRect().height)
+}));
+check("⛶ 专注模式：其它面板都让位", !focusBox.header && !focusBox.panel && !focusBox.output);
+check("⛶ 专注模式：编辑器铺满（≥650px）", focusBox.editor >= 650, `${focusBox.editor}px`);
+await page.keyboard.press("Escape");
+await sleep(400);
+check("Esc 退出专注模式", !(await page.evaluate(() => document.body.classList.contains("learn-focus"))));
 
 // ---------- 存进作品库 ----------
 const savedContent = await page.evaluate(() => CodeEditor.getValue());
