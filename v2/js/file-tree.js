@@ -32,8 +32,9 @@ const FileManager = (() => {
 
   function clone(obj) { return JSON.parse(JSON.stringify(obj)); }
 
+  // 「示例宝库」排第一个：小朋友进来第一眼就看到可以玩的例子
   function defaultFolders() {
-    return [clone(MY_FOLDER), clone(EXAMPLES_FOLDER)];
+    return [clone(EXAMPLES_FOLDER), clone(MY_FOLDER)];
   }
 
   function isExampleId(id) {
@@ -50,6 +51,12 @@ const FileManager = (() => {
     if (!folders.length) folders = defaultFolders();
     if (!folders.some(f => f.id === EXAMPLES_FOLDER.id)) {
       folders.push(clone(EXAMPLES_FOLDER));
+    }
+    // 老版本存的顺序里「示例宝库」在后面，这里统一提到第一位
+    const exIdx = folders.findIndex(f => f.id === EXAMPLES_FOLDER.id);
+    if (exIdx > 0) {
+      const ex = folders.splice(exIdx, 1)[0];
+      folders.unshift(ex);
     }
     const ids = folders.map(f => f.id);
     files.forEach(f => {

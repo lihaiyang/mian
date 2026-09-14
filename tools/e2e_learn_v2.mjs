@@ -371,6 +371,36 @@ await sleep(500);
 check("工坊模式下编辑仍然写进文件",
   (await page.evaluate(() => (FileManager.getActiveFile() || {}).content)).includes("工坊里改一改"));
 
+// ---------- 🎁 示例宝库（右上角按钮 + 弹窗分类 + 打开进沙盒） ----------
+check("右上角按钮叫「示例宝库」", (await page.textContent("#btnResetDemos")).includes("示例宝库"));
+check("左侧文件夹把「示例宝库」排在第一个",
+  (await page.evaluate(() => (document.querySelector(".folder-head .folder-name") || {}).textContent)) === "示例宝库");
+
+const filesBeforeGallery = await page.evaluate(() => FileManager.getFiles().length);
+await page.click("#btnResetDemos");
+await page.waitForSelector("#galleryList .gallery-item", { timeout: 30000 });
+const galleryTabs = await page.evaluate(() => [...document.querySelectorAll("#galleryTabs .gallery-tab")].map(b => b.textContent.trim()));
+check("弹窗展示全部分类（≥9 个标签）", galleryTabs.length >= 9, galleryTabs.slice(0, 4).join(" / "));
+check("弹窗里有「小游戏」分类", galleryTabs.some(t => t.includes("小游戏")));
+const galleryCount = await page.locator("#galleryList .gallery-item").count();
+check("示例总数 ≥100", galleryCount >= 100, galleryCount + " 个");
+
+await page.evaluate(() => {
+  const t = [...document.querySelectorAll("#galleryTabs .gallery-tab")].find(b => b.textContent.includes("小游戏"));
+  if (t) t.click();
+});
+await sleep(400);
+const gameCount = await page.locator("#galleryList .gallery-item").count();
+check("小游戏示例 ≥10 个", gameCount >= 10, gameCount + " 个");
+await page.locator("#galleryList .gallery-item").first().click();
+await sleep(1200);
+check("从弹窗点开示例 → 进学习中心沙盒",
+  (await page.evaluate(() => document.body.classList.contains("mode-learn"))) &&
+  (await page.evaluate(() => document.querySelector("#learnTabs .learn-tab.active").dataset.tab)) === "example");
+check("沙盒里已经有示例代码", (await page.evaluate(() => CodeEditor.getValue())).trim().length > 0);
+check("打开示例不会新建作品库文件",
+  (await page.evaluate(() => FileManager.getFiles().length)) === filesBeforeGallery);
+
 const realErrors = pageErrors.filter((e) => !/favicon|ERR_FILE_NOT_FOUND|Failed to load resource/.test(e));
 check("没有 JS 报错", realErrors.length === 0, realErrors.slice(0, 2).join(" | "));
 

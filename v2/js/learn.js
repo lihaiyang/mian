@@ -14,7 +14,7 @@
  * 依赖：CodeEditor / PythonRunner / Progress / FileManager / App（切换模式与恢复工坊状态）
  */
 const Learn = (() => {
-  const V = "20260914c";
+  const V = "20260914d";
   const PAGE_SIZE = 40;
   const JUDGE_TIMEOUT_MS = 4000;
 
@@ -245,8 +245,52 @@ const Learn = (() => {
     adv.forEach(l => { if (!out.some(x => x.id === l.id)) out.push(l); });
     return out;
   }
-  function exampleList() { return typeof LEARN_EXAMPLES !== "undefined" ? LEARN_EXAMPLES : []; }
-  function exampleCats() { return typeof LEARN_EXAMPLE_CATEGORIES !== "undefined" ? LEARN_EXAMPLE_CATEGORIES : []; }
+  // 示例统一分类：把内置示例的 5 个分类和示例库的 11 个分类并成 8 组，
+  // 这样「示例宝库」弹窗和学习中心用的是同一套分类，孩子不会看到两套名字。
+  const GALLERY_GROUPS = [
+    { id: "game",   name: "小游戏",     emoji: "🎮", src: ["game"] },
+    { id: "basic",  name: "入门启蒙",   emoji: "🌟", src: ["basic", "print", "var", "calc"] },
+    { id: "loop",   name: "判断与循环", emoji: "🔁", src: ["if", "loop"] },
+    { id: "turtle", name: "海龟画室",   emoji: "🐢", src: ["turtle"] },
+    { id: "text",   name: "文字艺术",   emoji: "✍️", src: ["text", "string"] },
+    { id: "data",   name: "列表与字典", emoji: "🎒", src: ["list"] },
+    { id: "func",   name: "函数积木",   emoji: "🧩", src: ["func"] },
+    { id: "math",   name: "数学魔法",   emoji: "🧮", src: ["math"] }
+  ];
+
+  function groupOf(cat) {
+    const g = GALLERY_GROUPS.find(x => x.src.indexOf(cat) !== -1);
+    return g ? g.id : "basic";
+  }
+
+  function exampleCats() { return GALLERY_GROUPS; }
+
+  // 内置示例（js/examples.js 里的 DEFAULT_EXAMPLES）也并进来看，统一成一种数据形状
+  function builtinExamples() {
+    const list = typeof DEFAULT_EXAMPLES !== "undefined" ? DEFAULT_EXAMPLES : [];
+    return list.map(e => {
+      const meta = (typeof EXAMPLE_META !== "undefined" && EXAMPLE_META[e.id]) || {};
+      return {
+        id: e.id,
+        title: String(e.name || "").replace(/\.py$/, "").replace(/^[0-9]+[_\-\s]*/, ""),
+        emoji: "🎁",
+        level: meta.level || 1,
+        desc: meta.desc || "内置示例，点开就能玩",
+        tip: "这是内置示例，改一改再运行看看会有什么变化~",
+        code: e.content,
+        category: meta.category || "basic",
+        group: groupOf(meta.category || "basic"),
+        builtin: true
+      };
+    });
+  }
+
+  function exampleList() {
+    const lib = (typeof LEARN_EXAMPLES !== "undefined" ? LEARN_EXAMPLES : []).map(e => Object.assign({}, e, {
+      group: groupOf(e.category), builtin: false
+    }));
+    return lib.concat(builtinExamples());
+  }
   function bank() { return typeof EXERCISE_BANK !== "undefined" ? EXERCISE_BANK : []; }
   function topics() { return typeof EXERCISE_TOPICS !== "undefined" ? EXERCISE_TOPICS : []; }
   function levels() { return typeof EXERCISE_LEVELS !== "undefined" ? EXERCISE_LEVELS : []; }
@@ -816,7 +860,7 @@ const Learn = (() => {
         '<div class="ex-detail-head"><span class="ex-detail-emoji">' + curEx.emoji + '</span>' +
         '<div><div class="ex-detail-title">' + esc(curEx.title) + '</div>' +
         '<div class="ex-detail-meta">' + "⭐".repeat(Math.max(1, Math.min(3, curEx.level || 1))) + ' · ' +
-        esc((cats.find(c => c.id === curEx.category) || {}).name || curEx.category) + '</div></div></div>' +
+        esc((cats.find(c => c.id === curEx.group) || {}).name || curEx.group) + '</div></div></div>' +
         '<div class="ex-detail-desc">' + esc(curEx.desc) + '</div>' +
         '<div class="ex-detail-tip">💡 试试看：' + esc(curEx.tip || "改一改数字或文字，再运行一次，看看有什么变化。") + '</div>' +
         '<div class="ex-actions">' +
@@ -827,19 +871,19 @@ const Learn = (() => {
 
     html += '<div class="lib-toolbar"><input class="learn-search" id="exSearch" placeholder="🔍 搜索示例" value="' + esc(ui.exampleQuery) + '"></div>';
     html += '<div class="lib-toolbar">' +
-      '<button class="learn-chip' + (ui.exampleCat === "all" ? " active" : "") + '" data-act="ex-cat" data-cat="all">全部</button>' +
+      '<button class="learn-chip' + (ui.exampleCat === "all" ? " active" : "") + '" data-act="ex-cat" data-cat="all">全部 ' + list.length + '</button>' +
       cats.map(c => {
-        const n = list.filter(e => e.category === c.id).length;
+        const n = list.filter(e => e.group === c.id).length;
         if (!n) return "";
         return '<button class="learn-chip' + (ui.exampleCat === c.id ? " active" : "") + '" data-act="ex-cat" data-cat="' + c.id + '">' +
-          c.emoji + ' ' + esc(c.name) + '</button>';
+          c.emoji + ' ' + esc(c.name) + ' ' + n + '</button>';
       }).join("") + '</div>';
     html += '<div class="lib-toolbar">' +
       '<button class="learn-chip' + (ui.exampleLevel === 0 ? " active" : "") + '" data-act="ex-level" data-level="0">全部难度</button>' +
       [1, 2, 3].map(l => '<button class="learn-chip' + (ui.exampleLevel === l ? " active" : "") + '" data-act="ex-level" data-level="' + l + '">' + "⭐".repeat(l) + '</button>').join("") +
       '</div>';
 
-    let items = list.filter(e => ui.exampleCat === "all" || e.category === ui.exampleCat);
+    let items = list.filter(e => ui.exampleCat === "all" || e.group === ui.exampleCat);
     if (ui.exampleLevel) items = items.filter(e => e.level === ui.exampleLevel);
     const q = ui.exampleQuery.trim().toLowerCase();
     if (q) items = items.filter(e => (e.title + e.desc + (e.code || "")).toLowerCase().indexOf(q) !== -1);
@@ -2043,6 +2087,17 @@ const Learn = (() => {
     open,
     exit,
     goto,
+
+    // ===== 给工坊的「🎁 示例宝库」弹窗用 =====
+    loadExamples: () => ensureAssets(["examples"]),
+    examplesReady: () => !!assets.examples,
+    getAllExamples: () => exampleList(),
+    getGalleryCategories: () => GALLERY_GROUPS,
+    /** 从弹窗里点开一个示例：进学习中心、在沙盒里打开（草稿隔离，不动作品库） */
+    openExampleInSandbox(id) {
+      open("example");
+      openExample(id);
+    },
     isActive,
     noteEditorChange,
     onRunFinished,

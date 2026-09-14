@@ -16,7 +16,8 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-JS = os.path.join(ROOT, "js", "examples-lib.js")
+# 默认检查 v1 的示例库；也可以指定路径，例如 python3 tools/check_examples.py v2/js/examples-lib.js
+JS = os.path.join(ROOT, sys.argv[1]) if len(sys.argv) > 1 else os.path.join(ROOT, "js", "examples-lib.js")
 
 TURTLE_STUB = '''
 """假的 turtle 模块：所有画图动作都忽略，仅用于离线校验示例代码能不能跑。"""
@@ -54,7 +55,7 @@ bgcolor = title = setup = exitonclick = tracer = update = listen = _noop
 onkey = onclick = onscreenclick = clearscreen = bye = _noop
 '''
 
-STDIN = "小明\n12\n3\n5\n7\n1\n2\n3\n4\n5\napple\nbanana\ncat\n石头\n3 5\n10\n20\n你好\nabc\n" * 3
+STDIN = "12\n8\n5\n3\n7\n2\n9\n4\n1\n5\n6\n小明\napple\nbanana\ncat\n石头\n3 5\n10\n20\n你好\nabc\n2\n7\n4\n9\n1\n5\n3\n8\n6\n2\n4\n7\n1\n3\n5\n2\n8\n4\n" * 2
 
 
 def load_examples():
@@ -82,6 +83,7 @@ def main():
     env["PYTHONIOENCODING"] = "utf-8"
 
     failures = []
+    eof_count = []
     for i, ex in enumerate(examples):
         path = os.path.join(tmp, "ex_%03d.py" % i)
         with open(path, "w", encoding="utf-8") as fh:
@@ -95,9 +97,16 @@ def main():
             continue
         if res.returncode != 0:
             tail = (res.stderr or "").strip().split("\n")[-1] if res.stderr else "未知错误"
+            # 游戏类示例会一直问输入，喂完就 EOFError —— 这是我们喂得不够，不算示例的毛病
+            if "EOFError" in tail:
+                eof_count.append(ex["id"])
+                continue
             failures.append((ex["id"], ex["title"], tail[:140]))
 
     print("=" * 60)
+    if eof_count:
+        print("ℹ️ %d 个交互示例喂完输入后正常结束（EOFError，属于预期）：%s"
+              % (len(eof_count), "、".join(eof_count[:6]) + ("…" if len(eof_count) > 6 else "")))
     if failures:
         print("❌ %d / %d 个示例有问题：" % (len(failures), len(examples)))
         for eid, title, why in failures:

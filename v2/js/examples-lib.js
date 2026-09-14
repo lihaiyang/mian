@@ -2,13 +2,13 @@
  * 📚 少儿 Python 示例宝库（纯数据文件）
  * 这里只有两个常量，没有函数、没有导入，小朋友可以直接看、直接改 ✨
  *
- *   LEARN_EXAMPLE_CATEGORIES ：10 个分类（id / name / emoji）
+ *   LEARN_EXAMPLE_CATEGORIES ：11 个分类（id / name / emoji），含 12 个小游戏
  *   LEARN_EXAMPLES            ：可以直接运行的小示例，每个都配有说明和「改一改」的小建议
  *
  * level 的含义：1 = 一看就懂，2 = 要动脑，3 = 有点挑战 🚀
  */
 
-// 🗂️ 十个示例分类，每个分类都有 12 个小示例
+// 🗂️ 十一个示例分类：前十个每类 12 个小示例，最后是 12 个小游戏
 const LEARN_EXAMPLE_CATEGORIES = [
   { id: "print", name: "打招呼与输出", emoji: "🗣️" },
   { id: "var", name: "变量百宝箱", emoji: "📦" },
@@ -19,7 +19,8 @@ const LEARN_EXAMPLE_CATEGORIES = [
   { id: "list", name: "列表与字典", emoji: "📋" },
   { id: "func", name: "函数积木", emoji: "🧩" },
   { id: "math", name: "数学与随机", emoji: "🔢" },
-  { id: "turtle", name: "海龟画图", emoji: "🐢" }
+  { id: "turtle", name: "海龟画图", emoji: "🐢" },
+  { id: "game", name: "小游戏", emoji: "🎮" }
 ];
 
 // 🎁 示例宝库：共 120 个小示例，分成 10 类，每一段都能直接运行
@@ -1242,5 +1243,126 @@ const LEARN_EXAMPLES = [
     desc: "走一步再往上走一步，一级一级爬上台阶",
     tip: "把 range(5) 改成 range(10)，楼梯会变长",
     code: "# 🪜 画一段彩色楼梯\n# 💡 往前走一步，转弯往上走一步，一级台阶就画好了～\n\nimport turtle\n\nt = turtle.Turtle()\nt.speed(0)\nt.pensize(4)\n\ncolors = [\"#EF4444\", \"#F97316\", \"#FACC15\", \"#22C55E\", \"#3B82F6\"]\n\nfor i in range(5):\n    t.pencolor(colors[i % len(colors)])\n    t.forward(60)     # 往前走\n    t.left(90)\n    t.forward(60)     # 往上走\n    t.right(90)\n\nprint(\"🪜 楼梯画好啦，一步一步往上爬！\")"
+  },
+  {
+    id: "lb_g01",
+    title: "猜数字大冒险",
+    emoji: "🎲",
+    category: "game",
+    level: 2,
+    desc: "电脑想好一个 1~20 的数字，你有 5 次机会猜中它",
+    tip: "把 range(1, 6) 改成 range(1, 11)，就有 10 次机会啦",
+    code: "# 🎲 猜数字大冒险\n# 💡 在下面的输入框里输入你猜的数字，按回车提交\nimport random\n\nsecret = random.randint(1, 20)\nprint(\"🤖 我想好了一个 1~20 的数字，你有 5 次机会！\")\n\nfor i in range(1, 6):\n    text = input(f\"第 {i} 次猜：\").strip()\n    if not text.isdigit():          # 打错字也没关系，提示一下就好\n        print(\"⚠️ 要输入数字哦，再来一次\")\n        continue\n    guess = int(text)\n    if guess == secret:\n        print(\"🎉 猜对啦！你太厉害了！\")\n        break\n    elif guess < secret:\n        print(\"📈 小了，再大一点\")\n    else:\n        print(\"📉 大了，再小一点\")\nelse:\n    print(f\"😢 机会用完啦，答案是 {secret}，再来一次吧！\")"
+  },
+  {
+    id: "lb_g02",
+    title: "石头剪刀布",
+    emoji: "✂️",
+    category: "game",
+    level: 2,
+    desc: "和电脑玩三局石头剪刀布，看看谁更厉害",
+    tip: "把 range(1, 4) 改成 range(1, 11)，就能玩十局",
+    code: "# ✂️ 石头剪刀布（三局两胜）\nimport random\n\nchoices = [\"石头\", \"剪刀\", \"布\"]\nwin = 0\n\nfor i in range(1, 4):\n    me = input(f\"第 {i} 局，你出什么？（石头/剪刀/布）\").strip()\n    cpu = random.choice(choices)\n    print(f\"你出【{me}】，电脑出【{cpu}】\")\n    if me == cpu:\n        print(\"🤝 平局！\")\n    elif (me == \"石头\" and cpu == \"剪刀\") or (me == \"剪刀\" and cpu == \"布\") or (me == \"布\" and cpu == \"石头\"):\n        win += 1\n        print(\"🎉 这一局你赢啦！\")\n    else:\n        print(\"😅 这一局电脑赢了\")\n\nprint(f\"🏆 三局下来，你赢了 {win} 局\")"
+  },
+  {
+    id: "lb_g03",
+    title: "心算抢答赛",
+    emoji: "🔢",
+    category: "game",
+    level: 2,
+    desc: "三道乘法题，答对一题得 10 分，看看能拿多少分",
+    tip: "把 random.randint(2, 9) 改成 randint(10, 99)，就变成两位数乘法啦",
+    code: "# 🔢 心算抢答赛\nimport random\n\nscore = 0\n\nfor i in range(1, 4):\n    a = random.randint(2, 9)\n    b = random.randint(2, 9)\n    text = input(f\"第 {i} 题：{a} × {b} = \").strip()\n    if not text.isdigit():\n        print(f\"⚠️ 要输入数字哦，这题正确答案是 {a * b}\")\n        continue\n    answer = int(text)\n    if answer == a * b:\n        score += 10\n        print(\"✅ 答对啦，+10 分！\")\n    else:\n        print(f\"❌ 正确答案是 {a * b}，下一题加油\")\n\nprint(f\"🏁 挑战结束，你的总分是 {score} 分\")\nprint(\"👑 满分小天才！\" if score == 30 else \"💪 多练几次会更快哦\")"
+  },
+  {
+    id: "lb_g04",
+    title: "比大小：谁的数字大",
+    emoji: "🎯",
+    category: "game",
+    level: 1,
+    desc: "你和电脑各抽一个 1~100 的随机数，比一比谁大",
+    tip: "把 100 改成 1000，数字会更大更刺激",
+    code: "# 🎯 比大小\nimport random\n\nme = random.randint(1, 100)\ncpu = random.randint(1, 100)\n\nprint(f\"🧑 你的数字是 {me}\")\nprint(f\"🤖 电脑的数字是 {cpu}\")\n\nif me > cpu:\n    print(\"🎉 你赢啦！\")\nelif me < cpu:\n    print(\"😅 电脑赢了这一局\")\nelse:\n    print(\"🤝 居然一样大，平局！\")"
+  },
+  {
+    id: "lb_g05",
+    title: "贪吃蛇的脚印",
+    emoji: "🐍",
+    category: "game",
+    level: 2,
+    desc: "用小海龟画出一条弯弯曲曲的蛇形路线",
+    tip: "把 range(8) 改成 range(16)，蛇会更长",
+    code: "# 🐍 贪吃蛇的脚印\nimport turtle\n\nt = turtle.Turtle()\nt.speed(0)\nt.pensize(8)\nt.color(\"#22C55E\")\n\nfor i in range(8):\n    t.forward(40)\n    if i % 2 == 0:\n        t.right(90)\n        t.forward(30)\n        t.right(90)\n    else:\n        t.left(90)\n        t.forward(30)\n        t.left(90)\n\nprint(\"🐍 小蛇爬过去啦，看看右边的画布！\")"
+  },
+  {
+    id: "lb_g06",
+    title: "21 点：要不要再来一张",
+    emoji: "🃏",
+    category: "game",
+    level: 3,
+    desc: "抽牌比点数，超过 21 就爆牌，敢不敢再要一张？",
+    tip: "把 21 改成 30，就变成「30 点」的新玩法",
+    code: "# 🃏 21 点小游戏\nimport random\n\ncards = [random.randint(1, 10), random.randint(1, 10)]\ntotal = sum(cards)\nprint(f\"🃏 你先拿到 {cards}，合计 {total} 点\")\n\nwhile total < 21:\n    cmd = input(\"还要一张吗？（输入 y 要牌，其它任意键停牌）\").strip().lower()\n    if cmd != \"y\":\n        break\n    card = random.randint(1, 10)\n    total += card\n    print(f\"抽到 {card} 点，现在合计 {total} 点\")\n\nif total == 21:\n    print(\"🎉 正好 21 点，完美！\")\nelif total > 21:\n    print(f\"💥 爆牌啦（{total} 点），下次稳一点\")\nelse:\n    print(f\"🛑 停牌，你的最终点数是 {total}\")"
+  },
+  {
+    id: "lb_g07",
+    title: "打地鼠",
+    emoji: "🍄",
+    category: "game",
+    level: 2,
+    desc: "地鼠会随机钻出 4 个洞，猜猜它在几号洞",
+    tip: "把 range(1, 6) 改成 range(1, 11)，玩十个回合",
+    code: "# 🍄 打地鼠（文字版）\nimport random\n\nscore = 0\n\nfor i in range(1, 6):\n    hole = random.randint(1, 4)\n    pick = input(f\"第 {i} 回合：地鼠在几号洞？（1~4）\").strip()\n    if pick.isdigit() and int(pick) == hole:\n        score += 1\n        print(\"🔨 打中啦！\")\n    else:\n        print(f\"😜 没打中，地鼠躲在 {hole} 号洞\")\n\nprint(f\"🏆 五回合打中 {score} 只地鼠！\")"
+  },
+  {
+    id: "lb_g08",
+    title: "记忆翻牌",
+    emoji: "🧠",
+    category: "game",
+    level: 2,
+    desc: "先记住三个数字，再凭记忆把它们写出来",
+    tip: "把 range(3) 改成 range(5)，挑战记五个数字",
+    code: "# 🧠 记忆翻牌：记住三个数字\nimport random\n\nnums = [random.randint(1, 9) for _ in range(3)]\nprint(\"👀 记住这三个数字：\", nums)\n\nanswer = input(\"请按顺序输入刚才的三个数字（用空格隔开）：\").split()\n\nif answer == [str(n) for n in nums]:\n    print(\"🎉 全对！你的记忆力真棒\")\nelse:\n    print(f\"😅 差一点点，正确答案是 {nums}\")"
+  },
+  {
+    id: "lb_g09",
+    title: "躲陨石",
+    emoji: "🚀",
+    category: "game",
+    level: 3,
+    desc: "陨石随机出现在一条道上，往左还是往右？",
+    tip: "把 range(1, 5) 改成 range(1, 9)，躲得更久一点",
+    code: "# 🚀 躲陨石（文字版）\nimport random\n\npos = 3\nhit = 0\n\nfor i in range(1, 5):\n    rock = random.randint(1, 5)\n    move = input(f\"第 {i} 回合：陨石在第 {rock} 道，你往哪走？（1 左 / 2 不动 / 3 右）\").strip()\n    if move == \"1\":\n        pos -= 1\n    elif move == \"3\":\n        pos += 1\n    pos = max(1, min(5, pos))\n    if pos == rock:\n        hit += 1\n        print(f\"💥 被撞到了！你在第 {pos} 道\")\n    else:\n        print(f\"😎 躲开了，你在第 {pos} 道\")\n\nprint(f\"🏁 四回合下来被撞了 {hit} 次\")"
+  },
+  {
+    id: "lb_g10",
+    title: "幸运老虎机",
+    emoji: "🎰",
+    category: "game",
+    level: 1,
+    desc: "三个图案转一转，三个一样就是大奖",
+    tip: "往 icons 列表里再加一个 emoji，中奖会更难哦",
+    code: "# 🎰 幸运老虎机\nimport random\n\nicons = [\"🍒\", \"🔔\", \"⭐\", \"🍋\", \"💎\"]\nresult = [random.choice(icons) for _ in range(3)]\n\nprint(\"🎰 \" + \" | \".join(result))\n\nif result[0] == result[1] == result[2]:\n    print(\"🎉 三个一样，大奖！\")\nelif result[0] == result[1] or result[1] == result[2] or result[0] == result[2]:\n    print(\"😀 有两个一样，小奖！\")\nelse:\n    print(\"🙂 这次没中，再转一次吧\")"
+  },
+  {
+    id: "lb_g11",
+    title: "井字棋：和电脑下一盘",
+    emoji: "⭕",
+    category: "game",
+    level: 3,
+    desc: "你下 ❌，电脑下 ⭕，看看能不能连成一条线",
+    tip: "把电脑那一步 board[4] 换到别的位置，难度就变了",
+    code: "# ⭕ 井字棋（简化版：你一步，电脑一步）\nboard = [\"1\", \"2\", \"3\", \"4\", \"5\", \"6\", \"7\", \"8\", \"9\"]\n\ndef show():\n    for i in range(0, 9, 3):\n        print(board[i], board[i + 1], board[i + 2])\n\nshow()\ntext = input(\"你先下 ❌，选个位置（1~9）：\").strip()\nif not text.isdigit() or not 1 <= int(text) <= 9:\n    print(\"⚠️ 要输入 1~9 的数字哦，这次先帮你下在中间\")\n    text = \"5\"\npos = int(text)\nboard[pos - 1] = \"❌\"\n\nif board[4] == \"5\":          # 电脑占中间\n    board[4] = \"⭕\"\nelse:\n    board[0] = \"⭕\"\n\nprint(\"---- 现在的棋盘 ----\")\nshow()\n\nlines = [(0, 1, 2), (3, 4, 5), (6, 7, 8), (0, 3, 6), (1, 4, 7), (2, 5, 8), (0, 4, 8), (2, 4, 6)]\nfor a, b, c in lines:\n    if board[a] == board[b] == board[c] == \"❌\":\n        print(\"🎉 你连成一条线，赢啦！\")\n        break\nelse:\n    print(\"🤝 这一盘还没分出胜负，继续加油\")"
+  },
+  {
+    id: "lb_g12",
+    title: "乒乓球计分板",
+    emoji: "🏓",
+    category: "game",
+    level: 2,
+    desc: "模拟一场乒乓球比赛，一分一分地看比分变化",
+    tip: "把先到 11 分改成先到 21 分，就是排球规则啦",
+    code: "# 🏓 乒乓球计分板\nimport random\n\nme = 0\ncpu = 0\n\nfor i in range(1, 30):\n    if random.random() < 0.5:\n        me += 1\n    else:\n        cpu += 1\n    print(f\"第 {i} 球：你 {me} : {cpu} 电脑\")\n    if me == 11 or cpu == 11:\n        break\n\nprint(\"🏆 你赢啦！\" if me > cpu else \"😅 电脑赢了，再来一局\")\n"
   }
+
 ];
