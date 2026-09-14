@@ -1,0 +1,76 @@
+/* 🎮 游戏厅样式（与主设计系统同一套令牌，粗描边 + 贴纸感） */
+
+.gm { display: flex; flex-direction: column; gap: 14px; }
+.gm-top { display: flex; align-items: center; gap: 10px; }
+.gm-title { font-family: var(--font-display); font-size: 20px; font-weight: 800; }
+.gm-score { margin-left: auto; font-weight: 800; font-size: 16px; background: var(--yellow);
+  border: 2.5px solid var(--ink); border-radius: 999px; padding: 4px 14px; }
+.gm-track { height: 12px; border-radius: 999px; border: 2.5px solid var(--ink); background: var(--paper-3); overflow: hidden; }
+.gm-track span { display: block; height: 100%; width: 0; background: var(--teal); transition: width .3s ease; }
+.gm-body { min-height: 320px; display: flex; flex-direction: column; gap: 14px; align-items: center; justify-content: center; }
+.gm-prompt { font-size: 19px; font-weight: 700; text-align: center; }
+.gm-prompt b { color: var(--violet); }
+.gm-tip { min-height: 56px; }
+
+/* 打地鼠 */
+.gm-holes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; width: 100%; max-width: 660px; }
+.gm-hole {
+  min-height: 108px; border: var(--line) solid var(--ink); border-radius: var(--radius);
+  background: var(--paper-3); box-shadow: var(--shadow-card); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px; transition: transform .14s ease;
+}
+.gm-hole:hover { transform: translateY(-3px); }
+.gm-hole .gm-mole { font-size: 40px; transition: transform .2s ease; }
+.gm-hole .gm-mole.pop { transform: translateY(-8px) scale(1.15); }
+.gm-hole .gm-word { font-family: var(--font-en); font-weight: 700; font-size: 17px; }
+.gm-hole.ok { background: var(--teal-soft); border-color: var(--teal); }
+.gm-hole.miss { background: var(--yellow-soft); animation: gmshake .3s ease 1; }
+@keyframes gmshake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+/* 消消乐 / 翻牌 */
+.gm-grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; width: 100%; max-width: 700px; }
+.gm-card {
+  position: relative; min-height: 96px; border: var(--line) solid var(--ink); border-radius: var(--radius-sm);
+  background: var(--white); box-shadow: var(--shadow-card); font-weight: 700; display: grid; place-items: center;
+  padding: 8px; transition: transform .14s ease;
+}
+.gm-card:hover { transform: translateY(-3px); }
+.gm-card .gm-face { font-family: var(--font-en); font-size: 17px; }
+.gm-card.open { background: var(--yellow-soft); }
+.gm-card.done { background: var(--teal-soft); border-color: var(--teal); opacity: .75; }
+.gm-card.gm-flip .gm-face2 { display: none; font-size: 15px; line-height: 1.4; text-align: center; }
+.gm-card.gm-flip .gm-back { font-size: 32px; }
+.gm-card.gm-flip.open .gm-back { display: none; }
+.gm-card.gm-flip.open .gm-face2 { display: block; }
+
+/* 接龙 */
+.gm-chain { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; width: 100%; max-width: 700px; }
+.gm-pick {
+  min-height: 92px; border: var(--line) solid var(--ink); border-radius: var(--radius); background: var(--white);
+  box-shadow: var(--shadow-card); display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; font-weight: 700;
+}
+.gm-pick .gm-mole { font-size: 30px; }
+.gm-pick.ok { background: var(--teal-soft); }
+.gm-pick.miss { background: var(--yellow-soft); }
+
+/* Bingo */
+.gm-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 560px; }
+.gm-cell {
+  min-height: 96px; border: var(--line) solid var(--ink); border-radius: var(--radius-sm); background: var(--white);
+  box-shadow: var(--shadow-card); display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; font-weight: 700;
+}
+.gm-cell .gm-mole { font-size: 30px; }
+.gm-cell .en { font-family: var(--font-en); font-size: 15px; }
+.gm-cell.mark { background: var(--teal-soft); border-color: var(--teal); }
+.gm-cell.miss { animation: gmshake .3s ease 1; }
+
+/* 结算 */
+.gm-result { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+
+@media (max-width: 760px) {
+  .gm-holes { grid-template-columns: repeat(2, 1fr); }
+  .gm-grid4 { grid-template-columns: repeat(3, 1fr); }
+  .gm-body { min-height: 260px; }
+}

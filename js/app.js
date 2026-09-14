@@ -78,6 +78,21 @@ window.App = (() => {
       CloudSync.init();
       const chip = document.getElementById("btnUserChip");
       if (chip) chip.addEventListener("click", () => openMyPanel("profile"));
+
+      // 顶栏「云同步」按钮：没开启就打开面板，已开启就立即同步一次
+      const btnSyncNow = document.getElementById("btnSyncNow");
+      if (btnSyncNow) {
+        btnSyncNow.addEventListener("click", async () => {
+          if (!CloudSync.isSignedIn()) { openMyPanel("cloud"); return; }
+          showToast("☁️ 正在同步…", "☁️");
+          await CloudSync.syncNow(false);
+          await CloudSync.whenIdle();
+          const st = CloudSync.getStatus();
+          if (st.status === "ok") showToast("🟢 同步完成", "☁️");
+          else if (st.status === "warn") showToast("🟡 " + (st.error || "有内容太大没能上传"), "⚠️");
+          else showToast("🔴 " + (st.error || "同步失败，稍后会自动重试"), "⚠️");
+        });
+      }
       const panelClose = document.getElementById("myPanelClose");
       if (panelClose) panelClose.addEventListener("click", closeMyPanel);
       const panelEl = document.getElementById("myPanel");

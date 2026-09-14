@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="day" data-size="m">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#F7EFE0">
+<meta name="description" content="萌语岛 English Island —— 给 6-10 岁孩子的英语学习岛：每天 15 分钟，听、说、读、写一关一关往前走。">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="萌语岛">
+<title>萌语岛 English Island · 每天 15 分钟学英语</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%BC%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css?v=20260914a">
+<link rel="stylesheet" href="css/games.css?v=20260914a">
+<link rel="stylesheet" href="css/print.css?v=20260914a" media="print">
+</head>
+<body class="en-body">
+
+<div class="app">
+  <header class="app-header">
+    <div class="brand" role="button" tabindex="0" id="brandHome" aria-label="回到地图首页">
+      <div class="brand-logo" aria-hidden="true">🐼</div>
+      <div>
+        <div class="brand-name">萌语岛</div>
+        <div class="brand-sub">English Island</div>
+      </div>
+    </div>
+    <div class="hud" id="hud"></div>
+  </header>
+
+  <main id="view" aria-live="polite"></main>
+</div>
+
+<nav class="tabbar" aria-label="主导航">
+  <div class="tabbar-inner" id="tabbar"></div>
+</nav>
+
+<!-- 学习舞台（全屏覆盖，独立于页面路由） -->
+<div id="stageRoot" class="hidden" role="dialog" aria-modal="true" aria-label="学习关卡"></div>
+
+<!-- 全局层 -->
+<div id="modalRoot"></div>
+<div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+<div class="confetti-layer" id="confettiLayer" aria-hidden="true"></div>
+<div class="stamp-layer" id="stampLayer" aria-hidden="true"></div>
+
+<script>
+/* 资源版本号：改了 en/js 或 en/css 之后必须改这里（CDN 有 4 小时默认缓存） */
+window.EN_V = "20260914a";
+</script>
+<script src="js/store.js?v=20260914a"></script>
+<script src="js/audio-fx.js?v=20260914a"></script>
+<script src="js/ui.js?v=20260914a"></script>
+<script src="js/player.js?v=20260914a"></script>
+<script src="js/speech.js?v=20260914a"></script>
+<script src="js/srs.js?v=20260914a"></script>
+<script src="js/progress.js?v=20260914a"></script>
+<script src="js/cloud.js?v=20260914a"></script>
+<script src="js/games.js?v=20260914a"></script>
+<script src="js/stage.js?v=20260914a"></script>
+<script src="js/app.js?v=20260914a"></script>
+</body>
+</html>

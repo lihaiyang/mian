@@ -4,6 +4,13 @@
 
 线上地址：<https://mian.lihaiyang.net> （备用：<https://mian-1ri.pages.dev>）
 
+> 🆕 **同一个仓库里还有第二个站**：**🐼 萌语岛 English Island** —— 给 6–10 岁孩子的英语学习岛，
+> 每天 15 分钟在探险地图上打通「听 → 说 → 读 → 写 → 玩」，单词自动进记忆盒，家长看得到周报。
+> 线上地址 <https://mian.lihaiyang.net/en/>，代码在 [`en/`](./en/)，说明见 [`en/README.md`](./en/README.md)，
+> 设计方案见 [`英语学习网站设计方案.md`](./英语学习网站设计方案.md)。
+> **两站共用一次部署、共用一张 `accounts` 表（一个同步码管两站）**；改 `_headers`、`wrangler.toml`
+> 这类共用文件时，记得两站的 e2e 都跑一遍。
+
 ## 功能一览
 
 | 模块 | 说明 |

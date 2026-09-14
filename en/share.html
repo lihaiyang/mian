@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="day" data-size="m">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#F7EFE0">
+<title>学习周报 · 萌语岛</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%BC%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css?v=20260914a">
+<link rel="stylesheet" href="css/print.css?v=20260914a" media="print">
+</head>
+<body class="en-body">
+<div class="app">
+  <header class="app-header">
+    <div class="brand"><div class="brand-logo" aria-hidden="true">🐼</div>
+      <div><div class="brand-name">萌语岛</div><div class="brand-sub">English Island · 学习周报</div></div></div>
+    <div class="hud"><a class="hud-chip" href="./index.html">▶ 去学习</a></div>
+  </header>
+  <main id="view"><div class="loading"><span class="spin"></span><span>正在打开周报…</span></div></main>
+</div>
+<script>
+/**
+ * 只读分享页：/en/share.html?id=xxxx
+ * 数据来自 GET /api/en/share?id=xxx —— 只有家长主动点「生成分享链接」时才会有内容，
+ * 里面不含录音、不含任何个人信息，只有学习统计。
+ */
+(function () {
+  var view = document.getElementById("view");
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  var id = (location.search.match(/[?&]id=([^&]+)/) || [])[1];
+  if (!id) {
+    view.innerHTML = '<div class="card">' + panda("这个链接不完整，让家长重新生成一次吧～") + "</div>";
+    return;
+  }
+  fetch("/api/en/share?id=" + encodeURIComponent(id))
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data || !data.ok) {
+        view.innerHTML = '<div class="card">' + panda("这个分享已经失效了，让家长再生成一个新的吧～") + "</div>";
+        return;
+      }
+      var body = data.content || "";
+      var rows = "";
+      try {
+        var j = JSON.parse(body);
+        rows = Object.keys(j).map(function (k) {
+          return '<div class="today-item"><span aria-hidden="true">•</span> ' + esc(k) + " <b>" + esc(j[k]) + "</b></div>";
+        }).join("");
+      } catch (e) {
+        rows = '<div class="today-item">' + esc(body) + "</div>";
+      }
+      view.innerHTML =
+        '<div class="section-title">📊 ' + esc(data.title || "学习周报") +
+          '<span class="ribbon">只读</span></div>' +
+        '<div class="card"><div class="today-plan">' + rows + "</div>" +
+          '<div class="muted small" style="margin-top:12px">这份周报由家长主动分享，只有学习统计，没有任何个人信息，也没有录音。</div>' +
+        "</div>" +
+        '<div class="btn-row" style="margin-top:14px">' +
+          '<a class="btn btn-primary" href="./index.html">▶ 我也要学</a>' +
+          '<button class="btn" onclick="window.print()">🖨 打印</button>' +
+        "</div>";
+    })
+    .catch(function () {
+      view.innerHTML = '<div class="card">' + panda("网络好像不太顺，稍后再打开试试～") + "</div>";
+    });
+  function panda(text) {
+    return '<div class="panda"><div class="panda-face" aria-hidden="true">🐼</div><div class="panda-text">' + esc(text) + "</div></div>";
+  }
+})();
+</script>
+</body>
+</html>

@@ -2578,3 +2578,13 @@ body.dark-mode .award-stat { background: #1E293B; border-color: #334155; }
    否则从「示例宝库」里点还原时，确认框会被宝库弹窗压住，按钮点不到。 */
 #confirmModal { z-index: 300; }
 .toast-box { z-index: 400; }
+
+/* 顶栏「云同步」按钮：一眼看出同步状态，点一下立即同步 */
+.sync-btn { gap: 4px; }
+.sync-btn .sync-dot { font-size: 13px; line-height: 1; }
+.sync-btn .sync-label { font-size: 12px; font-weight: 700; }
+.sync-btn.is-ok { border-color: #86EFAC; }
+.sync-btn.is-warn { border-color: #FCD34D; }
+.sync-btn.is-error { border-color: #FCA5A5; background: var(--danger-light); }
+body.dark-mode .sync-btn.is-error { background: #3B1D1D; }
+@media (max-width: 900px) { .sync-btn .sync-label { display: none; } }

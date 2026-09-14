@@ -1,0 +1,16 @@
+{
+  "name": "萌语岛 English Island",
+  "short_name": "萌语岛",
+  "description": "给 6-10 岁孩子的英语学习岛：每天 15 分钟，听说读写一关一关往前走。",
+  "lang": "zh-CN",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F7EFE0",
+  "theme_color": "#F7EFE0",
+  "icons": [
+    { "src": "img/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "img/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

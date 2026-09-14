@@ -391,7 +391,14 @@ const Progress = (() => {
   }
 
   function saveStats() {
-    writeJson(statsKey(currentId), stats);
+    // 内容没变就不写、也不触发同步（避免和云同步的 reload 互相喂成死循环）
+    const key = statsKey(currentId);
+    let payload = "";
+    try { payload = JSON.stringify(stats); } catch (e) { payload = ""; }
+    let changed = true;
+    try { changed = localStorage.getItem(key) !== payload; } catch (e) {}
+    if (!changed) return;
+    writeJson(key, stats);
     // 学习记录也要同步（做题、学课、XP、徽章、模拟考都走这里）
     if (typeof CloudSync !== "undefined" && CloudSync.noteDirty) CloudSync.noteDirty();
   }

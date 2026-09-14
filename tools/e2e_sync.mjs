@@ -62,6 +62,22 @@ const serverFiles = (page, code) => page.evaluate(async (c) => {
   return (d.files || []).filter((f) => !f.deleted).map((f) => f.name);
 }, code);
 
+// 统计 /api/sync 请求数（用来抓「同步空转」这类问题）
+async function startCounting(page) {
+  await page.evaluate(() => {
+    window.__syncCalls = 0;
+    if (!window.__origFetch) {
+      window.__origFetch = window.fetch;
+      window.fetch = function (url, opts) {
+        if (String(url).indexOf("/api/sync") !== -1) window.__syncCalls++;
+        return window.__origFetch.apply(this, arguments);
+      };
+    }
+    window.__syncCalls = 0;
+  });
+}
+const syncCalls = (page) => page.evaluate(() => window.__syncCalls || 0);
+
 const A = await newDevice("A");
 const B = await newDevice("B");
 
@@ -161,15 +177,22 @@ check("断网时状态是错误并给出提示",
 
 await B.ctx.setOffline(false);
 let uploaded = false;
-for (let i = 0; i < 16 && !uploaded; i++) {           // 不手动点同步，等自动重试
+for (let i = 0; i < 20 && !uploaded; i++) {           // 不手动点同步，等自动重试（只轮询本地状态，别打服务端）
   await sleep(1000);
-  uploaded = await B.page.evaluate(async (c) => {
-    const r = await fetch("/api/sync?code=" + encodeURIComponent(c) + "&since=0");
-    const d = await r.json();
-    return (d.files || []).some((f) => f.name === "断网时写的.py");
-  }, code);
+  uploaded = await B.page.evaluate(() => {
+    const st = CloudSync.getStatus();
+    return st.status === "ok" && st.lastSyncAt > 0;
+  });
 }
-check("恢复网络后自动补传（不需要手动点）", uploaded);
+check("恢复网络后自动补传（不需要手动点）", uploaded,
+  JSON.stringify(await statusOf(B.page)));
+// 确认这一步真的传到云端（只查一次）
+const uploadedOnServer = await B.page.evaluate(async (c) => {
+  const r = await fetch("/api/sync?code=" + encodeURIComponent(c) + "&since=0");
+  const d = await r.json();
+  return (d.files || []).some((f) => f.name === "断网时写的.py");
+}, code);
+check("补传的内容确实到了云端", uploadedOnServer);
 
 // ---------- B 的作品也应回到 A ----------
 const aSyncOk = await sync(A.page);
@@ -186,6 +209,54 @@ const aFiles = await filesOf(A.page);
 check("A 那边也能看到 B 在断网期间写的作品",
   aFiles.indexOf("断网时写的.py") !== -1,
   aFiles.join(" | ") + " ／ 云端: " + aDiag.remoteNames.join(" | ") + " ／ rev " + aDiag.rev + "→" + aDiag.serverRev);
+
+// ---------- 顶栏「云同步」按钮 ----------
+await B.page.bringToFront();
+await sleep(500);
+const btn = await B.page.evaluate(() => {
+  const b = document.getElementById("btnSyncNow");
+  return { label: (document.getElementById("syncLabel") || {}).textContent, dot: (document.getElementById("syncDot") || {}).textContent,
+           title: b ? b.title : "" };
+});
+check("顶栏有「云同步」按钮并显示状态", /已同步|同步中|部分未传|同步失败/.test(btn.label || ""), JSON.stringify(btn));
+await B.page.click("#btnSyncNow");
+await sleep(2500);
+const afterClick = await B.page.evaluate(() => document.getElementById("syncLabel").textContent);
+check("点一下「云同步」会立即同步（状态回到已同步）", /已同步/.test(afterClick), afterClick);
+
+// ---------- 闲置的设备靠「后台自动同步」收到改动 ----------
+await A.page.bringToFront();                      // A 在前台改内容
+await A.page.evaluate(() => {
+  const f = FileManager.getFiles().find((x) => x.name === "断网时写的.py") || FileManager.getFiles()[0];
+  FileManager.setActiveFile(f.id);
+  CodeEditor.setValue("print('闲置设备也要能收到这一行')\n");
+});
+await sleep(4000);                                // 等 A 自己的防抖同步推上去
+const pushedByA = await A.page.evaluate(async (c) => {
+  const r = await fetch("/api/sync?code=" + encodeURIComponent(c) + "&since=0");
+  const d = await r.json();
+  return (d.files || []).some((f) => /闲置设备也要能收到这一行/.test(f.content || ""));
+}, code);
+check("A 改内容后确实推到了云端", pushedByA);
+
+await B.page.bringToFront();                      // B 回到前台，然后【什么都不做】
+await sleep(2000);
+const bRevBefore = (await statusOf(B.page)).lastSyncAt;
+let got = false;
+for (let i = 0; i < 13 && !got; i++) {            // 最多等 ~52 秒（后台定时同步周期 45 秒）
+  await sleep(4000);
+  got = await B.page.evaluate(() => FileManager.getFiles().some((f) => /闲置设备也要能收到这一行/.test(f.content || "")));
+}
+check("闲置的设备不用做任何操作，也会自动收到改动（后台自动同步）", got,
+  "B 上次同步：" + new Date(bRevBefore || 0).toLocaleTimeString("zh-CN"));
+
+// ---------- 静置 12 秒不应该有任何同步请求（防空转） ----------
+await A.page.bringToFront();
+await sleep(1500);
+await startCounting(A.page);
+await sleep(12000);
+const idleCalls = await syncCalls(A.page);
+check("静置时不会空转同步（12 秒内请求数 ≤ 1）", idleCalls <= 1, idleCalls + " 次 /api/sync");
 
 const realErrors = pageErrors.filter((e) => !/favicon|Failed to load resource|ERR_INTERNET_DISCONNECTED|net::/.test(e));
 check("没有 JS 报错", realErrors.length === 0, realErrors.slice(0, 2).join(" | "));

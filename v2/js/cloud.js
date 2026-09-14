@@ -12,7 +12,9 @@ const CloudSync = (() => {
   const PROFILES_KEY = "codepanda_profiles_v1";
   const STATS_PREFIX = "codepanda_stats_v1_";
   const VFS_KEY = "codepanda_vfs_v1";
-  const DEBOUNCE_MS = 3000;
+  const DEBOUNCE_MS = 1500;      // 改动后多久同步
+  const MAX_WAIT_MS = 8000;      // 连续敲字时的最长等待：不能一直往后拖，最多 8 秒必须传一次
+  const PERIODIC_MS = 45000;     // 后台兜底：页面在前台时每隔一会儿自动同步一次（也顺便拉别人的改动）
   const API = "/api";
 
   let state = { code: "", pin: "", accountId: "", rev: 0, hasPin: false, nickname: "", avatar: "" };
@@ -112,6 +114,8 @@ const CloudSync = (() => {
   let scheduled = false;        // 已经排好「补跑」的那一轮
   let retryTimer = null;
   let retryDelay = 0;
+  let periodicTimer = null;
+  let firstDirtyAt = 0;          // 这一批改动最早是什么时候发生的（配合 MAX_WAIT_MS）
   const idleWaiters = [];       // 等「这一轮真的跑完」的人（手动同步按钮 / 测试用）
   let clockOffset = 0;          // 服务端时间 - 本地时间，让多台设备的时间戳对齐
   let skippedNote = "";         // 有文件太大没传上去时的说明
@@ -591,6 +595,7 @@ const CloudSync = (() => {
         scheduled = true;
         setTimeout(() => { scheduled = false; syncNow(true); }, 300);       // 同步期间又改了 → 立刻补跑
       }
+      if (!dirty) firstDirtyAt = 0;
       releaseIdleWaiters();
     }
     return ok;
@@ -604,13 +609,43 @@ const CloudSync = (() => {
 
   function noteDirty() {
     if (!isSignedIn()) return;
-    if (!syncing && !scheduled) dirty = true;
+    dirty = true;
+    if (!firstDirtyAt) firstDirtyAt = Date.now();
     if (timer) clearTimeout(timer);
-    timer = setTimeout(() => { timer = null; syncNow(true); }, DEBOUNCE_MS);
+    // 普通情况：安静 1.5 秒就同步；一直敲字的话，最多等 8 秒也必须传一次
+    const waited = Date.now() - firstDirtyAt;
+    const wait = Math.max(300, Math.min(DEBOUNCE_MS, MAX_WAIT_MS - waited));
+    timer = setTimeout(() => { timer = null; syncNow(true); }, wait);
   }
 
   // ---------- 顶栏：头像 + 昵称 + 云状态 ----------
+  // 顶栏「云同步」按钮：显示状态，点一下立即同步
+  function renderSyncButton() {
+    const btn = document.getElementById("btnSyncNow");
+    const dot = document.getElementById("syncDot");
+    const label = document.getElementById("syncLabel");
+    if (!btn || !dot || !label) return;
+    const map3 = { idle: "⚪", syncing: "🟡", ok: "🟢", warn: "🟡", error: "🔴" };
+    if (!isSignedIn()) {
+      dot.textContent = "☁️";
+      label.textContent = "开启同步";
+      btn.title = "还没有开启云同步：点我打开云同步面板";
+      btn.classList.remove("is-ok", "is-warn", "is-error");
+      return;
+    }
+    dot.textContent = map3[status] || "⚪";
+    label.textContent = status === "syncing" ? "同步中…"
+      : status === "error" ? "同步失败"
+      : status === "warn" ? "部分未传"
+      : "已同步";
+    btn.title = statusLine() + "（点一下立即同步）";
+    btn.classList.toggle("is-ok", status === "ok");
+    btn.classList.toggle("is-warn", status === "syncing" || status === "warn");
+    btn.classList.toggle("is-error", status === "error");
+  }
+
   function renderChip() {
+    renderSyncButton();
     const avatar = document.getElementById("userAvatar");
     const name = document.getElementById("userName");
     const dot = document.getElementById("cloudDot");
@@ -886,12 +921,44 @@ const CloudSync = (() => {
       if (isSignedIn()) setTimeout(() => syncNow(true), 1500);
       if (typeof FileManager !== "undefined" && FileManager.onChange) FileManager.onChange(() => noteDirty());
       window.addEventListener("online", () => { if (isSignedIn()) syncNow(true); });
-      // 从后台切回来时补一次（中间可能漏了同步）
-      document.addEventListener("visibilitychange", () => {
-        if (document.hidden || !isSignedIn()) return;
-        if (Date.now() - lastSyncAt < 20000) return;
+
+      // 回到页面 / 窗口重新聚焦时补一次（别让闲置的设备一直看不到别的设备的改动）
+      const catchUp = () => {
+        if (!isSignedIn()) return;
+        if (Date.now() - lastSyncAt < 15000) return;
         syncNow(true);
-      });
+      };
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) catchUp(); });
+      window.addEventListener("focus", catchUp);
+
+      // 后台自动同步：页面在前台时每 PERIODIC_MS 自动跑一轮（有改动就推，没改动也会拉一次别人的改动）
+      if (!periodicTimer) {
+        periodicTimer = setInterval(() => {
+          if (!isSignedIn()) return;
+          if (typeof document !== "undefined" && document.hidden) return;   // 页面在后台就先不管，回来时会补
+          syncNow(true);
+        }, PERIODIC_MS);
+      }
+
+      // 关页面 / 切走时尽力把还没传的改动推出去（keepalive 让请求在页面卸载后继续发送）
+      const flushOnExit = () => {
+        if (!isSignedIn() || !dirty) return;
+        try {
+          const collected = collectChanges();
+          if (!countRows(collected.changes)) return;
+          const body = JSON.stringify({ code: state.code, pin: state.pin, changes: collected.changes });
+          if (body.length > 60000) return;        // keepalive 请求体有 64KB 上限
+          // 注意：这里【不记账】。万一没发出去，下次同步会重发（服务端 LWW 幂等，重发无害）
+          fetch(API + "/sync", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: body,
+            keepalive: true
+          }).catch(() => {});
+        } catch (e) {}
+      };
+      window.addEventListener("pagehide", flushOnExit);
+      document.addEventListener("visibilitychange", () => { if (document.hidden) flushOnExit(); });
     },
     isSignedIn, getStatus, createAccount, login, setPin, rotateCode, signOutLocal,
     syncNow, noteDirty, whenIdle, isIdle,

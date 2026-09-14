@@ -159,9 +159,11 @@ const FileManager = (() => {
   // 保存到本地存储（失败时通知界面，避免静默丢失孩子的代码）
   function saveToStorage() {
     try {
-      localStorage.setItem(filesKey(), JSON.stringify({
+      const payload = JSON.stringify({
         v: FORMAT_VERSION, folders: folders, files: files, collapsed: collapsed
-      }));
+      });
+      const changed = localStorage.getItem(filesKey()) !== payload;
+      localStorage.setItem(filesKey(), payload);
       if (activeFileId) {
         localStorage.setItem(activeKey(), activeFileId);
       }
@@ -169,8 +171,10 @@ const FileManager = (() => {
         lastStorageError = null;
         storageErrorListeners.forEach(fn => { try { fn(null); } catch (e) {} });
       }
-      // 落盘成功就排队同步：新建 / 删除 / 重命名 / 移动 / 改内容都算
-      if (typeof CloudSync !== "undefined" && CloudSync.noteDirty) CloudSync.noteDirty();
+      // 只有内容真的变了才排队同步：新建 / 删除 / 重命名 / 移动 / 改内容都算。
+      // 【重要】不能无条件调用：同步结束会 refreshUI → FileManager.reload() → init() → saveToStorage()，
+      // 无条件通知就变成「同步→落盘→再同步」的死循环（实测一分钟能打 200+ 次请求，直接把限流打满）。
+      if (changed && typeof CloudSync !== "undefined" && CloudSync.noteDirty) CloudSync.noteDirty();
       return true;
     } catch (e) {
       console.error("保存本地存储失败", e);

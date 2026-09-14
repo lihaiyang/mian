@@ -1,0 +1,12 @@
+/* 🖨 打印样式：单词卡与家长周报（A4） */
+@media print {
+  .app-header, .tabbar, .toast-wrap, .confetti-layer, .stamp-layer, .btn, .btn-row { display: none !important; }
+  body { background: #fff; }
+  .app { max-width: none; padding: 0; }
+  .card { break-inside: avoid; box-shadow: none; border: 2px solid #000; }
+  .word-grid { grid-template-columns: repeat(3, 1fr); }
+  .word-tile { border: 1.5px solid #000; min-height: 0; }
+  .kpi, .report-kpi { border: 1.5px solid #000; }
+  .spark .sbar { border: 1.5px solid #000; }
+  a[href]::after { content: ""; }
+}
