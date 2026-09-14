@@ -109,12 +109,27 @@ const CloudSync = (() => {
 
   let dirty = false;
   let syncing = false;
+  let scheduled = false;        // 已经排好「补跑」的那一轮
   let retryTimer = null;
   let retryDelay = 0;
+  const idleWaiters = [];       // 等「这一轮真的跑完」的人（手动同步按钮 / 测试用）
   let clockOffset = 0;          // 服务端时间 - 本地时间，让多台设备的时间戳对齐
   let skippedNote = "";         // 有文件太大没传上去时的说明
 
   function serverNow() { return Date.now() + clockOffset; }
+
+  function isIdle() { return !syncing && !dirty && !scheduled; }
+
+  function releaseIdleWaiters() {
+    if (!isIdle()) return;
+    const list = idleWaiters.splice(0);
+    list.forEach((fn) => { try { fn(); } catch (e) {} });
+  }
+
+  function whenIdle() {
+    if (isIdle()) return Promise.resolve();
+    return new Promise((resolve) => { idleWaiters.push(resolve); });
+  }
 
   function syncClock(serverTime) {
     if (typeof serverTime === "number" && serverTime > 0) clockOffset = serverTime - Date.now();
@@ -533,7 +548,9 @@ const CloudSync = (() => {
   // ---------- 同步一轮：先推后拉 ----------
   async function syncNow(silent) {
     if (!isSignedIn()) return false;
-    if (syncing) { dirty = true; return false; }        // 正在同步 → 记下来，结束后补跑
+    // 正在同步：记下「还有改动」，并等这一轮 + 补跑那一轮真正结束再返回。
+    // （以前这里直接 return，调用方会读到上一轮留下的旧状态，看起来像"同步成功了"）
+    if (syncing) { dirty = true; await whenIdle(); return true; }
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
       setStatus("error", "现在没有网络，等联网后会自动同步");
       return false;
@@ -543,8 +560,11 @@ const CloudSync = (() => {
     if (!silent) setStatus("syncing");
     let ok = true;
     try {
-      const pushed = await pushChanges();               // ① 先推：本机改过的东西先上去
-      const pulled = await pullChanges(false);          // ② 再拉：把云端更新的合并回来
+      // ① 先拉：把云端更新的合并进来（学习记录在这一步就并集好了；
+      //    本地改过的行不会被覆盖，等下面推上去）
+      const pulled = await pullChanges(false);
+      // ② 再推：本机改过的、以及刚并集出来的学习记录
+      const pushed = await pushChanges();
       refreshUI(pulled.touched);
       lastSyncAt = Date.now();
       retryDelay = 0;
@@ -558,11 +578,20 @@ const CloudSync = (() => {
       }
     } catch (e) {
       ok = false;
-      setStatus("error", String(e.message || e));
+      const msg = String((e && e.message) || e);
+      const friendly = /Failed to fetch|NetworkError|Load failed|network error|ERR_/i.test(msg)
+        ? "网络不太好，没能同步，稍后会自动重试"
+        : msg;
+      setStatus("error", friendly);
       scheduleRetry();
     } finally {
       syncing = false;
-      if (dirty) { dirty = false; setTimeout(() => syncNow(true), 300); }   // 同步期间又改了 → 立刻补跑
+      if (dirty) {
+        dirty = false;
+        scheduled = true;
+        setTimeout(() => { scheduled = false; syncNow(true); }, 300);       // 同步期间又改了 → 立刻补跑
+      }
+      releaseIdleWaiters();
     }
     return ok;
   }
@@ -575,7 +604,7 @@ const CloudSync = (() => {
 
   function noteDirty() {
     if (!isSignedIn()) return;
-    dirty = true;
+    if (!syncing && !scheduled) dirty = true;
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => { timer = null; syncNow(true); }, DEBOUNCE_MS);
   }
@@ -865,7 +894,8 @@ const CloudSync = (() => {
       });
     },
     isSignedIn, getStatus, createAccount, login, setPin, rotateCode, signOutLocal,
-    syncNow, noteDirty, openPanel, closePanel, renderPanel, renderChip, renderShareTab, showNeedSyncNotice,
+    syncNow, noteDirty, whenIdle, isIdle,
+    openPanel, closePanel, renderPanel, renderChip, renderShareTab, showNeedSyncNotice,
     shareCurrentFile, shareProgress, copyText,
     onStatus(fn) { listeners.push(fn); },
     getCode() { return state.code; }

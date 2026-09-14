@@ -44,7 +44,8 @@ async function sync(page, tries = 6) {
   for (let i = 0; i < tries; i++) {
     const ok = await page.evaluate(async () => {
       if (!CloudSync.isSignedIn()) return false;
-      await CloudSync.syncNow(true);
+      await CloudSync.syncNow(true);          // 现在会等这一轮真的跑完
+      await CloudSync.whenIdle();
       return CloudSync.getStatus().status === "ok";
     });
     if (ok) return true;
@@ -111,6 +112,8 @@ await A.page.evaluate(() => Progress.recordExercise({ id: "E0001", topic: "print
 await B.page.evaluate(() => Progress.recordExercise({ id: "E0002", topic: "print", level: 1, passed: true }));
 await sync(A.page);
 await sync(B.page);
+await sync(A.page);          // 再跑一轮：A 把自己的并集结果推上去
+await sync(B.page);
 await sleep(400);
 const merged = await B.page.evaluate(async (c) => {
   const r = await fetch("/api/sync?code=" + encodeURIComponent(c) + "&since=0");
@@ -153,7 +156,8 @@ const offlineStatus = await B.page.evaluate(async () => {
   return CloudSync.getStatus();
 });
 check("断网时状态是错误并给出提示",
-  offlineStatus.status === "error" && /没有网络/.test(offlineStatus.error || ""), offlineStatus.error);
+  offlineStatus.status === "error" && /没有网络|网络不太好/.test(offlineStatus.error || ""),
+  offlineStatus.status + " / " + (offlineStatus.error || ""));
 
 await B.ctx.setOffline(false);
 let uploaded = false;
@@ -168,10 +172,20 @@ for (let i = 0; i < 16 && !uploaded; i++) {           // 不手动点同步，�
 check("恢复网络后自动补传（不需要手动点）", uploaded);
 
 // ---------- B 的作品也应回到 A ----------
-await sync(A.page);
+const aSyncOk = await sync(A.page);
+const aDiag = await A.page.evaluate(async (c) => {
+  const st = CloudSync.getStatus();
+  const r = await fetch("/api/sync?code=" + encodeURIComponent(c) + "&since=0");
+  const d = await r.json();
+  return { status: st.status, err: st.error, rev: st.rev, serverRev: d.rev,
+           remoteNames: (d.files || []).filter((f) => !f.deleted).map((f) => f.name) };
+}, code);
+check("A 能同步成功（诊断）", aSyncOk, JSON.stringify(aDiag));
 await sleep(300);
 const aFiles = await filesOf(A.page);
-check("A 那边也能看到 B 在断网期间写的作品", aFiles.indexOf("断网时写的.py") !== -1, aFiles.join(" | "));
+check("A 那边也能看到 B 在断网期间写的作品",
+  aFiles.indexOf("断网时写的.py") !== -1,
+  aFiles.join(" | ") + " ／ 云端: " + aDiag.remoteNames.join(" | ") + " ／ rev " + aDiag.rev + "→" + aDiag.serverRev);
 
 const realErrors = pageErrors.filter((e) => !/favicon|Failed to load resource|ERR_INTERNET_DISCONNECTED|net::/.test(e));
 check("没有 JS 报错", realErrors.length === 0, realErrors.slice(0, 2).join(" | "));
