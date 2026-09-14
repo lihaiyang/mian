@@ -297,8 +297,12 @@ const CloudSync = (() => {
     });
 
     // 墓碑：上次发过、这次本地已经没有的行
+    const tombstones = [];                 // 待发墓碑的行键：拉取时要保护它们，见 syncNow
     Object.keys(lastSent).forEach(key => {
       if (seen[key]) return;
+      // vfs 只同步「当前档案」的数据文件：切换档案时不能把别的档案当成已删除推上去
+      if (key.indexOf("vfs|") === 0 && key.indexOf("vfs|" + pid + "|") !== 0) return;
+      tombstones.push(key);
       const row = lastSent[key].row || {};
       const t2 = serverNow();
       if (key.indexOf("file|") === 0) {
@@ -315,7 +319,7 @@ const CloudSync = (() => {
       sent.push({ key: key, h: "tombstone", row: null });   // 墓碑发成功后就别再发了
     });
 
-    return { changes: changes, sent: sent };
+    return { changes: changes, sent: sent, tombstones: tombstones };
   }
 
   // 只有服务器确认收到之后，才把这些行的哈希记下来（失败就原样重发，服务端 LWW 幂等）
@@ -345,6 +349,9 @@ const CloudSync = (() => {
   // ---------- 应用远端数据（按行合并，不整体覆盖） ----------
   function applyPull(data, opts) {
     const cloudWins = !!(opts && opts.cloudWins);
+    // 本地删掉、墓碑还没推上去的行（见 syncNow 里的 pending）：
+    // 云端那份「还没删除」的旧行不能把它们复活，否则删除动作永远发不出去
+    const protect = (opts && opts.protect) || null;
     const touchedProfiles = {};
     let localOnly = 0;                      // 本地有、云端也有、但本地更新 → 等推送
 
@@ -353,6 +360,7 @@ const CloudSync = (() => {
       const i = list.findIndex(x => x.id === p.id);
       const key = "profile|" + p.id;
       const local = i === -1 ? null : list[i];
+      if (i === -1 && !p.deleted && protect && protect[key]) { localOnly++; return; }
       if (local && localChanged(key, sigProfile(local), cloudWins)) { localOnly++; return; }
       if (p.deleted) { if (i !== -1) list.splice(i, 1); }
       else {
@@ -361,7 +369,9 @@ const CloudSync = (() => {
       }
       writeProfiles(list);
       touchedProfiles[p.id] = 1;
-      lastSent[key] = { h: hash(sigProfile(p)), t: p.updated_at, row: tombRow(p) };
+      // 云端已经是墓碑的行不用记账：记了下一轮会被当成「本地新删除」再推一次，永远推不完
+      if (p.deleted) delete lastSent[key];
+      else lastSent[key] = { h: hash(sigProfile(p)), t: p.updated_at, row: tombRow(p) };
     });
 
     (data.folders || []).forEach(f => {
@@ -369,6 +379,7 @@ const CloudSync = (() => {
       ws.folders = ws.folders || [];
       const i = ws.folders.findIndex(x => x.id === f.id);
       const key = "folder|" + f.id;
+      if (i === -1 && !f.deleted && protect && protect[key]) { localOnly++; return; }
       if (i !== -1 && localChanged(key, sigFolder(ws.folders[i]), cloudWins)) { localOnly++; return; }
       if (f.deleted) { if (i !== -1) ws.folders.splice(i, 1); }
       else {
@@ -377,7 +388,8 @@ const CloudSync = (() => {
       }
       writeWorkspace(f.profile_id, ws);
       touchedProfiles[f.profile_id] = 1;
-      lastSent[key] = { h: hash(sigFolder(f)), t: f.updated_at, row: tombRow(f) };
+      if (f.deleted) delete lastSent[key];
+      else lastSent[key] = { h: hash(sigFolder(f)), t: f.updated_at, row: tombRow(f) };
     });
 
     (data.files || []).forEach(f => {
@@ -385,6 +397,7 @@ const CloudSync = (() => {
       ws.files = ws.files || [];
       const i = ws.files.findIndex(x => x.id === f.id);
       const key = "file|" + f.id;
+      if (i === -1 && !f.deleted && protect && protect[key]) { localOnly++; return; }
       if (i !== -1 && localChanged(key, sigFile(ws.files[i]), cloudWins)) { localOnly++; return; }
       if (f.deleted) { if (i !== -1) ws.files.splice(i, 1); }
       else {
@@ -393,7 +406,9 @@ const CloudSync = (() => {
       }
       writeWorkspace(f.profile_id, ws);
       touchedProfiles[f.profile_id] = 1;
-      lastSent[key] = { h: hash(sigFile(f)), t: f.updated_at, row: tombRow(f) };
+      // 云端墓碑不记账（否则每轮同步都会把它当成「本地新删除」再推一次，rev 无限上涨）
+      if (f.deleted) delete lastSent[key];
+      else lastSent[key] = { h: hash(sigFile(f)), t: f.updated_at, row: tombRow(f) };
     });
 
     (data.progress || []).forEach(p => {
@@ -419,12 +434,14 @@ const CloudSync = (() => {
       const drafts = readDrafts(d.profile_id) || {};
       const key = "learn|" + d.profile_id + "|" + d.draft_id;
       const local = drafts[d.draft_id];
+      if (!local && !d.deleted && protect && protect[key]) { localOnly++; return; }
       if (local && localChanged(key, sigDraft(local.code), cloudWins)) { localOnly++; return; }
       if (d.deleted) delete drafts[d.draft_id];
       else drafts[d.draft_id] = { code: d.code || "", at: d.updated_at };
       writeDrafts(d.profile_id, drafts);
       touchedProfiles[d.profile_id] = 1;
-      lastSent[key] = { h: hash(sigDraft(d.code)), t: d.updated_at, row: tombRow(d) };
+      if (d.deleted) delete lastSent[key];
+      else lastSent[key] = { h: hash(sigDraft(d.code)), t: d.updated_at, row: tombRow(d) };
     });
     // 草稿变了要让学堂里的界面也跟着刷新
     if (typeof Learn !== "undefined" && Learn.reloadDrafts) {
@@ -437,10 +454,20 @@ const CloudSync = (() => {
       if (v.profile_id !== pid) return;      // 数据文件目前只同步当前档案
       const i = vfs.findIndex(x => x.path === v.path);
       const key = "vfs|" + pid + "|" + v.path;
+      const text = v.text || "";
+      // 空文本 = 删除墓碑；这里的 protect 装的是「本地删了、墓碑还没推上去」的行：
+      // 远端这份还是活的（有内容）时不能把它拉回来，否则删除动作永远发不出去
+      if (i === -1 && text && protect && protect[key]) { localOnly++; return; }
       if (i !== -1 && localChanged(key, sigVfs(vfs[i].text), cloudWins)) { localOnly++; return; }
-      if (i === -1) vfs.push({ path: v.path, text: v.text || "", updatedAt: v.updated_at });
-      else vfs[i] = Object.assign({}, vfs[i], { text: v.text || "", updatedAt: v.updated_at });
-      lastSent[key] = { h: hash(sigVfs(v.text)), t: v.updated_at, row: { profile_id: pid, path: v.path } };
+      if (i === -1 && !text) {
+        // 空文本是删除墓碑：本地本来就没有这个文件，别再凭空造一个空文件出来
+        // （代价：别的设备上「真正的空文件」不会出现在这台设备，比"删了又回来"划算）
+        delete lastSent[key];
+        return;
+      }
+      if (i === -1) vfs.push({ path: v.path, text: text, updatedAt: v.updated_at });
+      else vfs[i] = Object.assign({}, vfs[i], { text: text, updatedAt: v.updated_at });
+      lastSent[key] = { h: hash(sigVfs(text)), t: v.updated_at, row: { profile_id: pid, path: v.path } };
     });
     writeVfs(vfs);
 
@@ -588,7 +615,7 @@ const CloudSync = (() => {
     return res;
   }
 
-  // ---------- 同步一轮：先推后拉 ----------
+  // ---------- 同步一轮：先拉后推（拉取时保护「待发墓碑」的行） ----------
   async function syncNow(silent) {
     if (!isSignedIn()) return false;
     // 正在同步：记下「还有改动」，并等这一轮 + 补跑那一轮真正结束再返回。
@@ -603,10 +630,15 @@ const CloudSync = (() => {
     if (!silent) setStatus("syncing");
     let ok = true;
     try {
-      // ① 先拉：把云端更新的合并进来（学习记录在这一步就并集好了；
+      // ① 先算出「本地删掉了、墓碑还没推上去」的行，拉取时保护它们。
+      //    同步是「先拉后推」：云端那份还没删除的旧行会在 applyPull 里把刚删掉的
+      //    文件/文件夹/草稿重新拉回本机（删除动作永远发不出去）。
+      const protect = {};
+      collectChanges().tombstones.forEach(k => { protect[k] = 1; });
+      // ② 先拉：把云端更新的合并进来（学习记录在这一步就并集好了；
       //    本地改过的行不会被覆盖，等下面推上去）
-      const pulled = await pullChanges(false);
-      // ② 再推：本机改过的、以及刚并集出来的学习记录
+      const pulled = await pullChanges(false, { protect: protect });
+      // ③ 再推：本机改过的、刚删掉的、以及并集出来的学习记录
       const pushed = await pushChanges();
       refreshUI(pulled.touched);
       lastSyncAt = Date.now();

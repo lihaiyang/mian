@@ -23,6 +23,7 @@ const FileManager = (() => {
   let collapsed = {};      // 文件夹折叠状态 { folderId: true }
   let activeFileId = null;
   let listeners = [];
+  let reloadListeners = [];   // 「外部数据变更」（云同步合入远端内容）后的重画，不算本机改动
   let storageErrorListeners = [];
   let lastStorageError = null;
 
@@ -187,9 +188,16 @@ const FileManager = (() => {
     }
   }
 
-  // 广播变化
+  // 广播变化（本机改动：新建 / 删除 / 重命名 / 移动 / 改内容）
   function notifyChange() {
     listeners.forEach(fn => fn(files, activeFileId));
+  }
+
+  // 广播「数据被外部改过，需要重画」：云同步把远端内容合进本机后调用。
+  // 【重要】必须和 notifyChange 分开：onChange 被云同步当成「本机有改动，要标未同步」的信号，
+  // 在这里触发会每轮同步都误标「未同步」，老版本还因此踩过「同步→落盘→再同步」的死循环。
+  function notifyReload() {
+    reloadListeners.forEach(fn => { try { fn(files, activeFileId); } catch (e) {} });
   }
 
   return {
@@ -219,11 +227,21 @@ const FileManager = (() => {
       collapsed = {};
       activeFileId = null;
       init();
+      // 重新载入 = 外部数据变更 → 让界面重新画一次。
+      // 不通知的话，数据虽然同步下来了，文件树和编辑区还显示旧内容，
+      // 看起来就像「改了内容却同步不成功」；编辑区那份旧内容还会被 30 秒自动保存写回去，
+      // 把刚同步下来的新内容覆盖掉。
+      notifyReload();
       return files;
     },
 
     onChange(fn) {
       listeners.push(fn);
+    },
+
+    // 外部（云同步）重新载入数据后的重画通知：不表示本机有改动
+    onReload(fn) {
+      reloadListeners.push(fn);
     },
 
     getFiles() {

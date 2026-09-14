@@ -554,6 +554,119 @@ async function testOfflineThenOnline() {
 }
 
 // =====================================================================
+// ⑪ 刚删掉的文件，同步时不能被云端那份「还没删除」的旧行复活
+//    （同步是先拉后推：拉取这份旧行会把删除动作吃掉，墓碑永远发不出去）
+// =====================================================================
+async function testDeleteNotResurrected() {
+  const server = makeServer();
+  const store = makeStore();
+  seedProfile(store, "p_default", "小熊猫", "🐼");
+  seedWorkspace(store, "p_default", [
+    { id: "file_keep", name: "保留.py", content: "print('keep')", folderId: "f_mine" },
+    { id: "file_del", name: "要删的.py", content: "print('del')", folderId: "f_mine" }
+  ]);
+  const dev = makeDevice(store, server);
+  const code = await dev.CloudSync.createAccount("");     // 内部已经推过一次
+
+  // 删完立刻同步（中间没有别的同步 → 拉取一定会拿到云端那份还没删除的旧行）
+  const ws = JSON.parse(store.getItem("codepanda_python_files_v1__p_default"));
+  ws.files = ws.files.filter((f) => f.id !== "file_del");
+  store.setItem("codepanda_python_files_v1__p_default", JSON.stringify(ws));
+  await dev.CloudSync.syncNow(true);
+
+  const localIds = readFiles(store, "p_default").map((f) => f.id);
+  const remoteDel = server.rows(code, "files").find((r) => r.id === "file_del");
+  check("删掉的文件不会被拉取复活", localIds.indexOf("file_del") === -1, localIds.join(","));
+  check("删除动作确实传到了云端（墓碑 deleted=1）", !!remoteDel && Number(remoteDel.deleted) === 1,
+    remoteDel ? "deleted=" + remoteDel.deleted : "(云端没有这一行)");
+
+  // 云端墓碑拉回来之后，本地也不能凭空长出一个空文件
+  check("墓碑行不会在本地复活成空文件", readFiles(store, "p_default").every((f) => f.id !== "file_del"));
+}
+
+// =====================================================================
+// ⑪b 墓碑发成功之后，后续每轮同步不能再把它当成「本地新删除」重推
+//     （每轮重推会把 rev 一路推高，等于每次同步都在空写云端）
+// =====================================================================
+async function testTombstoneNoChurn() {
+  const server = makeServer();
+  const store = makeStore();
+  seedProfile(store, "p_default", "小熊猫", "🐼");
+  seedWorkspace(store, "p_default", [
+    { id: "file_keep", name: "保留.py", content: "print('keep')", folderId: "f_mine" },
+    { id: "file_del", name: "要删的.py", content: "print('del')", folderId: "f_mine" }
+  ]);
+  const dev = makeDevice(store, server);
+  const code = await dev.CloudSync.createAccount("");
+  await dev.CloudSync.syncNow(true);          // 先把游标推到最新，让删除这一轮不会被拉取复活
+
+  const ws = JSON.parse(store.getItem("codepanda_python_files_v1__p_default"));
+  ws.files = ws.files.filter((f) => f.id !== "file_del");
+  store.setItem("codepanda_python_files_v1__p_default", JSON.stringify(ws));
+  await dev.CloudSync.syncNow(true);
+  const tomb = server.rows(code, "files").find((r) => r.id === "file_del");
+  check("删除这一轮把墓碑推上去了", !!tomb && Number(tomb.deleted) === 1,
+    tomb ? "deleted=" + tomb.deleted : "(没有这一行)");
+
+  const revBefore = tomb.rev;
+  await dev.CloudSync.syncNow(true);
+  await dev.CloudSync.syncNow(true);
+  await dev.CloudSync.syncNow(true);
+  const revAfter = server.rows(code, "files").find((r) => r.id === "file_del").rev;
+  check("之后再同步 3 轮，墓碑不再重推（rev 不涨）", revBefore === revAfter, "rev " + revBefore + " → " + revAfter);
+}
+
+// =====================================================================
+// ⑫ 切换成长档案时，不能把别的档案的数据文件当成「已删除」推上去
+// =====================================================================
+async function testVfsProfileSwitchKeepsOtherProfile() {
+  const server = makeServer();
+  const store = makeStore();
+  store.setItem("codepanda_profiles_v1", JSON.stringify([
+    { id: "p_default", name: "小熊猫", emoji: "🐼" },
+    { id: "p_2", name: "小海龟", emoji: "🐢" }
+  ]));
+  store.setItem("codepanda_current_profile_v1", JSON.stringify("p_default"));
+  store.setItem("codepanda_vfs_v1", JSON.stringify([{ path: "数据.txt", text: "孩子写进去的内容" }]));
+  const dev = makeDevice(store, server);
+  const code = await dev.CloudSync.createAccount("");
+  check("当前档案的数据文件传上去了",
+    (server.rows(code, "vfs").find((r) => r.profile_id === "p_default") || {}).text === "孩子写进去的内容");
+
+  // 切换成另一个档案再同步
+  store.setItem("codepanda_current_profile_v1", JSON.stringify("p_2"));
+  await dev.CloudSync.syncNow(true);
+  const row = server.rows(code, "vfs").find((r) => r.profile_id === "p_default");
+  check("切换档案不会把上一个档案的数据文件清空",
+    !!row && row.text === "孩子写进去的内容", row ? JSON.stringify(row.text) : "(行没了)");
+}
+
+// =====================================================================
+// ⑬ 孩子用 Python 删掉的数据文件：删除要同步出去，而且不能被拉回来变成空文件
+// =====================================================================
+async function testVfsDeleteNoResurrect() {
+  const server = makeServer();
+  const store = makeStore();
+  seedProfile(store, "p_default", "小熊猫", "🐼");
+  seedWorkspace(store, "p_default", [{ id: "file_a", name: "a.py", content: "print(1)", folderId: "f_mine" }]);
+  store.setItem("codepanda_vfs_v1", JSON.stringify([{ path: "数据.txt", text: "孩子写的内容" }]));
+  const dev = makeDevice(store, server);
+  const code = await dev.CloudSync.createAccount("");
+  await dev.CloudSync.syncNow(true);          // 先把游标推到最新
+
+  // Python 跑完一轮，vfs 列表被整体重写：这条数据文件没了（相当于 os.remove）
+  store.setItem("codepanda_vfs_v1", JSON.stringify([]));
+  await dev.CloudSync.syncNow(true);
+  const row = server.rows(code, "vfs").find((r) => r.path === "数据.txt");
+  check("数据文件的删除会推到云端（text 变空）", !!row && row.text === "",
+    row ? JSON.stringify(row.text) : "(云端没有这一行)");
+
+  await dev.CloudSync.syncNow(true);          // 墓碑拉回来
+  const localVfs = JSON.parse(store.getItem("codepanda_vfs_v1") || "[]");
+  check("数据文件不会被拉取复活成空文件", !localVfs.some((v) => v.path === "数据.txt"), JSON.stringify(localVfs));
+}
+
+// =====================================================================
 (async () => {
   await testRetryAfterFailure();
   await testPullAndLocalWins();
@@ -565,6 +678,10 @@ async function testOfflineThenOnline() {
   await testManualOnly();
   await testDraftSync();
   await testOfflineThenOnline();
+  await testDeleteNotResurrected();
+  await testTombstoneNoChurn();
+  await testVfsProfileSwitchKeepsOtherProfile();
+  await testVfsDeleteNoResurrect();
 
   console.log(lines.join("\n"));
   console.log(failed === 0 ? `\n🎉 云同步 ${lines.length} 项全部通过` : `\n❌ ${failed} / ${lines.length} 项失败`);

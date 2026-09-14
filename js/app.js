@@ -127,16 +127,13 @@ window.App = (() => {
     TurtleEngine.init(canvas, sprite);
 
     // 4. 监听文件变化，更新 UI
-    FileManager.onChange((files, activeId) => {
-      renderFileList(files, activeId);
-      // 当前激活的文件如果被关闭了标签，自动重新打开
-      if (activeId) closedTabIds.delete(activeId);
-      renderEditorTabs(files, activeId);
-      const activeFile = FileManager.getActiveFile();
-      if (activeFile) {
-        CodeEditor.setValue(activeFile.content);
-      }
-    });
+    FileManager.onChange((files, activeId) => renderWorkspace(files, activeId));
+
+    // 4.1 云同步把远端内容合进本机后，也要重画一次：
+    //     否则数据已经同步下来了，文件树和编辑区还显示旧内容 —— 看起来就像「改了内容却同步不成功」。
+    if (typeof FileManager.onReload === "function") {
+      FileManager.onReload((files, activeId) => renderWorkspace(files, activeId));
+    }
 
     // 初始渲染
     const initialFiles = FileManager.getFiles();
@@ -309,6 +306,19 @@ window.App = (() => {
       "\"": "&quot;",
       "'": "&#39;"
     })[c]);
+  }
+
+  // 把工作区状态画到界面上：文件列表 + 编辑区标签 + 编辑区内容。
+  // 本机改动（FileManager.onChange）和云同步合入远端内容（FileManager.onReload）都走这里。
+  function renderWorkspace(files, activeId) {
+    renderFileList(files, activeId);
+    // 当前激活的文件如果被关闭了标签，自动重新打开
+    if (activeId) closedTabIds.delete(activeId);
+    renderEditorTabs(files, activeId);
+    const activeFile = FileManager.getActiveFile();
+    if (activeFile) {
+      CodeEditor.setValue(activeFile.content);
+    }
   }
 
   // 渲染左侧文件树列表
@@ -1284,22 +1294,31 @@ window.App = (() => {
   let autoSaveTimer = null;
   let autoSaveIndicatorTimer = null;
 
+  // 编辑区里有没有「用户新敲、还没落盘」的内容？
+  // 没有的话就不要回写：云同步拉回新内容后编辑区会被重新装载，
+  // 此时无条件回写只会把刚拉下来的新内容盖掉（再同步上去就把别的设备的修改抹了）。
+  function editorHasUserEdits() {
+    if (typeof CodeEditor !== "undefined" && CodeEditor.hasUserEdits) return CodeEditor.hasUserEdits();
+    return true;        // 拿不到判断依据时保持老行为
+  }
+
+  function autoSaveEditor() {
+    if (!editorHasUserEdits()) return false;
+    const content = CodeEditor.getValue();
+    if (!content) return false;
+    FileManager.updateActiveContent(content);
+    return true;
+  }
+
   function initAutoSave() {
     // 每 30 秒自动保存一次
     autoSaveTimer = setInterval(() => {
-      const content = CodeEditor.getValue();
-      if (content) {
-        FileManager.updateActiveContent(content);
-        showAutoSaveIndicator();
-      }
+      if (autoSaveEditor()) showAutoSaveIndicator();
     }, 30000);
 
     // 页面关闭或隐藏前保存
     window.addEventListener("beforeunload", () => {
-      const content = CodeEditor.getValue();
-      if (content) {
-        FileManager.updateActiveContent(content);
-      }
+      autoSaveEditor();
     });
   }
 

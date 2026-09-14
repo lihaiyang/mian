@@ -5,6 +5,8 @@
 const CodeEditor = (() => {
   let cmInstance = null;
   let fallbackTextarea = null;
+  let lastLoadedValue = null;     // 最后一次「程序装载进编辑区」的内容
+  let editorDirty = false;        // 编辑区里是否有「用户敲过、还没回写」的内容
   let currentFontSize = 15;
   const MIN_FONT_SIZE = 12;
   const MAX_FONT_SIZE = 30;
@@ -199,6 +201,9 @@ const CodeEditor = (() => {
           updateStatusBar();
           maybeAutoHint(cm, change);
           const content = cm.getValue();
+          // 和「最后装载进来的内容」比对：不一样说明是用户敲的
+          // （云同步的 30 秒自动保存靠它判断能不能回写，别把刚拉下来的新内容盖掉）
+          editorDirty = content !== lastLoadedValue;
           persistContent(content);
           if (window.App && window.App.showAutoSaveIndicator) {
             window.App.showAutoSaveIndicator();
@@ -218,6 +223,7 @@ const CodeEditor = (() => {
     // 优雅降级处理
     textareaElement.addEventListener("input", () => {
       updateStatusBar();
+      editorDirty = textareaElement.value !== lastLoadedValue;
       persistContent(textareaElement.value);
     });
 
@@ -239,6 +245,10 @@ const CodeEditor = (() => {
   }
 
   function setValue(val) {
+    // 先登记再设置：CodeMirror 的 setValue 会同步触发 change 事件，
+    // 那里用 lastLoadedValue 判断「是不是用户改的」，顺序不能反
+    lastLoadedValue = val;
+    editorDirty = false;
     if (cmInstance) {
       if (cmInstance.getValue() !== val) {
         cmInstance.setValue(val);
@@ -249,6 +259,12 @@ const CodeEditor = (() => {
     }
     updateStatusBar();
     schedulePunctuationCheck();
+  }
+
+  // 编辑区里有没有「用户新敲、还没回写」的内容？
+  // 没有 → 现在这份内容就是我们最后交给它的那一份，回写只会盖掉别处更新过的版本。
+  function hasUserEdits() {
+    return editorDirty;
   }
 
   function getValue() {
@@ -416,6 +432,7 @@ const CodeEditor = (() => {
     init,
     setValue,
     getValue,
+    hasUserEdits,
     insertSnippet,
     zoomIn,
     zoomOut,

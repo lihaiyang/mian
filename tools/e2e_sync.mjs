@@ -158,6 +158,11 @@ check("B 用同步码登录成功", loginOk);
 await sleep(600);
 const bFiles = await filesOf(B.page);
 check("B 登录后拿到 A 的作品", bFiles.indexOf("来自设备A.py") !== -1, bFiles.join(" | "));
+// 界面层面：数据同步下来还不够，左栏文件树也必须重画出来（否则孩子看不到）
+const bTree = await B.page.evaluate(() =>
+  [...document.querySelectorAll(".file-item .file-name")].map((e) => e.textContent.trim()));
+check("B 登录后左栏文件树也显示了 A 的作品（界面真的刷新了）",
+  bTree.some((n) => n.indexOf("来自设备A.py") !== -1), bTree.join(" | "));
 
 // ---------- 两台设备各做一道题 → 学习记录并集 ----------
 await A.page.evaluate(() => Progress.recordExercise({ id: "E0001", topic: "print", level: 1, passed: true }));
@@ -190,6 +195,10 @@ await sync(B.page);
 await sleep(400);
 const afterDelete = await filesOf(B.page);
 check("A 删掉的文件在 B 那边也没了", afterDelete.indexOf("来自设备A.py") === -1, afterDelete.join(" | "));
+const afterDeleteTree = await B.page.evaluate(() =>
+  [...document.querySelectorAll(".file-item .file-name")].map((e) => e.textContent.trim()));
+check("B 的左栏文件树里也真的没有了（界面刷新，不只是内存数据）",
+  !afterDeleteTree.some((n) => n.indexOf("来自设备A.py") !== -1), afterDeleteTree.join(" | "));
 const serverAfterDelete = await serverFiles(B.page, code);
 check("云端也标记成删除了（墓碑行）", serverAfterDelete.indexOf("来自设备A.py") === -1, serverAfterDelete.join(" | "));
 const tombstone = await B.page.evaluate(async (c) => {
@@ -318,6 +327,51 @@ const got = await B.page.evaluate(() => FileManager.getFiles().some((f) => /闲�
 check("另一台设备重新打开页面时会拉到改动", got);
 const bStatus = await statusOf(B.page);
 check("重新打开后状态是「已同步」", bStatus.status === "ok", bStatus.status);
+
+// ---------- 核心回归：拉取之后编辑区必须自己刷新 ----------
+// 这是「文件内容改了，但同步不成功」的真凶：数据同步下来了，编辑区还显示旧内容，
+// 用户看到的永远是旧的；而且那份旧内容会在 30 秒自动保存时被写回去，把新内容覆盖掉。
+await B.page.bringToFront();
+const targetName = await B.page.evaluate(() => (FileManager.getActiveFile() || {}).name || "");
+const freshText = "print('B 的编辑区必须自动看到这一行')\n";
+await A.page.bringToFront();
+await A.page.evaluate(({ name, text }) => {
+  const f = FileManager.getFiles().find((x) => x.name === name) || FileManager.getFiles()[0];
+  FileManager.setActiveFile(f.id);
+  CodeEditor.setValue(text);          // 走真实的「用户改代码」路径
+}, { name: targetName, text: freshText });
+await A.page.click("#btnSyncNow");
+await sleep(3000);
+const bEditorBefore = await B.page.evaluate(() => CodeEditor.getValue());
+await B.page.bringToFront();
+await B.page.click("#btnSyncNow");     // B 只点同步，不碰文件、不切标签
+await sleep(3000);
+const bEditorAfter = await B.page.evaluate(() => CodeEditor.getValue());
+check("B 同步前编辑区还是旧内容（复现前提）", !/B 的编辑区必须自动看到这一行/.test(bEditorBefore),
+  JSON.stringify(bEditorBefore.slice(0, 30)));
+check("B 点一下同步，编辑区就自动显示最新内容（不用手动点文件）",
+  /B 的编辑区必须自动看到这一行/.test(bEditorAfter), JSON.stringify(bEditorAfter.slice(0, 40)));
+
+// ---------- 自动保存守卫：编辑区里没有用户新内容时不许回写 ----------
+const editFlags = await B.page.evaluate(() => {
+  if (typeof CodeEditor.hasUserEdits !== "function") return { missing: true };   // 老版本没有这个判断
+  CodeEditor.setValue("print('程序装载的内容')\n");      // 程序装载 = 不算用户改动
+  const afterProgrammatic = CodeEditor.hasUserEdits();
+  const cm = document.querySelector(".CodeMirror");
+  if (cm && cm.CodeMirror) cm.CodeMirror.replaceRange("# 孩子敲的\n", { line: 0, ch: 0 });
+  const afterTyping = CodeEditor.hasUserEdits();
+  return { afterProgrammatic: afterProgrammatic, afterTyping: afterTyping };
+});
+check("程序装载内容后不算「用户改动」（自动保存不会回写盖掉云端新内容）",
+  editFlags.afterProgrammatic === false, JSON.stringify(editFlags));
+check("孩子敲字之后才算「用户改动」（该存的还是要存）",
+  editFlags.afterTyping === true, JSON.stringify(editFlags));
+// 把 B 的编辑区恢复成文件内容，别把临时内容留在后续检查里
+await B.page.evaluate(() => {
+  const f = FileManager.getActiveFile();
+  if (f) CodeEditor.setValue(f.content);
+  FileManager.updateActiveContent(CodeEditor.getValue());
+});
 
 // ---------- 静置 12 秒不应该有任何同步请求（防空转） ----------
 await A.page.bringToFront();
