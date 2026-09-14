@@ -352,6 +352,19 @@ window.App = (() => {
     listElem.innerHTML = "";
 
     folders.forEach(folder => {
+      // 「示例宝库」不放文件了：它现在是通往宝库（145 个示例，沙盒里打开）的入口，
+      // 这样左栏和右上角按钮指的是同一个东西，不会再出现「同名两处、各有各的副本」。
+      if (folder.builtin) {
+        const entry = document.createElement("button");
+        entry.className = "folder-entry";
+        entry.title = "打开示例宝库：145 个示例，含 12 个小游戏（在学习中心里随手改、随手跑）";
+        entry.innerHTML = '<span class="folder-emoji">🎁</span><span class="folder-name">示例宝库</span>' +
+          '<span class="folder-entry-go">点开玩 ›</span>';
+        entry.addEventListener("click", () => openGallery());
+        listElem.appendChild(entry);
+        return;
+      }
+
       const inFolder = files.filter(f => (f.folderId || myFolderId) === folder.id);
       const isCollapsed = !!collapsedMap[folder.id];
 
@@ -549,7 +562,7 @@ window.App = (() => {
 
   // 移动到文件夹的小选单
   function showFolderMenu(anchor, file) {
-    showFloatingMenu(anchor, FileManager.getFolders().map(folder => ({
+    showFloatingMenu(anchor, FileManager.getFolders().filter(f => !f.builtin).map(folder => ({
       label: folder.emoji + " " + folder.name + (folder.id === file.folderId ? "（当前）" : ""),
       disabled: folder.id === file.folderId,
       fn: () => {
@@ -660,14 +673,13 @@ window.App = (() => {
     if (btnGalleryReset) {
       btnGalleryReset.addEventListener("click", () => {
         showConfirmModal(
-          "⚠️ 注意啦！",
-          "恢复示例宝库会【替换掉你现在的所有文件】哦！<br>想保留自己的代码的话，先点「取消」，用左侧 📦 打包下载备份~<br><br>确定要恢复示例宝库吗？",
+          "♻️ 还原全部示例？",
+          "会把你在示例上改过的内容清掉，示例回到最初的样子。<br>" +
+          "你自己写的作品<b>不受影响</b>（那些在左侧「我的作品」里）。<br><br>确定要还原吗？",
           () => {
-            closedTabIds.clear();
-            saveClosedTabs();
-            FileManager.resetToDefault();
+            const n = (typeof Learn !== "undefined" && Learn.resetExampleDrafts) ? Learn.resetExampleDrafts() : 0;
             closeGalleryModal();
-            showToast("🎉 示例宝库已重新装满！", "🎁");
+            showToast(n ? ("🎉 已还原 " + n + " 个示例") : "👍 示例本来就是原版的，不用还原", "🎁");
             SoundEffects.playSuccess();
           }
         );
@@ -1400,6 +1412,7 @@ window.App = (() => {
 
   return {
     init,
+    openGallery,
     isLearnMode,
     enterLearnMode,
     exitLearnMode,

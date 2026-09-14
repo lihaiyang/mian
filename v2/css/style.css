@@ -2962,3 +2962,31 @@ body.dark-mode.learn-focus .learn-task-bar { background: #241F3A; }
 }
 .learn-code-row.collapsed:hover::after { color: var(--primary); }
 body.dark-mode .learn-code-row.collapsed { background: #1E293B; border-color: #334155; }
+
+/* 「示例宝库」入口（左栏）：不是文件夹，点开是宝库弹窗 */
+.folder-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - 12px);
+  margin: 6px;
+  padding: 9px 10px;
+  border: 2px solid #DDD6FE;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #EEF0FF 0%, #FDF2F8 100%);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  text-align: left;
+  transition: transform .14s ease, box-shadow .14s ease;
+}
+.folder-entry:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(91, 95, 237, .18); }
+.folder-entry .folder-emoji { font-size: 15px; }
+.folder-entry .folder-name { font-size: 12.5px; font-weight: 800; color: #4C1D95; }
+.folder-entry-go { margin-left: auto; font-size: 10.5px; font-weight: 800; color: #7C3AED; }
+body.dark-mode .folder-entry { background: linear-gradient(135deg, #232838, #2A2438); border-color: #4338CA; }
+body.dark-mode .folder-entry .folder-name { color: #C7D2FE; }
+
+/* 确认弹窗永远盖在别的弹窗之上（它是「在已打开的弹窗上再问一句」的对话框）。
+   否则从「示例宝库」里点还原时，确认框会被宝库弹窗压住，按钮点不到。 */
+#confirmModal { z-index: 300; }
+.toast-box { z-index: 400; }

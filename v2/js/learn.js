@@ -14,7 +14,7 @@
  * 依赖：CodeEditor / PythonRunner / Progress / FileManager / App（切换模式与恢复工坊状态）
  */
 const Learn = (() => {
-  const V = "20260914d";
+  const V = "20260914e";
   const PAGE_SIZE = 40;
   const JUDGE_TIMEOUT_MS = 4000;
 
@@ -2093,6 +2093,15 @@ const Learn = (() => {
     examplesReady: () => !!assets.examples,
     getAllExamples: () => exampleList(),
     getGalleryCategories: () => GALLERY_GROUPS,
+    /** 还原全部示例：把示例上改过的草稿都清掉（孩子自己的作品不受影响） */
+    resetExampleDrafts() {
+      const ids = exampleList().map(e => e.id);
+      const all = loadDrafts();
+      let n = 0;
+      ids.forEach(id => { if (all[id]) { delete all[id]; n++; } });
+      if (n) { persistDrafts(); renderHud(); updateTaskBar(); }
+      return n;
+    },
     /** 从弹窗里点开一个示例：进学习中心、在沙盒里打开（草稿隔离，不动作品库） */
     openExampleInSandbox(id) {
       open("example");

@@ -373,11 +373,13 @@ check("工坊模式下编辑仍然写进文件",
 
 // ---------- 🎁 示例宝库（右上角按钮 + 弹窗分类 + 打开进沙盒） ----------
 check("右上角按钮叫「示例宝库」", (await page.textContent("#btnResetDemos")).includes("示例宝库"));
-check("左侧文件夹把「示例宝库」排在第一个",
-  (await page.evaluate(() => (document.querySelector(".folder-head .folder-name") || {}).textContent)) === "示例宝库");
+check("左栏「示例宝库」是宝库入口（和右上角是同一个东西）",
+  (await page.evaluate(() => (document.querySelector(".folder-entry .folder-name") || {}).textContent)) === "示例宝库");
+check("工作区里不再有内置示例文件（示例只住在宝库里）",
+  (await page.evaluate(() => FileManager.getFiles().filter(f => /^ex_/.test(f.id)).length)) === 0);
 
 const filesBeforeGallery = await page.evaluate(() => FileManager.getFiles().length);
-await page.click("#btnResetDemos");
+await page.click(".folder-entry");   // 从左栏入口进宝库
 await page.waitForSelector("#galleryList .gallery-item", { timeout: 30000 });
 const galleryTabs = await page.evaluate(() => [...document.querySelectorAll("#galleryTabs .gallery-tab")].map(b => b.textContent.trim()));
 check("弹窗展示全部分类（≥9 个标签）", galleryTabs.length >= 9, galleryTabs.slice(0, 4).join(" / "));
@@ -400,6 +402,24 @@ check("从弹窗点开示例 → 进学习中心沙盒",
 check("沙盒里已经有示例代码", (await page.evaluate(() => CodeEditor.getValue())).trim().length > 0);
 check("打开示例不会新建作品库文件",
   (await page.evaluate(() => FileManager.getFiles().length)) === filesBeforeGallery);
+
+// 改一个示例 → 用「♻️ 还原全部示例」清掉（顺便回归：确认弹窗要能点得到）
+const exampleOpened = await page.evaluate(() => Learn.currentLearnId());
+await page.evaluate(() => { const cm = document.querySelector(".CodeMirror"); if (cm && cm.CodeMirror) cm.CodeMirror.setValue("# 我改过了"); });
+await sleep(900);
+const hasExampleDraft = () => page.evaluate((id) => {
+  const all = JSON.parse(localStorage.getItem("codepanda_learn_drafts_v1__" + Progress.getCurrentProfile().id) || "{}");
+  return !!all[id];
+}, exampleOpened);
+check("改示例会产生学堂草稿", await hasExampleDraft());
+await page.click("#btnResetDemos");
+await page.waitForSelector("#galleryList .gallery-item", { timeout: 20000 });
+await page.click("#btnGalleryReset");
+await sleep(400);
+check("确认弹窗盖在宝库弹窗之上（按钮可点）", await page.isVisible("#confirmModal.active"));
+await page.click("#btnConfirmOk");
+await sleep(800);
+check("「还原全部示例」清掉了示例草稿", !(await hasExampleDraft()));
 
 const realErrors = pageErrors.filter((e) => !/favicon|ERR_FILE_NOT_FOUND|Failed to load resource/.test(e));
 check("没有 JS 报错", realErrors.length === 0, realErrors.slice(0, 2).join(" | "));

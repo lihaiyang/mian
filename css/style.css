@@ -2573,3 +2573,8 @@ body.dark-mode .award-stat { background: #1E293B; border-color: #334155; }
   box-shadow: 0 4px 12px rgba(91, 95, 237, .26);
 }
 .learn-top-btn:hover { transform: translateY(-1px); }
+
+/* 确认弹窗永远盖在别的弹窗之上（它是「在已打开的弹窗上再问一句」的对话框）。
+   否则从「示例宝库」里点还原时，确认框会被宝库弹窗压住，按钮点不到。 */
+#confirmModal { z-index: 300; }
+.toast-box { z-index: 400; }
