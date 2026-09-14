@@ -86,6 +86,19 @@ CREATE TABLE IF NOT EXISTS vfs (
   rev         INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (account_id, profile_id, path)
 );
+-- 学堂草稿（在「学习中心/学堂」里做题、上课、看示例时写的代码）
+CREATE TABLE IF NOT EXISTS learn (
+  account_id  TEXT NOT NULL,
+  profile_id  TEXT NOT NULL,
+  draft_id    TEXT NOT NULL,
+  code        TEXT,
+  updated_at  INTEGER NOT NULL,
+  deleted     INTEGER NOT NULL DEFAULT 0,
+  rev         INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (account_id, profile_id, draft_id)
+);
+CREATE INDEX IF NOT EXISTS idx_learn_rev ON learn(account_id, rev);
+
 -- 公开分享（作品短链 / 学习进度只读页）
 CREATE TABLE IF NOT EXISTS shares (
   id          TEXT PRIMARY KEY,

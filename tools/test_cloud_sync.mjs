@@ -39,7 +39,7 @@ function makeStore() {
 }
 
 // ---------------- 假服务端（语义和 functions/api/sync.js 一致） ----------------
-const TABLES = ["profiles", "folders", "files", "progress", "vfs"];
+const TABLES = ["profiles", "folders", "files", "progress", "vfs", "learn"];
 const MAX_CONTENT = 262144;
 
 function makeServer() {
@@ -61,7 +61,8 @@ function makeServer() {
   });
   const keyOf = (table, row) =>
     table === "progress" ? row.profile_id :
-    table === "vfs" ? row.profile_id + "|" + row.path : row.id;
+    table === "vfs" ? row.profile_id + "|" + row.path :
+    table === "learn" ? row.profile_id + "|" + row.draft_id : row.id;
 
   async function handler(url, opts) {
     log.push(url);
@@ -146,6 +147,15 @@ function makeServer() {
       const old = acc.tables.progress.get(p.profile_id);
       if (old && !(p.updated_at >= old.updated_at)) return;
       acc.tables.progress.set(p.profile_id, row);
+    });
+    (c.learn || []).forEach((d) => {
+      const code = String(d.code || "");
+      if (code.length > MAX_CONTENT) { skipped += 1; return; }
+      const row = { profile_id: d.profile_id, draft_id: d.draft_id, code: code, deleted: d.deleted ? 1 : 0, updated_at: d.updated_at, rev: rev };
+      const k = keyOf("learn", d);
+      const old = acc.tables.learn.get(k);
+      if (old && !(d.updated_at >= old.updated_at)) return;
+      acc.tables.learn.set(k, row);
     });
     (c.vfs || []).forEach((v) => {
       const row = Object.assign({}, v, { rev: rev });
@@ -411,7 +421,66 @@ async function testUpgradeReset() {
 }
 
 // =====================================================================
-// ⑧ 离线时不报错、联网后自动补传
+// ⑧ 改内容 → 只标记「未同步」，不会自动发请求；点一下才同步
+// =====================================================================
+async function testManualOnly() {
+  const server = makeServer();
+  const store = makeStore();
+  seedProfile(store, "p_default", "小熊猫", "🐼");
+  seedWorkspace(store, "p_default", [{ id: "file_m", name: "m.py", content: "第一版", folderId: "f_mine" }]);
+  const dev = makeDevice(store, server);
+  const code = await dev.CloudSync.createAccount("");
+  await dev.CloudSync.syncNow(true);
+
+  const callsBefore = server.log.length;
+  const ws = JSON.parse(store.getItem("codepanda_python_files_v1__p_default"));
+  ws.files[0].content = "改过的内容";
+  store.setItem("codepanda_python_files_v1__p_default", JSON.stringify(ws));
+  dev.CloudSync.noteDirty();
+  await sleep(1500);                      // 等一会儿，不该有任何自动请求
+
+  const st = dev.CloudSync.getStatus();
+  check("改了内容只标记「未同步」，不自动发请求",
+    st.status === "dirty" && st.dirty === true && server.log.length === callsBefore,
+    st.status + " / 请求数 " + (server.log.length - callsBefore));
+  check("未同步时云端还是旧内容", server.rows(code, "files")[0].content === "第一版");
+
+  await dev.CloudSync.syncNow(true);
+  check("点一下同步就传上去了", server.rows(code, "files")[0].content === "改过的内容");
+  check("同步完成后状态回到「已同步」",
+    dev.CloudSync.getStatus().status === "ok" && dev.CloudSync.getStatus().dirty === false);
+}
+
+// =====================================================================
+// ⑨ 学堂草稿也会同步（练习/教程/示例里写的代码）
+// =====================================================================
+async function testDraftSync() {
+  const server = makeServer();
+  const storeA = makeStore();
+  seedProfile(storeA, "p_default", "小熊猫", "🐼");
+  storeA.setItem("codepanda_learn_drafts_v1__p_default", JSON.stringify({
+    E0001: { code: "print('设备A写的答案')", at: Date.now() },
+    L05: { code: "print('上课时写的')", at: Date.now() }
+  }));
+  const devA = makeDevice(storeA, server);
+  const code = await devA.CloudSync.createAccount("");
+  await devA.CloudSync.syncNow(true);
+  check("学堂草稿会传到云端",
+    server.rows(code, "learn").length === 2, server.rows(code, "learn").map(r => r.draft_id).join(","));
+
+  // 新设备登录 → 草稿也要回来
+  const storeB = makeStore();
+  seedProfile(storeB, "p_default", "小熊猫", "🐼");
+  const devB = makeDevice(storeB, server);
+  await devB.CloudSync.login(code, "");
+  const draftsB = JSON.parse(storeB.getItem("codepanda_learn_drafts_v1__p_default") || "{}");
+  check("新设备登录后能拿到草稿",
+    !!draftsB.E0001 && /设备A写的答案/.test(draftsB.E0001.code) && !!draftsB.L05,
+    Object.keys(draftsB).join(","));
+}
+
+// =====================================================================
+// ⑩ 离线时不报错、联网后点一下就能补传
 // =====================================================================
 async function testOfflineThenOnline() {
   const server = makeServer();
@@ -433,9 +502,11 @@ async function testOfflineThenOnline() {
 
   globalThis.navigator.onLine = true;
   dev.listeners["win:online"] && dev.listeners["win:online"]();
-  await sleep(1200);
+  await sleep(800);
+  check("联网后不会自己偷偷同步（等用户点）",
+    server.rows(code, "files")[0].content !== "断网时写的内容");
   await dev.CloudSync.syncNow(true);
-  check("联网后自动补传", server.rows(code, "files")[0].content === "断网时写的内容");
+  check("联网后点一下同步就能补传", server.rows(code, "files")[0].content === "断网时写的内容");
 }
 
 // =====================================================================
@@ -446,6 +517,8 @@ async function testOfflineThenOnline() {
   await testBusyDoesNotDrop();
   await testSkippedIsWarned();
   await testUpgradeReset();
+  await testManualOnly();
+  await testDraftSync();
   await testOfflineThenOnline();
 
   console.log(lines.join("\n"));

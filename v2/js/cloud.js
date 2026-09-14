@@ -12,9 +12,6 @@ const CloudSync = (() => {
   const PROFILES_KEY = "codepanda_profiles_v1";
   const STATS_PREFIX = "codepanda_stats_v1_";
   const VFS_KEY = "codepanda_vfs_v1";
-  const DEBOUNCE_MS = 1500;      // 改动后多久同步
-  const MAX_WAIT_MS = 8000;      // 连续敲字时的最长等待：不能一直往后拖，最多 8 秒必须传一次
-  const PERIODIC_MS = 45000;     // 后台兜底：页面在前台时每隔一会儿自动同步一次（也顺便拉别人的改动）
   const API = "/api";
 
   let state = { code: "", pin: "", accountId: "", rev: 0, hasPin: false, nickname: "", avatar: "" };
@@ -66,7 +63,7 @@ const CloudSync = (() => {
 
   function getStatus() {
     return {
-      signedIn: isSignedIn(), status: status, error: lastError, lastSyncAt: lastSyncAt,
+      signedIn: isSignedIn(), status: status, error: lastError, lastSyncAt: lastSyncAt, dirty: dirtyCount > 0,
       code: state.code, hasPin: !!state.hasPin, rev: state.rev || 0,
       accountId: state.accountId, nickname: state.nickname, avatar: state.avatar
     };
@@ -81,6 +78,12 @@ const CloudSync = (() => {
   function writeStats(pid, st) { writeJson(STATS_PREFIX + pid, st); }
   function readVfs() { return readJson(VFS_KEY, []) || []; }
   function writeVfs(list) { writeJson(VFS_KEY, list); }
+
+  // 学堂草稿：在做题 / 上课 / 看示例时写的代码（{ id: {code, at} }）
+  const DRAFTS_PREFIX = "codepanda_learn_drafts_v1__";
+  function draftsKey(pid) { return DRAFTS_PREFIX + pid; }
+  function readDrafts(pid) { return readJson(draftsKey(pid), null); }
+  function writeDrafts(pid, obj) { writeJson(draftsKey(pid), obj); }
 
   function currentProfileId() {
     try {
@@ -105,17 +108,12 @@ const CloudSync = (() => {
   //   ② 拉取：本地改过的行「不被覆盖」，等下一轮推送；本地没改过的行用云端版本覆盖
   //   ③ 学习记录是累加型数据 → 不覆盖，只做并集合并（两台设备各做一半时谁都不丢）
   //   ④ lastSent 只在推送成功后记账；同步中再有改动就补跑一轮；失败退避重试
-  const RETRY_BASE = 2000;
-  const RETRY_MAX = 30000;
   const STATE_VERSION = 2;      // 老版本「发请求前就记账」有 bug，升级后强制重新同步一次
 
   let dirty = false;
   let syncing = false;
   let scheduled = false;        // 已经排好「补跑」的那一轮
-  let retryTimer = null;
-  let retryDelay = 0;
-  let periodicTimer = null;
-  let firstDirtyAt = 0;          // 这一批改动最早是什么时候发生的（配合 MAX_WAIT_MS）
+  let dirtyCount = 0;            // 本机有多少处改动还没同步（只用来显示「未同步」）
   const idleWaiters = [];       // 等「这一轮真的跑完」的人（手动同步按钮 / 测试用）
   let clockOffset = 0;          // 服务端时间 - 本地时间，让多台设备的时间戳对齐
   let skippedNote = "";         // 有文件太大没传上去时的说明
@@ -147,11 +145,12 @@ const CloudSync = (() => {
   function sigFile(f) { return JSON.stringify([f.name, f.folderId || f.folder_id || "", f.content || ""]); }
   function sigStats(st) { return JSON.stringify(st || {}); }
   function sigVfs(text) { return JSON.stringify(text || ""); }
+  function sigDraft(code) { return JSON.stringify(code || ""); }
 
   // 墓碑只需要记住「这一行是谁」，不要把文件内容也存进同步状态
   function tombRow(row) {
     const out = {};
-    ["id", "profile_id", "path", "name", "folder_id"].forEach(k => {
+    ["id", "profile_id", "path", "name", "folder_id", "draft_id"].forEach(k => {
       if (row && row[k] !== undefined && row[k] !== null && row[k] !== "") out[k] = row[k];
     });
     return out;
@@ -232,7 +231,7 @@ const CloudSync = (() => {
   // ---------- 收集本地所有行（纯函数：不改任何状态，改完状态放在 commitSent） ----------
   function collectChanges() {
     const t = serverNow();
-    const changes = { profiles: [], folders: [], files: [], progress: [], vfs: [] };
+    const changes = { profiles: [], folders: [], files: [], progress: [], vfs: [], learn: [] };
     const sent = [];                    // 成功之后才写进 lastSent
     const seen = {};
 
@@ -271,6 +270,18 @@ const CloudSync = (() => {
       }
     });
 
+    // 学堂草稿：孩子的练习答案也在里面，必须一起同步（以前只存本机，换设备就没了）
+    profiles.forEach(p => {
+      const drafts = readDrafts(p.id);
+      if (!drafts) return;
+      Object.keys(drafts).forEach(id => {
+        const code = (drafts[id] && drafts[id].code) || "";
+        add("learn", "learn|" + p.id + "|" + id, sigDraft(code), {
+          profile_id: p.id, draft_id: id, code: code
+        });
+      });
+    });
+
     const pid = currentProfileId();
     readVfs().forEach(v => {
       add("vfs", "vfs|" + pid + "|" + v.path, sigVfs(v.text), { profile_id: pid, path: v.path, text: v.text || "" });
@@ -289,6 +300,8 @@ const CloudSync = (() => {
         changes.profiles.push({ id: row.id, name: row.name || "小朋友", emoji: row.emoji || "", updated_at: t2, deleted: 1 });
       } else if (key.indexOf("vfs|") === 0) {
         changes.vfs.push({ profile_id: row.profile_id, path: row.path, text: "", updated_at: t2 });
+      } else if (key.indexOf("learn|") === 0) {
+        changes.learn.push({ profile_id: row.profile_id, draft_id: row.draft_id, code: "", updated_at: t2, deleted: 1 });
       }
       sent.push({ key: key, h: "tombstone", row: null });   // 墓碑发成功后就别再发了
     });
@@ -307,7 +320,7 @@ const CloudSync = (() => {
 
   function countRows(c) {
     return (c.profiles || []).length + (c.folders || []).length + (c.files || []).length +
-      (c.progress || []).length + (c.vfs || []).length;
+      (c.progress || []).length + (c.vfs || []).length + (c.learn || []).length;
   }
 
   // 本地这行在「上次成功同步」之后被改过吗？
@@ -391,6 +404,23 @@ const CloudSync = (() => {
         lastSent[key] = { h: hash(sigStats(merged)), t: p.updated_at, row: { profile_id: p.profile_id } };
       }
     });
+
+    // 学堂草稿：和文件一样，本地改过的保留，其余用云端版本
+    (data.learn || []).forEach(d => {
+      const drafts = readDrafts(d.profile_id) || {};
+      const key = "learn|" + d.profile_id + "|" + d.draft_id;
+      const local = drafts[d.draft_id];
+      if (local && localChanged(key, sigDraft(local.code), cloudWins)) { localOnly++; return; }
+      if (d.deleted) delete drafts[d.draft_id];
+      else drafts[d.draft_id] = { code: d.code || "", at: d.updated_at };
+      writeDrafts(d.profile_id, drafts);
+      touchedProfiles[d.profile_id] = 1;
+      lastSent[key] = { h: hash(sigDraft(d.code)), t: d.updated_at, row: tombRow(d) };
+    });
+    // 草稿变了要让学堂里的界面也跟着刷新
+    if (typeof Learn !== "undefined" && Learn.reloadDrafts) {
+      try { Learn.reloadDrafts(); } catch (e) {}
+    }
 
     const pid = currentProfileId();
     const vfs = readVfs();
@@ -511,26 +541,26 @@ const CloudSync = (() => {
     saveSent();
     dirty = false;
     syncing = false;
-    retryDelay = 0;
+    dirtyCount = 0;
     skippedNote = "";
-    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
-    if (timer) { clearTimeout(timer); timer = null; }
     notify();
   }
 
   // ---------- 推送（成功才记账） ----------
   async function pushChanges() {
-    if (!isSignedIn()) return { sent: 0, skipped: 0 };
+    if (!isSignedIn()) return { sent: 0, skipped: 0, dropped: 0 };
     const collected = collectChanges();
     const n = countRows(collected.changes);
-    if (!n && !collected.sent.length) return { sent: 0, skipped: 0 };
+    if (!n && !collected.sent.length) return { sent: 0, skipped: 0, dropped: 0 };
     const data = await apiCall("/sync", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ code: state.code, pin: state.pin, changes: collected.changes })
     });
     commitSent(collected.sent);            // ← 关键：只有服务器确认了才记账
-    return { sent: collected.sent.length, skipped: data.skipped || 0 };
+    const dropped = data.dropped || {};
+    const droppedN = Object.keys(dropped).reduce((n, k) => n + (Number(dropped[k]) || 0), 0);
+    return { sent: collected.sent.length, skipped: data.skipped || 0, dropped: droppedN };
   }
 
   // ---------- 拉取（游标只在拉取成功后推进，避免漏掉别人在中间写的行） ----------
@@ -571,10 +601,13 @@ const CloudSync = (() => {
       const pushed = await pushChanges();
       refreshUI(pulled.touched);
       lastSyncAt = Date.now();
-      retryDelay = 0;
-      if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+      dirtyCount = 0;                       // 同步成功 → 本机没有未同步的改动了
+      const droppedN = pushed.dropped || 0;
       if (pushed.skipped > 0) {
         skippedNote = "有 " + pushed.skipped + " 个内容太大（单个文件上限 256KB），没能上传";
+        setStatus("warn", skippedNote);
+      } else if (droppedN > 0) {
+        skippedNote = "有 " + droppedN + " 行没能上传（大概率是本机档案和云端对不上）";
         setStatus("warn", skippedNote);
       } else {
         skippedNote = "";
@@ -584,38 +617,29 @@ const CloudSync = (() => {
       ok = false;
       const msg = String((e && e.message) || e);
       const friendly = /Failed to fetch|NetworkError|Load failed|network error|ERR_/i.test(msg)
-        ? "网络不太好，没能同步，稍后会自动重试"
+        ? "网络不太好，没能同步。改动都还在本机，点一下「云同步」再试一次就行"
         : msg;
       setStatus("error", friendly);
-      scheduleRetry();
     } finally {
       syncing = false;
-      if (dirty) {
+      if (dirty) {                          // 同步期间又改了 → 标记为「还没同步」，等下次手动同步
         dirty = false;
-        scheduled = true;
-        setTimeout(() => { scheduled = false; syncNow(true); }, 300);       // 同步期间又改了 → 立刻补跑
+        dirtyCount += 1;
       }
-      if (!dirty) firstDirtyAt = 0;
       releaseIdleWaiters();
     }
     return ok;
   }
 
-  function scheduleRetry() {
-    if (retryTimer || !isSignedIn()) return;
-    retryDelay = retryDelay ? Math.min(retryDelay * 2, RETRY_MAX) : RETRY_BASE;
-    retryTimer = setTimeout(() => { retryTimer = null; syncNow(true); }, retryDelay);
-  }
-
+  // 本机有改动 → 只做一件事：把状态标成「未同步」，等用户点同步。
+  // （不做任何自动同步：不防抖、不定时、不后台重试 —— 按孩子和家长的心理模型，
+  //   "我点它才同步"最可预期；也让「未同步」这个提示变得有意义）
   function noteDirty() {
     if (!isSignedIn()) return;
     dirty = true;
-    if (!firstDirtyAt) firstDirtyAt = Date.now();
-    if (timer) clearTimeout(timer);
-    // 普通情况：安静 1.5 秒就同步；一直敲字的话，最多等 8 秒也必须传一次
-    const waited = Date.now() - firstDirtyAt;
-    const wait = Math.max(300, Math.min(DEBOUNCE_MS, MAX_WAIT_MS - waited));
-    timer = setTimeout(() => { timer = null; syncNow(true); }, wait);
+    dirtyCount += 1;
+    if (syncing || scheduled) return;
+    setStatus(status === "error" ? "error" : "dirty", lastError);
   }
 
   // ---------- 顶栏：头像 + 昵称 + 云状态 ----------
@@ -625,23 +649,25 @@ const CloudSync = (() => {
     const dot = document.getElementById("syncDot");
     const label = document.getElementById("syncLabel");
     if (!btn || !dot || !label) return;
-    const map3 = { idle: "⚪", syncing: "🟡", ok: "🟢", warn: "🟡", error: "🔴" };
+    const map3 = { idle: "⚪", syncing: "🟡", ok: "🟢", warn: "🟡", error: "🔴", dirty: "🟡" };
     if (!isSignedIn()) {
       dot.textContent = "☁️";
       label.textContent = "开启同步";
       btn.title = "还没有开启云同步：点我打开云同步面板";
-      btn.classList.remove("is-ok", "is-warn", "is-error");
+      btn.classList.remove("is-ok", "is-warn", "is-error", "is-dirty");
       return;
     }
     dot.textContent = map3[status] || "⚪";
     label.textContent = status === "syncing" ? "同步中…"
       : status === "error" ? "同步失败"
       : status === "warn" ? "部分未传"
+      : status === "dirty" ? "未同步"
       : "已同步";
     btn.title = statusLine() + "（点一下立即同步）";
     btn.classList.toggle("is-ok", status === "ok");
     btn.classList.toggle("is-warn", status === "syncing" || status === "warn");
     btn.classList.toggle("is-error", status === "error");
+    btn.classList.toggle("is-dirty", status === "dirty");
   }
 
   function renderChip() {
@@ -654,7 +680,7 @@ const CloudSync = (() => {
     avatar.textContent = prof ? prof.emoji : "🐼";
     if (name) name.textContent = prof ? prof.name : "小朋友";
     if (dot) {
-      const map = { idle: "⚪", syncing: "🟡", ok: "🟢", warn: "🟡", error: "🔴" };
+      const map = { idle: "⚪", syncing: "🟡", ok: "🟢", warn: "🟡", error: "🔴", dirty: "🟡" };
       dot.textContent = isSignedIn() ? (map[status] || "⚪") : "☁️";
       dot.title = isSignedIn()
         ? (status === "error"
@@ -668,7 +694,7 @@ const CloudSync = (() => {
     if (pa) pa.textContent = prof ? prof.emoji : "🐼";
     if (pn) pn.textContent = prof ? prof.name : "小朋友";
     if (pd) {
-      const map2 = { idle: "⚪", syncing: "🟡", ok: "🟢", warn: "🟡", error: "🔴" };
+      const map2 = { idle: "⚪", syncing: "🟡", ok: "🟢", warn: "🟡", error: "🔴", dirty: "🟡" };
       pd.textContent = isSignedIn() ? (map2[status] || "⚪") : "☁️";
     }
     const chip = document.getElementById("btnUserChip");
@@ -686,6 +712,7 @@ const CloudSync = (() => {
 
   function statusLine() {
     if (status === "syncing") return "🟡 正在同步…";
+    if (status === "dirty") return "🟡 本机有改动还没同步，点一下同步";
     if (status === "error") return "🔴 " + esc(lastError || "同步失败") + "（会自动重试）";
     if (status === "warn") return "🟡 " + esc(skippedNote || "同步完成，但有内容没能上传");
     if (lastSyncAt) return "🟢 上次同步：" + new Date(lastSyncAt).toLocaleTimeString("zh-CN");
@@ -778,8 +805,11 @@ const CloudSync = (() => {
     on("cloudSyncNow", async () => {
       toast("正在同步…", "🔄");
       await syncNow(false);
+      await whenIdle();
       renderPanel(); renderChip();
-      toast(status === "ok" ? "🟢 同步完成" : ("同步失败：" + lastError), status === "ok" ? "☁️" : "⚠️");
+      const st = getStatus();
+      toast(st.status === "ok" ? "🟢 同步完成" : (st.status === "warn" ? ("🟡 " + (st.error || skippedNote)) : ("🔴 " + (st.error || "同步失败"))),
+        st.status === "ok" ? "☁️" : "⚠️");
     });
 
     on("cloudRotate", () => {
@@ -920,45 +950,11 @@ const CloudSync = (() => {
       notify();
       if (isSignedIn()) setTimeout(() => syncNow(true), 1500);
       if (typeof FileManager !== "undefined" && FileManager.onChange) FileManager.onChange(() => noteDirty());
-      window.addEventListener("online", () => { if (isSignedIn()) syncNow(true); });
-
-      // 回到页面 / 窗口重新聚焦时补一次（别让闲置的设备一直看不到别的设备的改动）
-      const catchUp = () => {
+      // 恢复联网时只把红点清掉，**不自动同步**（等用户点）
+      window.addEventListener("online", () => {
         if (!isSignedIn()) return;
-        if (Date.now() - lastSyncAt < 15000) return;
-        syncNow(true);
-      };
-      document.addEventListener("visibilitychange", () => { if (!document.hidden) catchUp(); });
-      window.addEventListener("focus", catchUp);
-
-      // 后台自动同步：页面在前台时每 PERIODIC_MS 自动跑一轮（有改动就推，没改动也会拉一次别人的改动）
-      if (!periodicTimer) {
-        periodicTimer = setInterval(() => {
-          if (!isSignedIn()) return;
-          if (typeof document !== "undefined" && document.hidden) return;   // 页面在后台就先不管，回来时会补
-          syncNow(true);
-        }, PERIODIC_MS);
-      }
-
-      // 关页面 / 切走时尽力把还没传的改动推出去（keepalive 让请求在页面卸载后继续发送）
-      const flushOnExit = () => {
-        if (!isSignedIn() || !dirty) return;
-        try {
-          const collected = collectChanges();
-          if (!countRows(collected.changes)) return;
-          const body = JSON.stringify({ code: state.code, pin: state.pin, changes: collected.changes });
-          if (body.length > 60000) return;        // keepalive 请求体有 64KB 上限
-          // 注意：这里【不记账】。万一没发出去，下次同步会重发（服务端 LWW 幂等，重发无害）
-          fetch(API + "/sync", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: body,
-            keepalive: true
-          }).catch(() => {});
-        } catch (e) {}
-      };
-      window.addEventListener("pagehide", flushOnExit);
-      document.addEventListener("visibilitychange", () => { if (document.hidden) flushOnExit(); });
+        if (status === "error") setStatus(dirtyCount ? "dirty" : "idle", "");
+      });
     },
     isSignedIn, getStatus, createAccount, login, setPin, rotateCode, signOutLocal,
     syncNow, noteDirty, whenIdle, isIdle,

@@ -6,14 +6,15 @@ import { json, bad, rateLimit, authAccount, nowSec, clientIp } from "./_utils.js
 
 const MAX_CONTENT = 262144;      // 单个文件 256KB
 const MAX_TOTAL = 1048576;       // 一次推送 1MB
-const LIMITS = { profiles: 20, folders: 60, files: 800, progress: 20, vfs: 200 };
+const LIMITS = { profiles: 20, folders: 60, files: 800, progress: 20, vfs: 200, learn: 600 };
 const BATCH = 50;
 
 const COLS = {
   folders: "id, account_id, profile_id, name, emoji, builtin, keep, position, updated_at, deleted, rev",
   files: "id, account_id, profile_id, folder_id, name, content, updated_at, deleted, rev",
   progress: "account_id, profile_id, stats_json, updated_at, rev",
-  vfs: "account_id, profile_id, path, text, updated_at, rev"
+  vfs: "account_id, profile_id, path, text, updated_at, rev",
+  learn: "account_id, profile_id, draft_id, code, updated_at, deleted, rev"
 };
 
 function str(v, n) { return String(v === undefined || v === null ? "" : v).slice(0, n); }
@@ -45,7 +46,7 @@ export async function onRequestGet({ request, env }) {
     hasPin: !!acc.pin_hash,
     profiles: profRows
   };
-  for (const table of ["folders", "files", "progress", "vfs"]) {
+  for (const table of ["folders", "files", "progress", "vfs", "learn"]) {
     const res = await db.prepare(
       "SELECT " + COLS[table] + " FROM " + table + " WHERE account_id = ? AND rev > ?"
     ).bind(acc.id, since).all();
@@ -83,11 +84,13 @@ export async function onRequestPost({ request, env }) {
     .results.map(r => r.id));
   const stmts = [];
   let skipped = 0;
+  // 被丢掉的行走这里记账，最后回报给客户端 —— 绝不静默丢数据
+  const dropped = { profiles: 0, folders: 0, files: 0, progress: 0, vfs: 0, learn: 0 };
 
   // 1) 档案
-  (c.profiles || []).slice(0, LIMITS.profiles).forEach(p => {
+  (c.profiles || []).forEach((p, idx) => {
     const id = str(p.id, 60);
-    if (!id) return;
+    if (idx >= LIMITS.profiles || !id) { dropped.profiles += 1; return; }
     stmts.push(db.prepare(
       "INSERT INTO profiles (id, account_id, name, emoji, updated_at, deleted, rev) VALUES (?,?,?,?,?,?,?) " +
       "ON CONFLICT(account_id, id) DO UPDATE SET name=excluded.name, emoji=excluded.emoji, updated_at=excluded.updated_at, deleted=excluded.deleted, rev=excluded.rev " +
@@ -98,8 +101,8 @@ export async function onRequestPost({ request, env }) {
   });
 
   // 2) 文件夹
-  (c.folders || []).slice(0, LIMITS.folders).forEach(f => {
-    if (!owned.has(str(f.profile_id, 60))) return;
+  (c.folders || []).forEach((f, idx) => {
+    if (idx >= LIMITS.folders || !owned.has(str(f.profile_id, 60))) { dropped.folders += 1; return; }
     stmts.push(db.prepare(
       "INSERT INTO folders (id, account_id, profile_id, name, emoji, builtin, keep, position, updated_at, deleted, rev) VALUES (?,?,?,?,?,?,?,?,?,?,?) " +
       "ON CONFLICT(account_id, id) DO UPDATE SET profile_id=excluded.profile_id, name=excluded.name, emoji=excluded.emoji, " +
@@ -112,8 +115,8 @@ export async function onRequestPost({ request, env }) {
   });
 
   // 3) 文件
-  (c.files || []).slice(0, LIMITS.files).forEach(f => {
-    if (!owned.has(str(f.profile_id, 60))) return;
+  (c.files || []).forEach((f, idx) => {
+    if (idx >= LIMITS.files || !owned.has(str(f.profile_id, 60))) { dropped.files += 1; return; }
     const content = String(f.content === undefined || f.content === null ? "" : f.content);
     if (content.length > MAX_CONTENT) { skipped += 1; return; }
     stmts.push(db.prepare(
@@ -126,8 +129,8 @@ export async function onRequestPost({ request, env }) {
   });
 
   // 4) 学习记录
-  (c.progress || []).slice(0, LIMITS.progress).forEach(p => {
-    if (!owned.has(str(p.profile_id, 60))) return;
+  (c.progress || []).forEach((p, idx) => {
+    if (idx >= LIMITS.progress || !owned.has(str(p.profile_id, 60))) { dropped.progress += 1; return; }
     const stats = JSON.stringify(p.stats || {});
     if (stats.length > MAX_CONTENT) { skipped += 1; return; }
     stmts.push(db.prepare(
@@ -138,8 +141,8 @@ export async function onRequestPost({ request, env }) {
   });
 
   // 5) Python 写出的数据文件
-  (c.vfs || []).slice(0, LIMITS.vfs).forEach(v => {
-    if (!owned.has(str(v.profile_id, 60))) return;
+  (c.vfs || []).forEach((v, idx) => {
+    if (idx >= LIMITS.vfs || !owned.has(str(v.profile_id, 60))) { dropped.vfs += 1; return; }
     const text = String(v.text === undefined || v.text === null ? "" : v.text);
     if (text.length > MAX_CONTENT) { skipped += 1; return; }
     stmts.push(db.prepare(
@@ -147,6 +150,20 @@ export async function onRequestPost({ request, env }) {
       "ON CONFLICT(account_id, profile_id, path) DO UPDATE SET text=excluded.text, updated_at=excluded.updated_at, rev=excluded.rev " +
       "WHERE excluded.updated_at >= vfs.updated_at"
     ).bind(acc.id, str(v.profile_id, 60), str(v.path, 120), text, num(v.updated_at) || Date.now(), rev));
+  });
+
+  // 6) 学堂草稿（练习 / 教程 / 示例里写的代码）
+  (c.learn || []).forEach((d, idx) => {
+    if (idx >= LIMITS.learn || !owned.has(str(d.profile_id, 60))) { dropped.learn += 1; return; }
+    const code = String(d.code === undefined || d.code === null ? "" : d.code);
+    if (code.length > MAX_CONTENT) { skipped += 1; return; }
+    stmts.push(db.prepare(
+      "INSERT INTO learn (account_id, profile_id, draft_id, code, updated_at, deleted, rev) VALUES (?,?,?,?,?,?,?) " +
+      "ON CONFLICT(account_id, profile_id, draft_id) DO UPDATE SET code=excluded.code, updated_at=excluded.updated_at, " +
+      "deleted=excluded.deleted, rev=excluded.rev " +
+      "WHERE excluded.updated_at >= learn.updated_at"
+    ).bind(acc.id, str(d.profile_id, 60), str(d.draft_id, 40), code,
+      num(d.updated_at) || Date.now(), d.deleted ? 1 : 0, rev));
   });
 
   try {
@@ -159,5 +176,8 @@ export async function onRequestPost({ request, env }) {
     return bad("保存到云端失败：" + String((e && e.message) || e).slice(0, 120), 500);
   }
 
-  return json({ ok: true, rev: rev, applied: stmts.length, skipped: skipped, serverTime: Date.now() });
+  return json({
+    ok: true, rev: rev, applied: stmts.length, skipped: skipped, dropped: dropped,
+    serverTime: Date.now()
+  });
 }

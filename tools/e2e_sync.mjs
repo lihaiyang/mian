@@ -86,32 +86,46 @@ const code = await A.page.evaluate(async () => await CloudSync.createAccount("")
 check("A 能生成同步码", /^[0-9A-Z]{4}-[0-9A-Z]{4}$/.test(code || ""), code);
 await sync(A.page);
 
-// ---------- A 建一个作品，应该自动上传（不手动点同步） ----------
+// ---------- A 建一个作品：不自动同步，而是显示「未同步」 ----------
 await A.page.evaluate(() => {
   FileManager.createFile("来自设备A.py", "print('设备A写的')\n");
 });
-await sleep(4500);                                  // 等自动同步（防抖 3 秒）
-const autoUploaded = await A.page.evaluate(async (c) => {
+await sleep(4000);                                  // 等一会儿：不应该有任何自动同步
+const notYet = await A.page.evaluate(async (c) => {
+  const st = CloudSync.getStatus();
   const r = await fetch("/api/sync?code=" + encodeURIComponent(c) + "&since=0");
   const d = await r.json();
-  return (d.files || []).some((f) => f.name === "来自设备A.py");
+  return { status: st.status, dirty: st.dirty,
+           onServer: (d.files || []).some((f) => f.name === "来自设备A.py"),
+           label: (document.getElementById("syncLabel") || {}).textContent };
 }, code);
-check("在工坊里新建文件会自动同步（不用手动点）", autoUploaded);
+check("新建文件后不会自己同步，而是显示「未同步」",
+  !notYet.onServer && notYet.status === "dirty" && notYet.label === "未同步",
+  JSON.stringify(notYet));
 
-// ---------- 在编辑器里敲字也应该自动上传 ----------
+// ---------- 在编辑器里改代码，同样是「未同步」 ----------
 await A.page.evaluate(() => {
   const f = FileManager.getFiles().find((x) => x.name === "来自设备A.py");
   FileManager.setActiveFile(f.id);
   CodeEditor.setValue("print('设备A改过的内容')\n");
 });
-await sleep(4500);
-const editedUploaded = await A.page.evaluate(async (c) => {
+await sleep(3000);
+const stillDirty = await A.page.evaluate(() => CloudSync.getStatus());
+check("改代码之后状态仍是「未同步」", stillDirty.status === "dirty" && stillDirty.dirty === true, stillDirty.status);
+
+// 手动点同步 → 两个改动一起上去
+await A.page.click("#btnSyncNow");
+await sleep(3000);
+const afterManual = await A.page.evaluate(async (c) => {
   const r = await fetch("/api/sync?code=" + encodeURIComponent(c) + "&since=0");
   const d = await r.json();
   const f = (d.files || []).find((x) => x.name === "来自设备A.py");
-  return f && /设备A改过的内容/.test(f.content);
+  return { status: CloudSync.getStatus().status, label: document.getElementById("syncLabel").textContent,
+           content: f ? f.content : "(没有这个文件)" };
 }, code);
-check("在编辑器里改代码会自动同步", editedUploaded);
+check("点一下同步：新建 + 改内容都传上去了",
+  /设备A改过的内容/.test(afterManual.content) && afterManual.status === "ok" && afterManual.label === "已同步",
+  JSON.stringify(afterManual).slice(0, 120));
 
 // ---------- B 用同步码登录，拿到 A 的作品 ----------
 const loginOk = await B.page.evaluate(async (c) => {
@@ -176,16 +190,14 @@ check("断网时状态是错误并给出提示",
   offlineStatus.status + " / " + (offlineStatus.error || ""));
 
 await B.ctx.setOffline(false);
-let uploaded = false;
-for (let i = 0; i < 20 && !uploaded; i++) {           // 不手动点同步，等自动重试（只轮询本地状态，别打服务端）
-  await sleep(1000);
-  uploaded = await B.page.evaluate(() => {
-    const st = CloudSync.getStatus();
-    return st.status === "ok" && st.lastSyncAt > 0;
-  });
-}
-check("恢复网络后自动补传（不需要手动点）", uploaded,
-  JSON.stringify(await statusOf(B.page)));
+await sleep(1500);
+const stillOffline = await statusOf(B.page);
+check("恢复网络后不会自己偷偷同步（状态仍是未同步/失败）",
+  stillOffline.status === "dirty" || stillOffline.status === "error", stillOffline.status);
+await B.page.click("#btnSyncNow");                    // 手动点一下
+await sleep(3000);
+const uploaded = (await statusOf(B.page)).status === "ok";
+check("点一下同步就补传上去了", uploaded, JSON.stringify(await statusOf(B.page)));
 // 确认这一步真的传到云端（只查一次）
 const uploadedOnServer = await B.page.evaluate(async (c) => {
   const r = await fetch("/api/sync?code=" + encodeURIComponent(c) + "&since=0");
@@ -210,6 +222,39 @@ check("A 那边也能看到 B 在断网期间写的作品",
   aFiles.indexOf("断网时写的.py") !== -1,
   aFiles.join(" | ") + " ／ 云端: " + aDiag.remoteNames.join(" | ") + " ／ rev " + aDiag.rev + "→" + aDiag.serverRev);
 
+// ---------- 学堂里写的代码（草稿）也要能同步 ----------
+await A.page.evaluate(() => { CodeEditor.setValue(""); });
+await A.page.evaluate(() => Learn.open("exercise"));
+await A.page.waitForSelector(".ex-row", { timeout: 30000 });
+await A.page.locator(".learn-panel .ex-row").first().click();
+await A.page.waitForSelector(".task-card");
+const draftId = await A.page.evaluate(() => Learn.currentLearnId());
+await A.page.evaluate(() => {
+  const cm = document.querySelector(".CodeMirror");
+  if (cm && cm.CodeMirror) cm.CodeMirror.setValue("print('学堂里写的答案')\n");
+});
+await sleep(1500);
+const draftDirty = await A.page.evaluate(() => CloudSync.getStatus());
+check("在学堂里写代码也会标记「未同步」", draftDirty.status === "dirty", draftDirty.status);
+await A.page.click("#btnSyncNow");
+await sleep(3000);
+const draftOnServer = await A.page.evaluate(async (c) => {
+  const r = await fetch("/api/sync?code=" + encodeURIComponent(c) + "&since=0");
+  const d = await r.json();
+  return (d.learn || []).some((x) => /学堂里写的答案/.test(x.code || ""));
+}, code);
+check("学堂草稿真的传到了云端（以前的 bug：永远同步不上）", draftOnServer);
+// B 手动同步一次，应该也能拿到这份草稿
+await B.page.click("#btnSyncNow");
+await sleep(3000);
+const bDrafts = await B.page.evaluate(() => {
+  const raw = localStorage.getItem("codepanda_learn_drafts_v1__" + Progress.getCurrentProfile().id) || "{}";
+  const obj = JSON.parse(raw);
+  return { ids: Object.keys(obj), text: Object.keys(obj).map((k) => obj[k].code || "").join("\n") };
+});
+check("另一台设备同步后也能拿到学堂草稿", /学堂里写的答案/.test(bDrafts.text),
+  bDrafts.ids.join(",") + " / " + bDrafts.text.slice(0, 30));
+
 // ---------- 顶栏「云同步」按钮 ----------
 await B.page.bringToFront();
 await sleep(500);
@@ -225,13 +270,17 @@ const afterClick = await B.page.evaluate(() => document.getElementById("syncLabe
 check("点一下「云同步」会立即同步（状态回到已同步）", /已同步/.test(afterClick), afterClick);
 
 // ---------- 闲置的设备靠「后台自动同步」收到改动 ----------
-await A.page.bringToFront();                      // A 在前台改内容
+await A.page.bringToFront();
+// 先回到工坊模式（前面进过学堂，学堂里改的是草稿，不是文件）
+await A.page.evaluate(() => { if (typeof Learn !== "undefined" && Learn.isActive && Learn.isActive()) Learn.exit(); });
+await sleep(600);
 await A.page.evaluate(() => {
   const f = FileManager.getFiles().find((x) => x.name === "断网时写的.py") || FileManager.getFiles()[0];
   FileManager.setActiveFile(f.id);
   CodeEditor.setValue("print('闲置设备也要能收到这一行')\n");
 });
-await sleep(4000);                                // 等 A 自己的防抖同步推上去
+await A.page.click("#btnSyncNow");                // 手动同步（现在没有自动同步了）
+await sleep(3000);
 const pushedByA = await A.page.evaluate(async (c) => {
   const r = await fetch("/api/sync?code=" + encodeURIComponent(c) + "&since=0");
   const d = await r.json();
@@ -239,16 +288,14 @@ const pushedByA = await A.page.evaluate(async (c) => {
 }, code);
 check("A 改内容后确实推到了云端", pushedByA);
 
-await B.page.bringToFront();                      // B 回到前台，然后【什么都不做】
-await sleep(2000);
-const bRevBefore = (await statusOf(B.page)).lastSyncAt;
-let got = false;
-for (let i = 0; i < 13 && !got; i++) {            // 最多等 ~52 秒（后台定时同步周期 45 秒）
-  await sleep(4000);
-  got = await B.page.evaluate(() => FileManager.getFiles().some((f) => /闲置设备也要能收到这一行/.test(f.content || "")));
-}
-check("闲置的设备不用做任何操作，也会自动收到改动（后台自动同步）", got,
-  "B 上次同步：" + new Date(bRevBefore || 0).toLocaleTimeString("zh-CN"));
+// 现在没有后台自动同步了：B 重新打开页面时会同步一次（这是唯一的「自动」行为）
+await B.page.reload({ waitUntil: "domcontentloaded" });
+await B.page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 60000 });
+await sleep(3000);
+const got = await B.page.evaluate(() => FileManager.getFiles().some((f) => /闲置设备也要能收到这一行/.test(f.content || "")));
+check("另一台设备重新打开页面时会拉到改动", got);
+const bStatus = await statusOf(B.page);
+check("重新打开后状态是「已同步」", bStatus.status === "ok", bStatus.status);
 
 // ---------- 静置 12 秒不应该有任何同步请求（防空转） ----------
 await A.page.bringToFront();

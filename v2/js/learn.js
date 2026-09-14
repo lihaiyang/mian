@@ -14,7 +14,7 @@
  * 依赖：CodeEditor / PythonRunner / Progress / FileManager / App（切换模式与恢复工坊状态）
  */
 const Learn = (() => {
-  const V = "20260914h";
+  const V = "20260914i";
   const PAGE_SIZE = 40;
   const JUDGE_TIMEOUT_MS = 4000;
 
@@ -72,6 +72,8 @@ const Learn = (() => {
         if (total > 2 * 1024 * 1024) delete drafts[id];   // 兜底：整库不超过约 2MB
       });
       localStorage.setItem(draftKey(draftProfileId), JSON.stringify(drafts));
+      // 草稿也要同步：以前只存本机，换设备就没了（这正是"改了代码点了同步也没用"的原因）
+      if (typeof CloudSync !== "undefined" && CloudSync.noteDirty) CloudSync.noteDirty();
       return true;
     } catch (e) {
       console.warn("学堂草稿保存失败（可能是浏览器存储满了）", e);
@@ -2113,6 +2115,13 @@ const Learn = (() => {
     currentLearnId,
     flushDraft,
     draftCount,
+    /** 云同步拉回草稿后，让内存里的草稿缓存失效并重画界面 */
+    reloadDrafts() {
+      drafts = null;
+      draftProfileId = "";
+      loadDrafts();
+      if (isActive()) { renderPanel(); updateTaskBar(); }
+    },
     openTab: (tab) => open(tab)
   };
 })();
