@@ -392,6 +392,8 @@ const Progress = (() => {
 
   function saveStats() {
     writeJson(statsKey(currentId), stats);
+    // 学习记录也要同步（做题、学课、XP、徽章、模拟考都走这里）
+    if (typeof CloudSync !== "undefined" && CloudSync.noteDirty) CloudSync.noteDirty();
   }
 
   function loadProfiles() {

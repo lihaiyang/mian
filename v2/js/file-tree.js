@@ -145,7 +145,8 @@ const FileManager = (() => {
     folders = defaultFolders();
     collapsed = {};
     files = [{
-      id: "file_" + Date.now(),
+      // id 固定：两台设备的起步文件是同一行，登录同步时不会出现两个同名文件
+      id: "file_welcome",
       name: "我的第一个程序.py",
       content: "# 🌟 欢迎来到萌码 Python！\n# 在这里写下你的第一行代码吧：\n\nprint(\"你好，Python！\")\n",
       folderId: myFolderId()
@@ -168,6 +169,8 @@ const FileManager = (() => {
         lastStorageError = null;
         storageErrorListeners.forEach(fn => { try { fn(null); } catch (e) {} });
       }
+      // 落盘成功就排队同步：新建 / 删除 / 重命名 / 移动 / 改内容都算
+      if (typeof CloudSync !== "undefined" && CloudSync.noteDirty) CloudSync.noteDirty();
       return true;
     } catch (e) {
       console.error("保存本地存储失败", e);

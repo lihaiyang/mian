@@ -121,6 +121,8 @@ const FileManager = (() => {
         lastStorageError = null;
         storageErrorListeners.forEach(fn => { try { fn(null); } catch (e) {} });
       }
+      // 落盘成功就排队同步：新建 / 删除 / 重命名 / 移动 / 改内容都算
+      if (typeof CloudSync !== "undefined" && CloudSync.noteDirty) CloudSync.noteDirty();
       return true;
     } catch (e) {
       console.error("保存本地存储失败", e);

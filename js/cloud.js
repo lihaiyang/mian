@@ -35,6 +35,16 @@ const CloudSync = (() => {
     if (s && typeof s === "object") state = Object.assign(state, s);
     const sent = readJson(SENT_KEY, null);
     if (sent && typeof sent === "object") lastSent = sent;
+    // 老版本会在「请求发出去之前」就记账，可能把根本没传上去的行记成已传。
+    // 升级后清一次记账 + 游标归零，强制完整同步一遍，把这笔糊涂账抹掉。
+    if (state.version !== STATE_VERSION) {
+      lastSent = {};
+      state.rev = 0;
+      state.version = STATE_VERSION;
+      saveState();
+      saveSent();
+      console.info("云同步：同步状态已升级，将重新完整同步一次");
+    }
   }
   function saveState() { writeJson(STATE_KEY, state); }
   function saveSent() { writeJson(SENT_KEY, lastSent); }
@@ -88,66 +98,192 @@ const CloudSync = (() => {
     return h.toString(36) + ":" + s.length;
   }
 
-  // ---------- 收集本地所有行（带变化检测，只推变化的） ----------
-  function collectChanges() {
-    const now = Date.now();
-    const changes = { profiles: [], folders: [], files: [], progress: [], vfs: [] };
-    const seen = {};
-    const push = (key, row, payload) => {
-      seen[key] = 1;
-      const h = hash(payload);
-      const prev = lastSent[key];
-      if (prev && prev.h === h) return;            // 没变，不传
-      const t = now;
-      lastSent[key] = { h: h, t: t, row: row };
-      return { row: row, t: t };
-    };
+  // ================= 同步核心（只有四条规则） =================
+  //   ① 推送：上次成功同步后被改过的行 → 推上去（服务端按 updated_at 做行级 LWW）
+  //   ② 拉取：本地改过的行「不被覆盖」，等下一轮推送；本地没改过的行用云端版本覆盖
+  //   ③ 学习记录是累加型数据 → 不覆盖，只做并集合并（两台设备各做一半时谁都不丢）
+  //   ④ lastSent 只在推送成功后记账；同步中再有改动就补跑一轮；失败退避重试
+  const RETRY_BASE = 2000;
+  const RETRY_MAX = 30000;
+  const STATE_VERSION = 2;      // 老版本「发请求前就记账」有 bug，升级后强制重新同步一次
 
-    readProfiles().forEach(p => {
-      const r = push("profile|" + p.id, { id: p.id, name: p.name, emoji: p.emoji || "" }, JSON.stringify([p.name, p.emoji]));
-      if (r) changes.profiles.push(Object.assign({ updated_at: r.t }, r.row));
+  let dirty = false;
+  let syncing = false;
+  let retryTimer = null;
+  let retryDelay = 0;
+  let clockOffset = 0;          // 服务端时间 - 本地时间，让多台设备的时间戳对齐
+  let skippedNote = "";         // 有文件太大没传上去时的说明
+
+  function serverNow() { return Date.now() + clockOffset; }
+
+  function syncClock(serverTime) {
+    if (typeof serverTime === "number" && serverTime > 0) clockOffset = serverTime - Date.now();
+  }
+
+  // ---------- 每行的「内容签名」：推送和拉取必须用同一个算法，否则会来回重推 ----------
+  function sigProfile(p) { return JSON.stringify([p.name, p.emoji || ""]); }
+  function sigFolder(f) {
+    return JSON.stringify([f.name, f.emoji || "", f.builtin ? 1 : 0, f.keep ? 1 : 0, Number(f.position) || 0]);
+  }
+  function sigFile(f) { return JSON.stringify([f.name, f.folderId || f.folder_id || "", f.content || ""]); }
+  function sigStats(st) { return JSON.stringify(st || {}); }
+  function sigVfs(text) { return JSON.stringify(text || ""); }
+
+  // 墓碑只需要记住「这一行是谁」，不要把文件内容也存进同步状态
+  function tombRow(row) {
+    const out = {};
+    ["id", "profile_id", "path", "name", "folder_id"].forEach(k => {
+      if (row && row[k] !== undefined && row[k] !== null && row[k] !== "") out[k] = row[k];
+    });
+    return out;
+  }
+
+  // ---------- 学习记录合并（唯一的「合并」：累加型数据覆盖任何一边都会丢） ----------
+  const STATS_MAX = ["runs", "successes", "turtleRuns", "vfsFiles", "longestCode", "xp",
+    "quizCorrect", "bestCombo", "firstTry", "solveDayMax", "lessonDayMax", "dailyDone",
+    "dailyFull", "turtleSaves", "nightRuns", "earlyRuns", "streak", "bestStreak", "lessonRuns"];
+  const STATS_SET = ["days", "badges", "packages", "medals"];                                    // 数组并集
+  // 映射：键并集、值取大。必须幂等 —— 每次拉取都会合并一次，相加会越合越多
+  const STATS_FLAG = ["missions", "lessons", "solved", "tried", "levelSolved", "lessonStage", "skill"];
+  const STATS_DATE = ["lastRunDate", "lastStreakDate", "lessonDay", "solveDay"];                 // 字符串日期取较晚的
+
+  function asArray(v) { return Array.isArray(v) ? v : []; }
+  function asMap(v) { return (v && typeof v === "object") ? v : {}; }
+
+  function mergeStats(local, remote) {
+    const a = local || {};
+    const b = remote || {};
+    const out = Object.assign({}, b, a);
+
+    STATS_MAX.forEach(k => { out[k] = Math.max(Number(a[k]) || 0, Number(b[k]) || 0); });
+
+    STATS_SET.forEach(k => {
+      const set = {};
+      asArray(b[k]).forEach(v => { set[v] = 1; });
+      asArray(a[k]).forEach(v => { set[v] = 1; });
+      out[k] = Object.keys(set);
     });
 
-    readProfiles().forEach(p => {
+    STATS_FLAG.forEach(k => {
+      const ma = asMap(a[k]);
+      const mb = asMap(b[k]);
+      const m = Object.assign({}, mb);
+      Object.keys(ma).forEach(key => {
+        const x = ma[key];
+        const y = m[key];
+        if (typeof x === "number" || typeof y === "number") m[key] = Math.max(Number(x) || 0, Number(y) || 0);
+        else m[key] = x || y;
+      });
+      out[k] = m;
+    });
+
+    STATS_DATE.forEach(k => {
+      const x = String(a[k] || "");
+      const y = String(b[k] || "");
+      out[k] = x > y ? x : y;
+    });
+
+    // 考试记录：按时间合并去重
+    const exams = {};
+    asArray(a.exams).concat(asArray(b.exams)).forEach(e => {
+      if (!e || typeof e !== "object") return;
+      exams[String(e.at || 0) + "|" + (e.level || 0)] = e;
+    });
+    out.exams = Object.keys(exams).map(k => exams[k]).sort((x, y) => (x.at || 0) - (y.at || 0)).slice(-60);
+
+    // 每日任务：同一天就合并进度，不同天取较晚的那天
+    const da = asMap(a.daily);
+    const db = asMap(b.daily);
+    if (String(db.date || "") > String(da.date || "")) out.daily = db;
+    else if (String(da.date || "") > String(db.date || "")) out.daily = da;
+    else {
+      const progress = Object.assign({}, asMap(db.progress));
+      Object.keys(asMap(da.progress)).forEach(k => {
+        progress[k] = Math.max(Number(progress[k]) || 0, Number(da.progress[k]) || 0);
+      });
+      const done = {};
+      asArray(da.done).forEach(v => { done[v] = 1; });
+      asArray(db.done).forEach(v => { done[v] = 1; });
+      out.daily = { date: da.date || db.date || "", progress: progress, done: Object.keys(done) };
+    }
+
+    return out;
+  }
+
+  // ---------- 收集本地所有行（纯函数：不改任何状态，改完状态放在 commitSent） ----------
+  function collectChanges() {
+    const t = serverNow();
+    const changes = { profiles: [], folders: [], files: [], progress: [], vfs: [] };
+    const sent = [];                    // 成功之后才写进 lastSent
+    const seen = {};
+
+    const add = (bucket, key, sig, row) => {
+      seen[key] = 1;
+      const h = hash(sig);
+      const prev = lastSent[key];
+      if (prev && prev.h === h) return;                  // 上次同步后没变过
+      changes[bucket].push(Object.assign({ updated_at: t }, row));
+      sent.push({ key: key, h: h, row: tombRow(row) });
+    };
+
+    const profiles = readProfiles();
+    profiles.forEach(p => {
+      add("profiles", "profile|" + p.id, sigProfile(p), { id: p.id, name: p.name, emoji: p.emoji || "" });
+    });
+
+    profiles.forEach(p => {
       const ws = readWorkspace(p.id);
       if (ws) {
         (ws.folders || []).forEach(f => {
-          const r = push("folder|" + f.id, { id: f.id, profile_id: p.id, name: f.name, emoji: f.emoji || "", builtin: f.builtin ? 1 : 0, keep: f.keep ? 1 : 0, position: f.position || 0 }, JSON.stringify([f.name, f.emoji, f.builtin, f.keep, f.position]));
-          if (r) changes.folders.push(Object.assign({ updated_at: r.t }, r.row));
+          add("folders", "folder|" + f.id, sigFolder(f), {
+            id: f.id, profile_id: p.id, name: f.name, emoji: f.emoji || "",
+            builtin: f.builtin ? 1 : 0, keep: f.keep ? 1 : 0, position: f.position || 0
+          });
         });
         (ws.files || []).forEach(f => {
-          const r = push("file|" + f.id, { id: f.id, profile_id: p.id, folder_id: f.folderId || "", name: f.name, content: f.content || "" }, JSON.stringify([f.name, f.folderId, f.content]));
-          if (r) changes.files.push(Object.assign({ updated_at: r.t }, r.row));
+          add("files", "file|" + f.id, sigFile(f), {
+            id: f.id, profile_id: p.id, folder_id: f.folderId || "", name: f.name, content: f.content || ""
+          });
         });
       }
       const st = readStats(p.id);
       if (st) {
-        const r = push("progress|" + p.id, { profile_id: p.id, stats: st }, JSON.stringify(st));
-        if (r) changes.progress.push(Object.assign({ updated_at: r.t }, r.row));
+        add("progress", "progress|" + p.id, sigStats(st), { profile_id: p.id, stats: st });
       }
     });
 
     const pid = currentProfileId();
     readVfs().forEach(v => {
-      const key = "vfs|" + pid + "|" + v.path;
-      const r = push(key, { profile_id: pid, path: v.path, text: v.text || "" }, JSON.stringify(v.text));
-      if (r) changes.vfs.push(Object.assign({ updated_at: r.t }, r.row));
+      add("vfs", "vfs|" + pid + "|" + v.path, sigVfs(v.text), { profile_id: pid, path: v.path, text: v.text || "" });
     });
 
-    // 墓碑：上次发过、现在没了的行
+    // 墓碑：上次发过、这次本地已经没有的行
     Object.keys(lastSent).forEach(key => {
       if (seen[key]) return;
-      const prev = lastSent[key];
-      const row = prev.row || {};
-      const t = now;
-      if (key.startsWith("file|")) changes.files.push({ id: row.id, profile_id: row.profile_id, folder_id: row.folder_id || "", name: row.name || "", content: "", updated_at: t, deleted: 1 });
-      else if (key.startsWith("folder|")) changes.folders.push({ id: row.id, profile_id: row.profile_id, name: row.name || "", emoji: row.emoji || "", updated_at: t, deleted: 1 });
-      else if (key.startsWith("profile|")) changes.profiles.push({ id: row.id, name: row.name || "小朋友", emoji: row.emoji || "", updated_at: t, deleted: 1 });
-      else if (key.startsWith("vfs|")) changes.vfs.push({ profile_id: row.profile_id, path: row.path, text: "", updated_at: t });
-      delete lastSent[key];
+      const row = lastSent[key].row || {};
+      const t2 = serverNow();
+      if (key.indexOf("file|") === 0) {
+        changes.files.push({ id: row.id, profile_id: row.profile_id, folder_id: row.folder_id || "", name: row.name || "", content: "", updated_at: t2, deleted: 1 });
+      } else if (key.indexOf("folder|") === 0) {
+        changes.folders.push({ id: row.id, profile_id: row.profile_id, name: row.name || "", emoji: row.emoji || "", updated_at: t2, deleted: 1 });
+      } else if (key.indexOf("profile|") === 0) {
+        changes.profiles.push({ id: row.id, name: row.name || "小朋友", emoji: row.emoji || "", updated_at: t2, deleted: 1 });
+      } else if (key.indexOf("vfs|") === 0) {
+        changes.vfs.push({ profile_id: row.profile_id, path: row.path, text: "", updated_at: t2 });
+      }
+      sent.push({ key: key, h: "tombstone", row: null });   // 墓碑发成功后就别再发了
     });
 
-    return changes;
+    return { changes: changes, sent: sent };
+  }
+
+  // 只有服务器确认收到之后，才把这些行的哈希记下来（失败就原样重发，服务端 LWW 幂等）
+  function commitSent(sent) {
+    sent.forEach(item => {
+      if (item.row) lastSent[item.key] = { h: item.h, t: serverNow(), row: item.row };
+      else delete lastSent[item.key];
+    });
+    saveSent();
   }
 
   function countRows(c) {
@@ -155,32 +291,44 @@ const CloudSync = (() => {
       (c.progress || []).length + (c.vfs || []).length;
   }
 
-  // ---------- 应用远端数据 ----------
-  function applyPull(data) {
+  // 本地这行在「上次成功同步」之后被改过吗？
+  //   cloudWins=true（登录新设备）：云端是权威，本地旧数据让位（学习记录仍然走并集）
+  //   默认：本地改过就保留本地，等下一轮推送去和服务端比时间
+  function localChanged(key, sig, cloudWins) {
+    if (cloudWins) return false;
+    const prev = lastSent[key];
+    if (!prev) return true;                 // 本地有、从没同步过 → 别丢孩子的东西
+    return prev.h !== hash(sig);
+  }
+
+  // ---------- 应用远端数据（按行合并，不整体覆盖） ----------
+  function applyPull(data, opts) {
+    const cloudWins = !!(opts && opts.cloudWins);
     const touchedProfiles = {};
-    const now = Date.now();
+    let localOnly = 0;                      // 本地有、云端也有、但本地更新 → 等推送
 
     (data.profiles || []).forEach(p => {
       const list = readProfiles();
       const i = list.findIndex(x => x.id === p.id);
-      if (p.deleted) {
-        if (i !== -1) list.splice(i, 1);
-        writeProfiles(list);
-        touchedProfiles[p.id] = 1;
-        lastSent["profile|" + p.id] = { h: hash(JSON.stringify([p.name, p.emoji || ""])), t: p.updated_at, row: { id: p.id, name: p.name, emoji: p.emoji || "" } };
-        return;
+      const key = "profile|" + p.id;
+      const local = i === -1 ? null : list[i];
+      if (local && localChanged(key, sigProfile(local), cloudWins)) { localOnly++; return; }
+      if (p.deleted) { if (i !== -1) list.splice(i, 1); }
+      else {
+        const row = { id: p.id, name: p.name, emoji: p.emoji || "🐼", createdAt: p.updated_at };
+        if (i === -1) list.push(row); else list[i] = Object.assign({}, list[i], row);
       }
-      const row = { id: p.id, name: p.name, emoji: p.emoji || "🐼", createdAt: p.updated_at };
-      if (i === -1) list.push(row); else list[i] = Object.assign({}, list[i], row);
       writeProfiles(list);
       touchedProfiles[p.id] = 1;
-      lastSent["profile|" + p.id] = { h: hash(JSON.stringify([p.name, p.emoji || ""])), t: p.updated_at, row: { id: p.id, name: p.name, emoji: p.emoji || "" } };
+      lastSent[key] = { h: hash(sigProfile(p)), t: p.updated_at, row: tombRow(p) };
     });
 
     (data.folders || []).forEach(f => {
       const ws = readWorkspace(f.profile_id) || { folders: [], files: [], collapsed: {} };
       ws.folders = ws.folders || [];
       const i = ws.folders.findIndex(x => x.id === f.id);
+      const key = "folder|" + f.id;
+      if (i !== -1 && localChanged(key, sigFolder(ws.folders[i]), cloudWins)) { localOnly++; return; }
       if (f.deleted) { if (i !== -1) ws.folders.splice(i, 1); }
       else {
         const row = { id: f.id, name: f.name, emoji: f.emoji || "📁", builtin: !!f.builtin, keep: !!f.keep, position: f.position || 0 };
@@ -188,13 +336,15 @@ const CloudSync = (() => {
       }
       writeWorkspace(f.profile_id, ws);
       touchedProfiles[f.profile_id] = 1;
-      lastSent["folder|" + f.id] = { h: hash(JSON.stringify([f.name, f.emoji, f.builtin, f.keep, f.position])), t: f.updated_at, row: { id: f.id, profile_id: f.profile_id, name: f.name, emoji: f.emoji || "" } };
+      lastSent[key] = { h: hash(sigFolder(f)), t: f.updated_at, row: tombRow(f) };
     });
 
     (data.files || []).forEach(f => {
       const ws = readWorkspace(f.profile_id) || { folders: [], files: [], collapsed: {} };
       ws.files = ws.files || [];
       const i = ws.files.findIndex(x => x.id === f.id);
+      const key = "file|" + f.id;
+      if (i !== -1 && localChanged(key, sigFile(ws.files[i]), cloudWins)) { localOnly++; return; }
       if (f.deleted) { if (i !== -1) ws.files.splice(i, 1); }
       else {
         const row = { id: f.id, name: f.name, content: f.content || "", folderId: f.folder_id || "" };
@@ -202,30 +352,41 @@ const CloudSync = (() => {
       }
       writeWorkspace(f.profile_id, ws);
       touchedProfiles[f.profile_id] = 1;
-      lastSent["file|" + f.id] = { h: hash(JSON.stringify([f.name, f.folder_id, f.content || ""])), t: f.updated_at, row: { id: f.id, profile_id: f.profile_id, name: f.name, folder_id: f.folder_id, content: "" } };
+      lastSent[key] = { h: hash(sigFile(f)), t: f.updated_at, row: tombRow(f) };
     });
 
     (data.progress || []).forEach(p => {
-      let st = {};
-      try { st = JSON.parse(p.stats_json || "{}"); } catch (e) { st = {}; }
-      // 学习记录里的「本地时间戳」不进 synced（避免每次都被判定为变化）
-      writeStats(p.profile_id, st);
+      let remote = {};
+      try { remote = JSON.parse(p.stats_json || "{}"); } catch (e) { remote = {}; }
+      const key = "progress|" + p.profile_id;
+      const local = readStats(p.profile_id) || {};
+      // 学习记录永远不覆盖：本地 ∪ 云端
+      const merged = cloudWins ? mergeStats(remote, local) : mergeStats(local, remote);
+      writeStats(p.profile_id, merged);
       touchedProfiles[p.profile_id] = 1;
-      lastSent["progress|" + p.profile_id] = { h: hash(JSON.stringify(st)), t: p.updated_at, row: { profile_id: p.profile_id, stats: st } };
+      if (sigStats(merged) !== sigStats(remote)) {
+        // 本地有云端没有的记录 → 清掉记账，下一轮推上去，让云端也补全
+        delete lastSent[key];
+        localOnly++;
+      } else {
+        lastSent[key] = { h: hash(sigStats(merged)), t: p.updated_at, row: { profile_id: p.profile_id } };
+      }
     });
 
     const pid = currentProfileId();
     const vfs = readVfs();
     (data.vfs || []).forEach(v => {
-      if (v.profile_id !== pid) return;      // 虚拟文件目前只同步当前档案
+      if (v.profile_id !== pid) return;      // 数据文件目前只同步当前档案
       const i = vfs.findIndex(x => x.path === v.path);
+      const key = "vfs|" + pid + "|" + v.path;
+      if (i !== -1 && localChanged(key, sigVfs(vfs[i].text), cloudWins)) { localOnly++; return; }
       if (i === -1) vfs.push({ path: v.path, text: v.text || "", updatedAt: v.updated_at });
       else vfs[i] = Object.assign({}, vfs[i], { text: v.text || "", updatedAt: v.updated_at });
-      lastSent["vfs|" + pid + "|" + v.path] = { h: hash(JSON.stringify(v.text || "")), t: v.updated_at, row: { profile_id: pid, path: v.path } };
+      lastSent[key] = { h: hash(sigVfs(v.text)), t: v.updated_at, row: { profile_id: pid, path: v.path } };
     });
     writeVfs(vfs);
 
-    return touchedProfiles;
+    return { touched: touchedProfiles, localOnly: localOnly };
   }
 
   function refreshUI(touched) {
@@ -247,10 +408,11 @@ const CloudSync = (() => {
       err.status = res.status;
       throw err;
     }
+    syncClock(data.serverTime);
     return data;
   }
 
-  // ---------- 对外操作 ----------
+  // ---------- 账号操作（同步码 = 账号 + 密码合体，服务端只存哈希） ----------
   async function createAccount(pin) {
     const prof = (typeof Progress !== "undefined" && Progress.getCurrentProfile) ? Progress.getCurrentProfile() : null;
     const data = await apiCall("/account", {
@@ -258,11 +420,16 @@ const CloudSync = (() => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ action: "create", pin: pin || "", nickname: prof ? prof.name : "", avatar: prof ? prof.emoji : "" })
     });
-    state.code = data.code; state.pin = pin || ""; state.accountId = data.accountId;
-    state.rev = 0; state.hasPin = !!data.hasPin;
-    state.nickname = prof ? prof.name : ""; state.avatar = prof ? prof.emoji : "";
+    state.code = data.code;
+    state.pin = pin || "";
+    state.accountId = data.accountId;
+    state.rev = 0;
+    state.hasPin = !!data.hasPin;
+    state.nickname = prof ? prof.name : "";
+    state.avatar = prof ? prof.emoji : "";
     saveState();
-    await pushChanges();          // 把本机已有作品先传上去
+    dirty = true;
+    await syncNow(true);            // 把本机已有的作品传上去
     return data.code;
   }
 
@@ -273,14 +440,21 @@ const CloudSync = (() => {
       body: JSON.stringify({ action: "login", code: code, pin: pin || "" })
     });
     state.code = code.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
-    state.pin = pin || ""; state.accountId = data.accountId; state.hasPin = !!data.hasPin;
-    state.nickname = data.nickname || ""; state.avatar = data.avatar || "";
+    state.pin = pin || "";
+    state.accountId = data.accountId;
+    state.hasPin = !!data.hasPin;
+    state.nickname = data.nickname || "";
+    state.avatar = data.avatar || "";
     state.rev = 0;
     saveState();
-    lastSent = {}; saveSent();
-    const pulled = await pullChanges(true);
-    refreshUI(pulled);
-    await pushChanges();          // 本机独有、云端没有的内容补传
+    lastSent = {};
+    saveSent();
+    // 登录时「云端优先」：新设备上的默认数据不该反过来盖掉云端；
+    // 但学习记录例外 —— 永远做并集，本机刚做的题不会丢
+    const pulled = await pullChanges(true, { cloudWins: true });
+    refreshUI(pulled.touched);
+    dirty = true;
+    await syncNow(true);            // 再推：本机独有、云端没有的内容补传
     return data;
   }
 
@@ -290,7 +464,9 @@ const CloudSync = (() => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ action: "setpin", code: state.code, pin: state.pin, newPin: newPin })
     });
-    state.pin = newPin; state.hasPin = !!data.hasPin; saveState();
+    state.pin = newPin;
+    state.hasPin = !!data.hasPin;
+    saveState();
     return state.hasPin;
   }
 
@@ -300,74 +476,106 @@ const CloudSync = (() => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ action: "rotate", code: state.code, pin: state.pin })
     });
-    state.code = data.code; saveState();
+    state.code = data.code;
+    saveState();
     return data.code;
   }
 
   function signOutLocal() {
-    state.code = ""; state.pin = ""; state.accountId = ""; state.rev = 0; state.hasPin = false;
+    state.code = "";
+    state.pin = "";
+    state.accountId = "";
+    state.rev = 0;
+    state.hasPin = false;
     saveState();
-    lastSent = {}; saveSent();
+    lastSent = {};
+    saveSent();
+    dirty = false;
+    syncing = false;
+    retryDelay = 0;
+    skippedNote = "";
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    if (timer) { clearTimeout(timer); timer = null; }
     notify();
   }
 
+  // ---------- 推送（成功才记账） ----------
   async function pushChanges() {
-    if (!isSignedIn() || busy) return 0;
-    busy = true;
-    setStatus("syncing");
-    try {
-      const changes = collectChanges();
-      const n = countRows(changes);
-      if (n === 0) { setStatus("ok"); busy = false; return 0; }
-      const data = await apiCall("/sync", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ code: state.code, pin: state.pin, changes: changes })
-      });
-      state.rev = data.rev || state.rev;
-      saveState();
-      saveSent();
-      lastSyncAt = Date.now();
-      setStatus("ok", "");
-      busy = false;
-      return n;
-    } catch (e) {
-      busy = false;
-      setStatus("error", String(e.message || e));
-      throw e;
-    }
+    if (!isSignedIn()) return { sent: 0, skipped: 0 };
+    const collected = collectChanges();
+    const n = countRows(collected.changes);
+    if (!n && !collected.sent.length) return { sent: 0, skipped: 0 };
+    const data = await apiCall("/sync", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: state.code, pin: state.pin, changes: collected.changes })
+    });
+    commitSent(collected.sent);            // ← 关键：只有服务器确认了才记账
+    return { sent: collected.sent.length, skipped: data.skipped || 0 };
   }
 
-  async function pullChanges(full) {
-    if (!isSignedIn()) return {};
+  // ---------- 拉取（游标只在拉取成功后推进，避免漏掉别人在中间写的行） ----------
+  async function pullChanges(full, opts) {
+    if (!isSignedIn()) return { touched: {}, localOnly: 0 };
     const since = full ? 0 : (state.rev || 0);
     const q = "/sync?code=" + encodeURIComponent(state.code) + "&pin=" + encodeURIComponent(state.pin || "") + "&since=" + since;
     const data = await apiCall(q, { method: "GET" });
-    const touched = applyPull(data);
+    const res = applyPull(data, opts);
     state.rev = data.rev || state.rev;
     state.hasPin = !!data.hasPin;
     if (data.nickname) state.nickname = data.nickname;
     if (data.avatar) state.avatar = data.avatar;
     saveState();
     saveSent();
-    lastSyncAt = Date.now();
-    setStatus("ok", "");
-    return touched;
+    return res;
   }
 
+  // ---------- 同步一轮：先推后拉 ----------
   async function syncNow(silent) {
-    if (!isSignedIn() || busy) return;
-    if (!navigator.onLine) { setStatus("error", "现在没有网络，等联网后会自动同步"); return; }
+    if (!isSignedIn()) return false;
+    if (syncing) { dirty = true; return false; }        // 正在同步 → 记下来，结束后补跑
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setStatus("error", "现在没有网络，等联网后会自动同步");
+      return false;
+    }
+    syncing = true;
+    dirty = false;
+    if (!silent) setStatus("syncing");
+    let ok = true;
     try {
-      if (!silent) setStatus("syncing");
-      const touched = await pullChanges(false);
-      refreshUI(touched);
-      await pushChanges();
-    } catch (e) { /* 状态已在内部设置 */ }
+      const pushed = await pushChanges();               // ① 先推：本机改过的东西先上去
+      const pulled = await pullChanges(false);          // ② 再拉：把云端更新的合并回来
+      refreshUI(pulled.touched);
+      lastSyncAt = Date.now();
+      retryDelay = 0;
+      if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+      if (pushed.skipped > 0) {
+        skippedNote = "有 " + pushed.skipped + " 个内容太大（单个文件上限 256KB），没能上传";
+        setStatus("warn", skippedNote);
+      } else {
+        skippedNote = "";
+        setStatus("ok", "");
+      }
+    } catch (e) {
+      ok = false;
+      setStatus("error", String(e.message || e));
+      scheduleRetry();
+    } finally {
+      syncing = false;
+      if (dirty) { dirty = false; setTimeout(() => syncNow(true), 300); }   // 同步期间又改了 → 立刻补跑
+    }
+    return ok;
+  }
+
+  function scheduleRetry() {
+    if (retryTimer || !isSignedIn()) return;
+    retryDelay = retryDelay ? Math.min(retryDelay * 2, RETRY_MAX) : RETRY_BASE;
+    retryTimer = setTimeout(() => { retryTimer = null; syncNow(true); }, retryDelay);
   }
 
   function noteDirty() {
     if (!isSignedIn()) return;
+    dirty = true;
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => { timer = null; syncNow(true); }, DEBOUNCE_MS);
   }
@@ -382,7 +590,7 @@ const CloudSync = (() => {
     avatar.textContent = prof ? prof.emoji : "🐼";
     if (name) name.textContent = prof ? prof.name : "小朋友";
     if (dot) {
-      const map = { idle: "⚪", syncing: "🟡", ok: "🟢", error: "🔴" };
+      const map = { idle: "⚪", syncing: "🟡", ok: "🟢", warn: "🟡", error: "🔴" };
       dot.textContent = isSignedIn() ? (map[status] || "⚪") : "☁️";
       dot.title = isSignedIn()
         ? (status === "error"
@@ -396,7 +604,7 @@ const CloudSync = (() => {
     if (pa) pa.textContent = prof ? prof.emoji : "🐼";
     if (pn) pn.textContent = prof ? prof.name : "小朋友";
     if (pd) {
-      const map2 = { idle: "⚪", syncing: "🟡", ok: "🟢", error: "🔴" };
+      const map2 = { idle: "⚪", syncing: "🟡", ok: "🟢", warn: "🟡", error: "🔴" };
       pd.textContent = isSignedIn() ? (map2[status] || "⚪") : "☁️";
     }
     const chip = document.getElementById("btnUserChip");
@@ -414,7 +622,8 @@ const CloudSync = (() => {
 
   function statusLine() {
     if (status === "syncing") return "🟡 正在同步…";
-    if (status === "error") return "🔴 " + esc(lastError || "同步失败");
+    if (status === "error") return "🔴 " + esc(lastError || "同步失败") + "（会自动重试）";
+    if (status === "warn") return "🟡 " + esc(skippedNote || "同步完成，但有内容没能上传");
     if (lastSyncAt) return "🟢 上次同步：" + new Date(lastSyncAt).toLocaleTimeString("zh-CN");
     return "⚪ 还没同步过";
   }
@@ -648,6 +857,12 @@ const CloudSync = (() => {
       if (isSignedIn()) setTimeout(() => syncNow(true), 1500);
       if (typeof FileManager !== "undefined" && FileManager.onChange) FileManager.onChange(() => noteDirty());
       window.addEventListener("online", () => { if (isSignedIn()) syncNow(true); });
+      // 从后台切回来时补一次（中间可能漏了同步）
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden || !isSignedIn()) return;
+        if (Date.now() - lastSyncAt < 20000) return;
+        syncNow(true);
+      });
     },
     isSignedIn, getStatus, createAccount, login, setPin, rotateCode, signOutLocal,
     syncNow, noteDirty, openPanel, closePanel, renderPanel, renderChip, renderShareTab, showNeedSyncNotice,

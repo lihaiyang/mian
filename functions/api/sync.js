@@ -70,7 +70,15 @@ export async function onRequestPost({ request, env }) {
   try { raw = JSON.stringify(c); } catch (e) { return bad("请求格式不对"); }
   if (raw.length > MAX_TOTAL) return bad("这次要保存的内容太多啦，先删掉一些不用的文件吧", 413);
 
-  const rev = num(acc.rev) + 1;
+  // rev 必须原子分配：两台设备同时推时若都基于同一个 acc.rev 计算，会拿到同一个 rev，
+  // 第三台设备按 rev 增量拉取时就会漏掉其中一批。RETURNING 不支持时退回旧算法。
+  let rev = num(acc.rev) + 1;
+  try {
+    const bumped = await db.prepare("UPDATE accounts SET rev = rev + 1 WHERE id = ? RETURNING rev")
+      .bind(acc.id).first();
+    if (bumped && bumped.rev) rev = num(bumped.rev);
+  } catch (e) { /* 兼容不支持 RETURNING 的环境 */ }
+
   const owned = new Set((await db.prepare("SELECT id FROM profiles WHERE account_id = ?").bind(acc.id).all())
     .results.map(r => r.id));
   const stmts = [];
@@ -145,8 +153,8 @@ export async function onRequestPost({ request, env }) {
     for (let i = 0; i < stmts.length; i += BATCH) {
       await db.batch(stmts.slice(i, i + BATCH));
     }
-    await db.prepare("UPDATE accounts SET rev = ?, last_seen = ? WHERE id = ?")
-      .bind(rev, nowSec(), acc.id).run();
+    await db.prepare("UPDATE accounts SET last_seen = ? WHERE id = ?")
+      .bind(nowSec(), acc.id).run();
   } catch (e) {
     return bad("保存到云端失败：" + String((e && e.message) || e).slice(0, 120), 500);
   }
