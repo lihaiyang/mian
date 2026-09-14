@@ -303,6 +303,51 @@ await page.click('[data-act="exam-start"]');
 await sleep(800);
 check("模拟考可以在学堂里开考", (await page.locator(".exam-nav-dot").count()) === 10);
 check("考试时任务条显示计时", (await page.textContent("#learnTaskProgress")).includes("⏱"));
+check("考试时编辑器在位（≥300px）",
+  (await page.evaluate(() => {
+    const w = document.querySelector(".editor-body-wrapper");
+    return !!w && !!w.offsetParent && w.getBoundingClientRect().height >= 300;
+  })));
+
+// 回归：考试里翻回上一题，写的代码不能丢
+const examQ1 = await page.evaluate(() => Learn.currentLearnId());
+await page.evaluate(() => {
+  const cm = document.querySelector(".CodeMirror");
+  if (cm && cm.CodeMirror) cm.CodeMirror.setValue("# 我的考试答案\nprint(2026)");
+});
+await sleep(800);
+await page.click('[data-act="exam-next"]');
+await sleep(700);
+check("考试可以翻到下一题", (await page.evaluate(() => Learn.currentLearnId())) !== examQ1);
+await page.click('[data-act="exam-prev"]');
+await sleep(700);
+check("翻回上一题，答案还在",
+  (await page.evaluate(() => CodeEditor.getValue())).includes("我的考试答案"));
+
+// 回归：考试里作答不能污染这道题平时的练习草稿
+await page.click('.learn-tab[data-tab="exercise"]');
+await page.waitForSelector(".ex-row", { timeout: 30000 });
+await sleep(400);
+const draftKeys = await page.evaluate(() => Object.keys(JSON.parse(
+  localStorage.getItem("codepanda_learn_drafts_v1__" + Progress.getCurrentProfile().id) || "{}")));
+check("考试中的代码不会写进练习草稿", draftKeys.indexOf(examQ1) === -1, "草稿 " + draftKeys.length + " 份");
+
+// 回归：从别的小节切回模拟考，编辑器要装回这一题的代码
+await page.click('.learn-tab[data-tab="exam"]');
+await sleep(800);
+check("切回模拟考会恢复这一题写的代码",
+  (await page.evaluate(() => CodeEditor.getValue())).includes("我的考试答案"));
+
+// 考试里「讲解优先」把代码区收起后，别的环节不受影响
+await page.click('[data-act="layout"][data-mode="read"]').catch(() => {});
+await page.click('.learn-tab[data-tab="example"]');
+await page.waitForSelector(".learn-panel .ex-row", { timeout: 20000 });
+await sleep(400);
+check("在别的环节编辑器不会被「讲解优先」藏起来",
+  await page.evaluate(() => {
+    const w = document.querySelector(".editor-body-wrapper");
+    return !!w && !!w.offsetParent && !document.querySelector(".learn-code-row").classList.contains("collapsed");
+  }));
 
 // ---------- 回工坊：编辑器恢复成作品库里的文件 ----------
 await page.click("#btnLearnExit");

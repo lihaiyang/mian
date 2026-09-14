@@ -14,7 +14,7 @@
  * 依赖：CodeEditor / PythonRunner / Progress / FileManager / App（切换模式与恢复工坊状态）
  */
 const Learn = (() => {
-  const V = "20260914b";
+  const V = "20260914c";
   const PAGE_SIZE = 40;
   const JUDGE_TIMEOUT_MS = 4000;
 
@@ -315,8 +315,13 @@ const Learn = (() => {
     if (section !== "exam") stopExamTimer();
     // 只有「教程」才显示讲解区：切到示例/练习/模拟考等要收起来（布局设置会记住，回来还在）
     if (section !== "lesson") hideLessonHost();
-    if (section !== "example") { /* 对照栏只在示例里用 */ }
     markTab(section);
+    // 从别的小节切回模拟考：把当前这一题写到一半的代码重新装回编辑器，
+    // 否则编辑器里会残留刚才在练习/示例里看的代码。
+    if (section === "exam" && ui.examPaper && !ui.examDone) {
+      loadExamQuestion();
+      startExamTimer();
+    }
     renderHud();
     renderPanel();
     applyLayout();
@@ -587,7 +592,7 @@ const Learn = (() => {
       row.appendChild(cmp);
       // 「讲解优先」时代码区收成一条提示栏，点它就展开
       row.addEventListener("click", () => {
-        if (row.classList.contains("collapsed")) setLayout("half");
+        if (row.classList.contains("collapsed") && section === "lesson") setLayout("half");
       });
       setTimeout(() => { try { CodeEditor.refresh(); } catch (e) {} }, 40);
     }
@@ -643,15 +648,18 @@ const Learn = (() => {
     const splitter = el("learnSplitter");
     if (!host || !splitter) return;
 
+    const row = el("learnCodeRow");
     const hasContent = host.innerHTML.trim() !== "";
     if (!isActive() || section !== "lesson" || !hasContent) {
       host.style.display = "none";
       splitter.classList.remove("show");
+      // 注意：「讲解优先」会把代码区收成一条提示栏，离开教程时必须展开回来，
+      // 否则练习 / 示例 / 模拟考里就看不到代码编辑区了。
+      if (row) row.classList.remove("collapsed");
       return;
     }
 
     const st = layoutFor("lesson");
-    const row = el("learnCodeRow");
     host.style.display = "flex";
     host.style.flex = "0 0 auto";
 
@@ -1512,6 +1520,7 @@ const Learn = (() => {
     loadIntoEditor("exercise", id);
     document.body.classList.remove("learn-wide");
     hideLessonHost();
+    applyLayout();
     markTab("exercise");
     renderPanel();
     renderJudgeResult(null);
@@ -1536,6 +1545,7 @@ const Learn = (() => {
     loadIntoEditor("example", id);
     document.body.classList.remove("learn-wide");
     hideLessonHost();
+    applyLayout();
     markTab("example");
     renderPanel();
     renderCompare();
@@ -1569,7 +1579,7 @@ const Learn = (() => {
   function startExam() {
     const ids = buildPaper(ui.examLevel, 10);
     if (!ids.length) { toast("这个级别还没有可考的题目~", "📝"); return; }
-    ui.examPaper = { level: ui.examLevel, ids: ids, answers: {}, startedAt: Date.now() };
+    ui.examPaper = { level: ui.examLevel, ids: ids, answers: {}, codes: {}, startedAt: Date.now() };
     ui.examIndex = 0;
     ui.examDone = null;
     startExamTimer();
@@ -1577,16 +1587,29 @@ const Learn = (() => {
     toast("📝 开始考试！做完一题点一次「批改这题」", "🚀");
   }
 
+  // 考试中途离开一道题（下一题 / 点题号 / 交卷前）时，把它写的代码收进试卷里
+  function saveExamCode() {
+    const st = ui.examPaper;
+    if (!st || !cur || cur.kind !== "exam" || !cur.id) return;
+    st.codes = st.codes || {};
+    st.codes[cur.id] = currentEditorCode();
+  }
+
   function loadExamQuestion() {
     const st = ui.examPaper;
     if (!st) return;
+    saveExamCode();                       // ← 关键：换题前先把上一题写的存下来
     const id = st.ids[ui.examIndex];
     flushDraft();
     cur = { kind: "exam", id: id };
     const ex = bank().find(e => e.id === id);
-    CodeEditor.setValue(starterCode(ex));
+    st.codes = st.codes || {};
+    // 回来时优先恢复自己写过的版本，没有再给起始模板（以前这里每次都重置，孩子翻回去答案就没了）
+    const saved = st.codes[id];
+    CodeEditor.setValue(typeof saved === "string" ? saved : starterCode(ex));
     judgeResult = null;
     hideLessonHost();
+    applyLayout();
     renderPanel();
     renderActionBar();
     updateTaskBar();
@@ -1600,6 +1623,7 @@ const Learn = (() => {
     if (!ex) return;
     const code = currentEditorCode();
     if (!code.trim()) { toast("先写点代码再来批改吧~", "📝"); return; }
+    saveExamCode();
     busy = true;
     setStatus("⏳ 正在批改…");
     const res = await runTests(code, ex.tests || []);
@@ -1616,6 +1640,7 @@ const Learn = (() => {
   function submitExam() {
     const st = ui.examPaper;
     if (!st) return;
+    saveExamCode();
     const right = Object.values(st.answers).filter(a => a.pass).length;
     const score = Math.round(right / st.ids.length * 100);
     const wrong = st.ids.filter(id => !(st.answers[id] && st.answers[id].pass));
@@ -1987,6 +2012,14 @@ const Learn = (() => {
   // ================= 给 app.js 用的钩子 =================
   function noteEditorChange(code) {
     if (!isActive() || !cur) return;
+    // 考试里写的代码只存进试卷，绝不能覆盖这道题平时的学习草稿
+    if (cur.kind === "exam") {
+      if (ui.examPaper) {
+        ui.examPaper.codes = ui.examPaper.codes || {};
+        ui.examPaper.codes[cur.id] = String(code === null || code === undefined ? "" : code).slice(0, DRAFT_MAX_CODE);
+      }
+      return;
+    }
     setDraft(cur.id, code);
   }
 
