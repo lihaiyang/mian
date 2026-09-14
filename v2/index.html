@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="VopFCYm2zzjFaqAyFj5WMd">
+<head data-page-node-id="cYsTQjkLpvcApqcr2sNMyU">
+  <meta charset="UTF-8" data-page-node-id="TkE7gLQD1Zcr05fErUHfCM">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="PzT9fFf31GOZZ40q2GI9qG">
+  <title>萌码 Python - 奇幻编程工坊</title>
+  <link rel="icon" href="data:,">
+  
+  <!-- CodeMirror 核心与 Python 语法高亮样式 -->
+  <link rel="stylesheet" href="/vendor/codemirror/codemirror.min.css" data-page-node-id="F6m5S0eWVsUeraOTNQriYe">
+  <link rel="stylesheet" href="/vendor/codemirror/show-hint.min.css">
+  
+  <!-- 全局自定义少儿样式 -->
+  <link rel="stylesheet" href="css/style.css?v=20260914a" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
+</head>
+<body data-page-node-id="MABBDhhrP5uEOfEzmMJlsw">
+
+  <!-- ================= 顶部导航与控制栏 ================= -->
+  <header class="app-header" data-page-node-id="QBborKtDQEFyecJYM4Kvfl">
+    <div class="brand-section" data-page-node-id="07ly9LXeqeI2svdJJKlCAZ">
+      <div class="brand-logo-wrap" title="点击探索更多" data-page-node-id="6JMoVfCLjCEiocGolK3pAc">
+        <span data-page-node-id="aWoi3eL2wjScEBbekdGp76">🐼</span>
+      </div>
+      <div data-page-node-id="fSH5emo0kLuxiIUkfWlEoe">
+        <h1 class="brand-title" data-page-node-id="0UVLh29it8vUMJYHEPDGcT">
+          萌码 Python <span class="brand-badge" data-page-node-id="GasbrTJEoztHjYKUvNeyhv">少儿探索版</span>
+        </h1>
+      </div>
+    </div>
+
+    <!-- 核心运行与主要操作 -->
+    <div class="header-actions" data-page-node-id="2E5QH4EX70tCF0wSaRFhpI">
+      <!-- 当前小朋友：头像 + 昵称 + 云同步状态（点开云同步面板） -->
+      <button class="header-btn user-chip" id="btnUserChip" title="云同步 / 我的档案">
+        <span class="user-avatar" id="userAvatar">🐼</span>
+        <span class="user-name" id="userName">小朋友</span>
+        <span class="cloud-dot" id="cloudDot">☁️</span>
+      </button>
+
+      <!-- 引擎状态小药丸 -->
+      <div class="engine-status-pill" id="engineStatusPill" title="基于 WebAssembly 的完整 Python 3 引擎" data-page-node-id="e5VYOvrETS4CQjE2YDQpU2">
+        <span class="status-dot loading" id="statusDot" data-page-node-id="CdKCpnLEI76036Kv5bckhp"></span>
+        <span id="statusText" data-page-node-id="tyni87kGQ4mvx6hGjBH9r1">魔法引擎加载中...</span>
+      </div>
+
+      <!-- 学习中心：教程 / 示例 / 练习 / 模拟考，一键进入 -->
+      <button class="header-btn learn-top-btn" id="btnOpenLearnTop" title="打开学习中心：跟着教程学、做练习、模拟考">
+        <span>🎓</span>
+        <span>学习中心</span>
+      </button>
+
+      <!-- 示例库重置 -->
+      <button class="header-btn" id="btnResetDemos" title="恢复所有好玩的初始示例代码" data-page-node-id="98KQCKeXC37G73yST2L2YO">
+        <span data-page-node-id="lVHTuDGxYeBRsQwWM8oe5G">🎁</span>
+        <span data-page-node-id="2gVHTI6TQbOSrHzu2YnxIk">趣味宝库</span>
+      </button>
+
+      <!-- 主题切换 -->
+      <button class="header-btn" id="btnToggleTheme" title="切换白天/星空夜景模式" data-page-node-id="iQBGfUGH19lan2SY2EgMTQ">
+        <span id="themeIcon" data-page-node-id="QsA4yp2TkYhFaIhcDS2hi8">🌙</span>
+      </button>
+
+      <!-- 运行 / 停止 / 清空按钮已移到右侧「运行舞台」面板上方（见 .run-bar），贴近输出结果 -->
+    </div>
+  </header>
+
+  <!-- ================= 学堂模式：顶部标签条（只在学堂模式显示，上面的顶栏保持原样） ================= -->
+  <div class="learn-bar" id="learnBar">
+    <div class="learn-bar-tabs" id="learnTabs">
+      <button class="learn-tab active" data-tab="path">🗺️ 学习地图</button>
+      <button class="learn-tab" data-tab="lesson">📚 教程</button>
+      <button class="learn-tab" data-tab="example">🎁 示例</button>
+      <button class="learn-tab" data-tab="exercise">✏️ 练习</button>
+      <button class="learn-tab" data-tab="exam">📝 模拟考</button>
+      <button class="learn-tab" data-tab="award">🏆 成就</button>
+    </div>
+    <div class="learn-bar-hud" id="learnHud"></div>
+    <button class="learn-exit-btn" id="btnLearnExit" title="回到创作工坊（学习进度和草稿都会保留）">⏸ 回到工坊</button>
+  </div>
+
+  <!-- ================= 主工作区三栏布局 ================= -->
+  <main class="app-workspace" data-page-node-id="0EIP2qBStjSEMGA4P9cf8v">
+
+    <!-- 0. 学堂模式的左栏：学习地图 / 教程 / 示例 / 题目卡（工坊模式下不显示） -->
+    <aside class="workspace-panel learn-panel" id="learnPanel">
+      <div class="learn-panel-body" id="learnBody"></div>
+    </aside>
+
+    <!-- 1. 左侧：文件树与积木代码栏 -->
+    <aside class="workspace-panel filetree-panel" data-page-node-id="fbabFUzmDy81AUl19ERHKb">
+      <div class="panel-header" data-page-node-id="EDkarB9o3VoryfmsU0PPCU">
+        <div class="panel-title" data-page-node-id="sDwZgfCOHt4aBJjQVPrHEo">
+          <span class="title-icon" data-page-node-id="3QqQuO1Ippr41ZGtPBBYvP">📂</span>
+          <span data-page-node-id="rCZylthUnWctzWjkQl0uR6">代码宝箱</span>
+        </div>
+        <div class="panel-tools" data-page-node-id="rP8l99yI16iWzsRoZi7569">
+          <button class="icon-btn file-tool-btn" id="btnNewFile" title="新建 Python 文件" data-page-node-id="br9CpLxXrjeQ6G1zZGsaSH"><span class="tool-ico">➕</span><span class="tool-label">新建</span></button>
+          <button class="icon-btn file-tool-btn" id="btnNewFolder" title="新建文件夹（把作品分门别类）"><span class="tool-ico">📁</span><span class="tool-label">文件夹</span></button>
+          <button class="icon-btn file-tool-btn" id="btnImportFile" title="导入电脑里的 .py 文件"><span class="tool-ico">📂</span><span class="tool-label">导入</span></button>
+          <button class="icon-btn file-tool-btn" id="btnExportZip" title="下载当前文件到电脑 (.py)" data-page-node-id="u10TZGXuTENGTp7Y1zHBbl"><span class="tool-ico">⬇️</span><span class="tool-label">下载</span></button>
+          <button class="icon-btn file-tool-btn" id="btnExportAll" title="打包下载全部作品 (zip)"><span class="tool-ico">📦</span><span class="tool-label">打包</span></button>
+          <button class="icon-btn file-tool-btn" id="btnShareCode" title="生成分享链接，发给同学或老师"><span class="tool-ico">🔗</span><span class="tool-label">分享</span></button>
+          <input type="file" id="fileImportInput" accept=".py,.txt" style="display:none">
+        </div>
+      </div>
+
+      <!-- 文件列表 -->
+      <div class="file-tree-container" data-page-node-id="z9QYTlkeBxB2Lckz0xgvj3">
+        <div class="file-section-label" data-page-node-id="IxHhBB4dsPGwV5S3w5iz8D">
+          <span data-page-node-id="TxSV5ReXVMJUCFfywc1Kn8">我的作品库</span>
+          <span id="fileCountBadge" style="font-size:10px; background:#E2E8F0; padding:1px 6px; border-radius:10px;" data-page-node-id="LoAqfbqTr898AWHWQ1ocsU">5个文件</span>
+        </div>
+        <div id="fileList" class="file-list" data-page-node-id="oFx1XnTgyyGB1PzOMrzwNn">
+          <!-- 动态渲染文件列表 -->
+        </div>
+      </div>
+
+      </aside>
+
+    <!-- 2. 中间：代码编辑器 -->
+    <section class="workspace-panel editor-panel" data-page-node-id="DtdgelaInDm5rXAV3bkLFr">
+      <!-- 顶部文件标签栏 -->
+      <!-- 学堂模式：正在学什么 / 正在做哪一题（工坊模式下隐藏） -->
+      <div class="learn-task-bar" id="learnTaskBar">
+        <span class="learn-task-crumb" id="learnTaskCrumb">✏️ 练习</span>
+        <span class="learn-task-progress" id="learnTaskProgress"></span>
+        <button class="learn-mini-btn" id="btnLearnSaveToLib" title="把这段代码存进「我的作品库」">📌 存进作品库</button>
+      </div>
+
+      <div class="editor-tabs-bar" data-page-node-id="obdF8mTs2l523HROhzQ6yI">
+        <div class="editor-tabs-list" id="editorTabsList" data-page-node-id="emzM7mGJQgBEMOJzggaXuw">
+          <!-- 动态渲染标签 -->
+        </div>
+
+        <!-- 标签批量关闭（只关标签，不会删文件） -->
+        <div class="editor-tabs-actions">
+          <button class="tab-action-btn" id="btnCloseOtherTabs" title="关闭其他标签（文件不会被删掉）">✕ 其他</button>
+          <button class="tab-action-btn" id="btnCloseAllTabs" title="关闭全部标签（文件不会被删掉）">✕ 全部</button>
+        </div>
+
+      </div>
+
+      <!-- 代码工具行：贴紧编辑器，专门服务「改代码」——标点体检 / 单步 / 上次成功 / 字号 -->
+      <div class="editor-tool-bar" id="editorToolBar">
+        <button class="magic-fix-btn" id="btnFixPunctuation" title="自动把中文引号、括号、冒号改成 Python 能认识的符号！">
+          <span>🩺</span>
+          <span>标点体检</span>
+        </button>
+        <button class="magic-fix-btn" id="btnStepMode" title="单步模式：一行一行运行，看清楚每一步">🐾 单步</button>
+        <button class="magic-fix-btn" id="btnSnapshot" title="回到上一次成功运行时的代码">⏪ 上次成功</button>
+        <div class="tool-spacer"></div>
+        <button class="icon-btn" id="btnZoomOut" title="缩小字体（Ctrl 和 - 一起按）" data-page-node-id="KCBTwDtfL5eC0xnVVPdazf">A-</button>
+        <button class="icon-btn" id="btnZoomIn" title="放大字体（Ctrl 和 = 一起按）" data-page-node-id="TjCRKKfbLb61zyC3EUfXhl">A+</button>
+        <button class="icon-btn" id="btnBigFont" title="护眼大字号模式（一键切换）">🔤</button>
+      </div>
+
+      <!-- 常用魔法积木栏（移到编辑器上方，更方便孩子点击） -->
+      <div class="snippets-bar" id="snippetsBar">
+        <div class="snippets-bar-header">
+          <span>🧩 魔法积木</span>
+          <button class="snippets-bar-toggle" id="snippetsToggle" title="收起/展开积木">▲</button>
+        </div>
+        <div class="snippet-chip-list" id="snippetsBarList">
+          <button class="snippet-chip" data-code="print(&quot;你好，世界！🌟&quot;)">📢 打印输出</button>
+          <button class="snippet-chip" data-code="name = input(&quot;你叫什么名字呀？&quot;)">❓ 提问回答</button>
+          <button class="snippet-chip" data-code="for i in range(5):&#10;    print(&quot;跑第&quot;, i + 1, &quot;圈&quot;)">🔄 重复5次</button>
+          <button class="snippet-chip" data-code="score = 85&#10;if score >= 60:&#10;    print(&quot;太棒啦！🎉&quot;)&#10;else:&#10;    print(&quot;继续加油哦！💪&quot;)">⚖️ 如果判断</button>
+          <button class="snippet-chip" data-code="import random&#10;lucky = random.randint(1, 100)">🎲 随机幸运数</button>
+          <button class="snippet-chip" data-code="import turtle&#10;t = turtle.Turtle()&#10;t.forward(100)&#10;t.right(90)">🐢 海龟前进转弯</button>
+          <button class="snippet-chip" data-code="t.color(&quot;coral&quot;)&#10;t.pensize(5)&#10;t.circle(60)">🎨 海龟画彩色圆</button>
+          <button class="snippet-chip" data-code="import turtle&#10;t = turtle.Turtle()&#10;t.speed(6)&#10;t.pensize(3)&#10;&#10;t.color(&quot;#EF4444&quot;)&#10;for i in range(4):&#10;    t.forward(100)&#10;    t.right(90)&#10;" title="完整可跑的海龟模板">🐢 海龟模板</button>
+          <button class="snippet-chip" data-code="name = input(&quot;你叫什么名字？&quot;)&#10;age = input(&quot;你几岁啦？&quot;)&#10;print(&quot;你好&quot;, name, &quot;！你今年&quot;, age, &quot;岁&quot;)" title="完整可跑的问答模板">💬 问答模板</button>
+          <button class="snippet-chip" data-code="numbers = [3, 7, 1, 9, 5]&#10;print(&quot;最大&quot;, max(numbers))&#10;print(&quot;最小&quot;, min(numbers))&#10;print(&quot;总和&quot;, sum(numbers))" title="列表与统计">🔢 列表统计</button>
+        </div>
+      </div>
+
+      <!-- 编辑器容器 -->
+      <div class="editor-body-wrapper" data-page-node-id="dUqFkFn2nU7M7tErGrfj9z">
+        <textarea id="codeEditorArea"></textarea>
+      </div>
+
+      <!-- 编辑器底部信息 -->
+      <!-- 学堂模式：贴手的操作条（工坊模式下隐藏） -->
+      <div class="learn-action-bar" id="learnActionBar">
+        <!-- 按钮由 js/learn.js 按当前内容（练习/教程/示例/模拟考）动态生成 -->
+        <span class="learn-act-status" id="learnActStatus"></span>
+      </div>
+
+      <div class="editor-status-bar" data-page-node-id="rLk2gQ0xaHwmkTlDqPJa0P">
+        <div data-page-node-id="avFBgqfA4WQXOjvuml7wAh">
+          <span id="cursorPos" data-page-node-id="lfV81yl2ZWPYm3GstXWS8F">第 1 行, 第 1 列</span> | 
+          <span id="charCount" data-page-node-id="bhDmgiebZ4Nee55eu8FmkY">0 个字符</span>
+        </div>
+        <div data-page-node-id="PqORSz2W4q9omhN7E3dCKo">
+          <span id="autoSaveIndicator" class="auto-save-indicator">💾 已自动保存</span>
+          <span data-page-node-id="m2SQGapFMflIVc0L6HE8GS">🐍 Python 3.12 语法</span> | 
+          <span data-page-node-id="75x0EmUWFSEb3Hh3z0I6cX">Tab = 4 空格</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. 右侧：运行控制台与海龟画图视窗 -->
+    <section class="workspace-panel output-panel" data-page-node-id="B2Z0qkPyaOFqlGzW2FBt0S">
+      <div class="panel-header" data-page-node-id="J6ZDKVCUEqoFrO8XlA8evW">
+        <div class="panel-title" data-page-node-id="T5E8OKH1O3hhStrfZgJfpg">
+          <span class="title-icon" data-page-node-id="HfdBWDc95OJ55DohZbjHBy">✨</span>
+          <span data-page-node-id="2UqDudjrkK4MB4ZyxSoxbr">运行舞台</span>
+        </div>
+
+        <!-- 终端与海龟画板切换标签 -->
+        <div class="output-tabs" data-page-node-id="dDHmnwsFaxh7nJXmP6Jxxc">
+          <button class="output-tab-btn active" id="tabBtnConsole" data-page-node-id="sPmAcZjFWsBoVUWy0jqCk1">
+            <span data-page-node-id="UgGMhzRl5pjcL9aSg1GKdA">🖥️ 控制台</span>
+          </button>
+          <button class="output-tab-btn" id="tabBtnTurtle" data-page-node-id="wYybYBlunUJMuCMO5Zc2JV">
+            <span data-page-node-id="kOasgWFNNUSlA5FhaLeL2p">🐢 海龟画布</span>
+          </button>
+          <button class="output-tab-btn learn-only" id="tabBtnJudge" title="看看这一题批改得怎么样">
+            <span>📝 批改</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- 运行控制条：运行 / 停止 / 清空输出（就在输出面板上方，点完马上看结果） -->
+      <div class="run-bar" id="runBar">
+        <button class="btn-run-magic" id="btnRunCode" title="运行你的 Python 代码 (快捷键: Ctrl+Enter)">
+          <span class="run-icon">🚀</span>
+          <span id="runBtnLabel">运行代码</span>
+        </button>
+        <button class="btn-stop-magic" id="btnStopCode" title="停止运行（中断死循环）" aria-label="停止运行" disabled>
+          <span>⏹</span>
+          <span>停止</span>
+        </button>
+        <button class="icon-btn" id="btnToggleSystem" title="隐藏平台提示，只看程序输出">🙈</button>
+        <button class="icon-btn" id="btnClearOutput" title="清空输出内容">🧹</button>
+      </div>
+
+      <!-- 3.1 视图 A：控制台终端 -->
+      <div class="console-view" id="consoleView" data-page-node-id="cHLtP2OH184hyWt9S72wf0">
+        <div class="terminal-logs" id="terminalLogs" aria-live="polite" aria-label="运行输出" data-page-node-id="0nzvzAuHMqYrGcKEdCCuoJ">
+          <div class="term-line system" data-page-node-id="unSZEUOqqzycZdNHNBPHI1">🌟 欢迎来到萌码 Python 奇幻工坊！</div>
+          <div class="term-line system" data-page-node-id="T3p1EDdd7HIp6ZQsknYRUt">💡 点击本面板上方的绿色「🚀 运行代码」按钮，见证奇迹发生吧！</div>
+        </div>
+        <!-- 单步调试控制条（打开单步模式后出现） -->
+        <div class="step-bar" id="stepBar" style="display:none;">
+          <span class="step-hint" id="stepHint">🐾 单步模式准备中…</span>
+          <button class="header-btn" id="btnStepNext" title="执行下一行">下一步 ▶</button>
+          <button class="header-btn" id="btnStepRun" title="不再逐行暂停，直接跑完">一路跑完 ⏭</button>
+        </div>
+
+        <!-- 终端输入行（模拟命令行输入） -->
+        <div class="terminal-input-line" id="terminalInputLine" style="display:none;">
+          <span class="terminal-prompt">❯</span>
+          <input type="text" class="terminal-input" id="terminalInput" placeholder="在这里输入..." autocomplete="off" spellcheck="false" maxlength="128">
+        </div>
+      </div>
+
+      <!-- 3.2 视图 B：海龟绘图视窗 (Turtle Graphics) -->
+      <div class="turtle-view" id="turtleView" data-page-node-id="JUmIP6Cn8yqBJp7kcAw3s8">
+        <div class="turtle-canvas-container" id="turtleContainer" data-page-node-id="OzkJxSRkoTGtqP2gplqmSH">
+          <div class="turtle-stage" id="turtleStage" data-page-node-id="opwcoScotRe1K3KD12ktjB">
+            <canvas id="turtleCanvas" width="500" height="500" data-page-node-id="PvVylnVAb2PpDmMJSljcBl"></canvas>
+            <!-- 动态海龟指针 -->
+            <div class="turtle-sprite" id="turtleSprite" data-page-node-id="fjjdTLOZHj7lgJx1V2JjEH">
+              <svg viewBox="0 0 100 100" width="100%" height="100%" data-page-node-id="7HTTEEDsw9BV86aEKkhYOB">
+                <!-- 卡通可爱小海龟矢量图 -->
+                <ellipse cx="50" cy="50" rx="30" ry="24" fill="#34D399" stroke="#059669" stroke-width="4" data-page-node-id="QMmDoPOKZYCBeTCNR38NPD"/>
+                <ellipse cx="50" cy="50" rx="20" ry="15" fill="#10B981" data-page-node-id="dxXCHNkOPE7DB1InhQCagg"/>
+                <!-- 龟壳花纹 -->
+                <polygon points="50,38 58,45 58,55 50,62 42,55 42,45" fill="#047857" data-page-node-id="eXTVpo07xmQ1o0zyIXsVDo"/>
+                <!-- 海龟头部（朝向右侧0度/前方） -->
+                <circle cx="82" cy="50" r="12" fill="#34D399" stroke="#059669" stroke-width="3" data-page-node-id="VOeo42mokWmundWx2A1aeY"/>
+                <!-- 眼睛 -->
+                <circle cx="86" cy="46" r="3" fill="#1E293B" data-page-node-id="tZ7Udn5mvz9mXPRrGlINVM"/>
+                <circle cx="86" cy="54" r="3" fill="#1E293B" data-page-node-id="3CoEq1Cfh5NOgIJzS8OPLC"/>
+                <circle cx="87" cy="45" r="1" fill="#FFFFFF" data-page-node-id="Z0NROEKS92iGnCBG2xM5JN"/>
+                <circle cx="87" cy="53" r="1" fill="#FFFFFF" data-page-node-id="oD4FT361IdIBGhV1A2KHFg"/>
+                <!-- 四只小脚 -->
+                <ellipse cx="32" cy="24" rx="8" ry="6" fill="#34D399" stroke="#059669" stroke-width="2" data-page-node-id="D4ZNUmvelDRKBwBrE06fAr"/>
+                <ellipse cx="68" cy="24" rx="8" ry="6" fill="#34D399" stroke="#059669" stroke-width="2" data-page-node-id="5bC42bPynSiI9UgUCxCJUM"/>
+                <ellipse cx="32" cy="76" rx="8" ry="6" fill="#34D399" stroke="#059669" stroke-width="2" data-page-node-id="fMZQYmsuuPIYTT6iiZM98q"/>
+                <ellipse cx="68" cy="76" rx="8" ry="6" fill="#34D399" stroke="#059669" stroke-width="2" data-page-node-id="08tb7SMecWabIgBxA4BBay"/>
+                <!-- 小尾巴 -->
+                <polygon points="18,50 10,47 10,53" fill="#34D399" data-page-node-id="7zfQWWOmpdKl9w9svgEe3t"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- 海龟工具栏 -->
+        <div class="turtle-toolbar" data-page-node-id="EM6Fj3Z5RFICIfYNbXCrZa">
+          <div class="turtle-speed-control" data-page-node-id="HXDUThDwAVJtubhUyWprYd">
+            <span data-page-node-id="fHNDA2HfaKcEncuFNYA1JY">🐢 绘制速度:</span>
+            <input type="range" id="turtleSpeedRange" min="1" max="10" value="7" data-page-node-id="4X2Y2bdyj1ucIHnJFn7Uuf">
+            <span id="speedLabel" style="font-weight:700; color:var(--primary);" data-page-node-id="6IPStq5wtimEbCSnlAB1dL">快速</span>
+          </div>
+          <button class="header-btn" id="btnDownloadDrawing" style="height:28px; padding:0 10px; font-size:11px;" data-page-node-id="n5VuFMHDxW6qBrNOXCc4Hc">
+            <span data-page-node-id="BEMBF2G507qI2XuogzEVVM">📸 保存画作</span>
+          </button>
+          <button class="header-btn" id="btnMakePoster" title="把作品名、画作和代码合成一张分享卡片" style="height:28px; padding:0 10px; font-size:11px;">
+            <span>🖼️ 作品卡</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3.3 视图 C：批改结果（学堂模式用） -->
+      <div class="judge-view" id="judgeView">
+        <div class="judge-body" id="judgeBody"></div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ================= 弹窗：新建文件 / 重命名 ================= -->
+  <div class="modal-overlay" id="fileModal" data-page-node-id="jO3K1ciClRJGqJ2o3QfhKC">
+    <div class="modal-card" data-page-node-id="9uGzmBchFtozXKBSUsK9Rv">
+      <div class="modal-title" id="fileModalTitle" data-page-node-id="bHCD1CmV9UF4aWJGoDtHXN">
+        <span data-page-node-id="ZvYm9teHBL2TiBF5iGAio7">✨ 新建 Python 代码文件</span>
+      </div>
+      <div class="modal-desc" id="fileModalDesc" data-page-node-id="ZwuBGOxHzbaAyDGRmBOxaW">给你的代码起一个酷酷的名字吧（建议以 .py 结尾）</div>
+      <input type="text" class="modal-input" id="fileModalInput" placeholder="例如：my_game.py" value="" data-page-node-id="tfe9zlOm5bx1HySmJbAXTW">
+      <div class="modal-footer" data-page-node-id="T30WN4Uc9IRDtb1DQaKd1e">
+        <button class="header-btn" id="btnCancelModal" data-page-node-id="9P5mG8Op8MwFKNRBRu2T9s">取消</button>
+        <button class="btn-run-magic" id="btnConfirmModal" style="padding:6px 18px; font-size:13px;" data-page-node-id="O6VoLAddb384rjWCcVnSv2">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 自定义确认弹窗（替代浏览器原生 confirm） ================= -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-card" style="max-width: 400px;">
+      <div class="modal-title" id="confirmModalTitle">
+        <span>⚠️ 确认操作</span>
+      </div>
+      <div class="modal-desc" id="confirmModalDesc" style="font-size: 14px; line-height: 1.6;"></div>
+      <div class="modal-footer">
+        <button class="header-btn" id="btnConfirmCancel">取消</button>
+        <button class="btn-run-magic" id="btnConfirmOk" style="padding:6px 18px; font-size:13px; background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 弹窗：趣味宝库（分类示例库） ================= -->
+  <div class="modal-overlay" id="galleryModal">
+    <div class="modal-card gallery-card">
+      <div class="modal-title">
+        <span>🎁 趣味宝库</span>
+      </div>
+      <div class="modal-desc">挑一个喜欢的作品点开就能玩，<b>不会弄丢你自己的代码</b>。想让宝库重新装满，用下面的「恢复初始示例」。</div>
+      <div class="gallery-tabs" id="galleryTabs"></div>
+      <div class="gallery-list" id="galleryList"></div>
+      <div class="modal-footer">
+        <button class="header-btn" id="btnGalleryReset" title="用初始示例替换当前所有文件（会先确认）">♻️ 恢复初始示例</button>
+        <button class="btn-run-magic" id="btnGalleryClose" style="padding:6px 18px; font-size:13px;">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 弹窗：我的档案（成长 + 云同步 + 分享，一个入口） ================= -->
+  <div class="modal-overlay" id="myPanel">
+    <div class="modal-card my-panel-card">
+      <div class="my-panel-head">
+        <span class="my-panel-avatar" id="panelAvatar">🐼</span>
+        <span class="my-panel-name" id="panelName">小朋友</span>
+        <span class="cloud-dot" id="panelCloudDot" title="云同步状态">☁️</span>
+      </div>
+      <div class="my-panel-tabs" id="myPanelTabs">
+        <button class="my-tab active" data-tab="profile">👤 成长</button>
+        <button class="my-tab" data-tab="cloud">☁️ 云同步</button>
+        <button class="my-tab" data-tab="share">🔗 分享</button>
+      </div>
+      <div class="my-panel-body">
+        <div class="my-pane active" id="paneProfile">
+          <div class="profile-row" id="profileRow"></div>
+          <div class="profile-editor" id="profileEditor" style="display:none;">
+            <input type="text" class="modal-input" id="profileNameInput" placeholder="小伙伴的名字（最多 12 个字）" maxlength="12">
+            <div class="profile-emoji-row" id="profileEmojiRow"></div>
+            <div class="profile-editor-actions">
+              <button class="header-btn" id="btnProfileCancel">取消</button>
+              <button class="btn-run-magic" id="btnProfileSave" style="padding:6px 16px; font-size:13px;">保存</button>
+            </div>
+          </div>
+
+          <!-- 等级与经验 -->
+          <div class="level-card" id="levelCard"></div>
+
+          <!-- 学习中心入口 -->
+          <button class="learn-entry-btn" id="btnOpenLearn">
+            <span class="learn-entry-emoji">🎓</span>
+            <span class="learn-entry-text">
+              <span class="learn-entry-title">进入学习中心</span>
+              <span class="learn-entry-sub">教程 · 示例 · 练习题 · 模拟考 · 奖牌，全都在这儿</span>
+            </span>
+            <span class="learn-entry-go">▶</span>
+          </button>
+
+          <!-- 今日任务 -->
+          <div class="daily-box" id="dailyBox"></div>
+
+          <div class="progress-stats" id="progressStats"></div>
+          <div class="progress-section-title"><span>🎯 闯关任务</span><span class="progress-section-count" id="missionProgress"></span></div>
+          <div class="mission-list" id="missionList"></div>
+          <div class="progress-section-title"><span>🥇 奖牌墙</span></div>
+          <div class="medal-list" id="medalList"></div>
+          <div class="progress-section-title"><span>🏅 成就徽章</span></div>
+          <div class="badge-list-wrap" id="badgeList"></div>
+          <div class="modal-footer">
+            <button class="header-btn" id="btnNewProfile">➕ 新伙伴</button>
+            <button class="header-btn" id="btnEditProfile">✏️ 改名字</button>
+          </div>
+        </div>
+        <div class="my-pane" id="paneCloud"><div id="cloudBody"></div></div>
+        <div class="my-pane" id="paneShare"><div id="shareBody"></div></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-run-magic" id="myPanelClose" style="padding:6px 18px; font-size:13px;">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 炫彩通知小泡泡 ================= -->
+  <div class="toast-box" id="toastBox" data-page-node-id="6qIoeipxlRgpMlcnI9x99W">
+    <span id="toastIcon" data-page-node-id="daRqEznTKjdg1aIar9ic3v">🎉</span>
+    <span id="toastMsg" data-page-node-id="TlIbvDcezXESlTgQegjaQE">操作成功！</span>
+  </div>
+
+  <!-- ================= 第三方依赖库 ================= -->
+  <!-- CodeMirror 核心脚本与组件 -->
+  <script src="/vendor/codemirror/codemirror.min.js"></script>
+  <script src="/vendor/codemirror/python.min.js"></script>
+  <script src="/vendor/codemirror/closebrackets.min.js"></script>
+  <script src="/vendor/codemirror/matchbrackets.min.js"></script>
+  <script src="/vendor/codemirror/show-hint.min.js"></script>
+  <!-- 五彩纸屑庆祝特效 -->
+  <script src="/vendor/confetti.min.js"></script>
+
+  <!-- ================= 自定义业务脚本模块 ================= -->
+  <script src="js/audio-confetti.js?v=20260914a"></script>
+  <script src="js/examples.js?v=20260914a"></script>
+  <script src="js/turtle-canvas.js?v=20260914a"></script>
+  <script src="js/zip-writer.js?v=20260914a"></script>
+  <script src="js/poster.js?v=20260914a"></script>
+  <script src="js/python-runner.js?v=20260914a"></script>
+  <script src="js/editor.js?v=20260914a"></script>
+  <script src="js/file-tree.js?v=20260914a"></script>
+  <script src="js/progress.js?v=20260914a"></script>
+  <script src="js/cloud.js?v=20260914a"></script>
+  <script src="js/learn.js?v=20260914a"></script>
+  <script src="js/app.js?v=20260914a"></script>
+
+</body>
+</html>

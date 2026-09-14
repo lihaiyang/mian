@@ -23,3 +23,6 @@ Thumbs.db
 # Python 工具脚本产生的缓存
 __pycache__/
 *.pyc
+
+# wrangler 本地构建缓存
+.wrangler/
