@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>键盘岛 · 打字练习 · 萌学园</title>
+<meta name="description" content="给小学生的打字练习：从基准键位到编程符号，练出盲打手感和速度。">
+<meta name="theme-color" content="#F7EFE0">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%8C%A8%EF%B8%8F%3C/text%3E%3C/svg%3E">
+
+<!-- 平台层样式（全站唯一一份） -->
+<link rel="stylesheet" href="/shared/styles/tokens.css?v=c1d611fa">
+<link rel="stylesheet" href="/shared/styles/base.css?v=d7cbbc1e">
+<link rel="stylesheet" href="/shared/styles/components.css?v=cd930eb7">
+<!-- 本学科特有样式 -->
+<link rel="stylesheet" href="css/typing.css?v=2beb1304">
+
+<style>
+  /* 学科主色：只覆盖这三个变量，其余全用平台令牌 */
+  :root { --accent: #4A5568; --accent-soft: #E7EAF0; --accent-ink: #FFFFFF; }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#typingText">跳到打字区</a>
+
+<div class="page">
+
+  <header class="page-head">
+    <a class="btn ghost sm" href="/" title="回到学科大厅">← 大厅</a>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:20px" aria-hidden="true">⌨️</span>
+      <strong>键盘岛</strong>
+    </div>
+    <div style="flex:1"></div>
+    <button class="btn ghost sm" id="btnProgress">📊 我的进度</button>
+    <button class="btn ghost sm" id="btnSync">☁️ 云同步</button>
+  </header>
+
+  <main class="page-body">
+    <div class="ty-layout">
+
+      <!-- 左：阶段与关卡 -->
+      <aside class="ty-side">
+        <div class="ty-stage-head" style="padding-bottom:8px">
+          <span>练什么</span><span class="ty-stage-count" id="sideHint">按顺序来</span>
+        </div>
+        <div id="lessonList"></div>
+      </aside>
+
+      <!-- 右：打字 -->
+      <section class="ty-main">
+
+        <div class="ty-card ty-head">
+          <h2><span id="stageTitle">选一关开始</span> · <span id="lessonTitle"></span></h2>
+          <div class="ty-sub" id="lessonDesc">左边挑一关，把手指放在基准键位上（左手 asdf、右手 jkl;），眼睛看屏幕。</div>
+          <div class="ty-tip" id="lessonTip" style="display:none"></div>
+        </div>
+
+        <div class="ty-card" id="typingPanel" style="display:none">
+          <div class="ty-text" id="typingText" tabindex="0" role="textbox"
+               aria-label="打字区，直接在键盘上敲就行" aria-live="polite"></div>
+
+          <div class="ty-hud">
+            <div class="ty-hud-item"><b id="hudWpm">0</b><span>WPM 速度</span></div>
+            <div class="ty-hud-item"><b id="hudAcc">100%</b><span>准确率</span></div>
+            <div class="ty-hud-item"><b id="hudPct">0%</b><span>进度</span></div>
+            <div class="ty-progress"><i id="progressFill"></i></div>
+          </div>
+
+          <div class="ty-kbd" id="kbd" aria-hidden="true"></div>
+          <div class="ty-kbd-hint" id="kbdHint">
+            <span id="shiftHint"></span>
+            <span>用 <b id="fingerHint"></b></span>
+          </div>
+        </div>
+
+        <div class="ty-card" id="resultCard" style="display:none">
+          <div id="resultBody"></div>
+          <div class="ty-actions">
+            <button class="btn" id="btnAgain">🔁 再来一次</button>
+            <button class="btn ghost" id="btnNext">➡️ 下一关</button>
+          </div>
+        </div>
+
+      </section>
+    </div>
+  </main>
+
+  <footer class="page-foot">
+    <p>练打字就像练琴：每天 10 分钟，比一次练一小时有用得多。</p>
+  </footer>
+</div>
+
+<!-- ================= 进度弹窗 ================= -->
+<div class="modal-overlay" id="progressModal">
+  <div class="modal-card" style="max-width:560px;max-height:82vh;overflow:auto">
+    <div class="modal-title"><span>📊 我的进度</span></div>
+
+    <div class="ty-pf-level">
+      <div>
+        <b id="pfLevel">Lv.1</b>
+        <div class="muted" id="pfTitle">初来乍到</div>
+      </div>
+      <div class="ty-pf-bar"><i id="pfBar"></i></div>
+      <div class="muted" style="font-size:12px"><span id="pfXp"></span> XP</div>
+    </div>
+
+    <div class="muted" style="margin-top:10px;font-size:13px">
+      连续打卡 <b id="pfStreak">0</b> 天
+    </div>
+
+    <div class="ty-sec-title">📋 今日任务</div>
+    <div id="pfDaily"></div>
+
+    <div class="ty-sec-title">🎖️ 徽章 <span class="muted" id="pfBadgeCount"></span></div>
+    <div class="ty-badges" id="pfBadges"></div>
+
+    <div class="ty-sec-title">🏅 奖牌 <span class="muted" id="pfMedalCount"></span></div>
+    <div class="ty-medals" id="pfMedals"></div>
+
+    <div class="modal-footer">
+      <button class="btn ghost" data-close>关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 云同步弹窗 ================= -->
+<div class="modal-overlay" id="syncModal">
+  <div class="modal-card" style="max-width:460px">
+    <div class="modal-title"><span>☁️ 云同步</span></div>
+    <div class="modal-desc" id="syncStatus"></div>
+
+    <div id="syncLoggedOut">
+      <div class="ty-field">
+        <label for="nickInput">给自己起个名字（可不填）</label>
+        <input id="nickInput" maxlength="12" placeholder="例如：小熊猫">
+      </div>
+      <button class="btn" id="btnCreateCode" style="width:100%">🔑 生成一个同步码</button>
+
+      <div class="ty-sec-title">已经有同步码了？</div>
+      <div class="ty-field">
+        <label for="codeInput">8 位同步码</label>
+        <input id="codeInput" maxlength="12" placeholder="例如：GH3W-WUFD" autocapitalize="characters">
+      </div>
+      <div class="ty-field">
+        <label for="pinInput">PIN（设过才填）</label>
+        <input id="pinInput" maxlength="6" inputmode="numeric" placeholder="4-6 位数字，可不填">
+      </div>
+      <button class="btn ghost" id="btnLogin" style="width:100%">🔓 登录并同步</button>
+    </div>
+
+    <div id="syncLoggedIn" style="display:none">
+      <button class="btn" id="btnSyncNow" style="width:100%">🔄 立即同步</button>
+      <button class="btn ghost" id="btnLogout" style="width:100%;margin-top:8px">关闭云同步</button>
+      <p class="muted" style="font-size:12px;margin-top:10px">
+        关闭只是停止同步，本机上的进度和作品不会被删掉。
+      </p>
+    </div>
+
+    <div class="ty-msg" id="syncMsg" style="display:none"></div>
+    <div class="muted" style="font-size:12px;margin-top:10px" id="syncBusy"></div>
+
+    <div class="modal-footer">
+      <button class="btn ghost" data-close>关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 平台层 → 学科 =================
+     顺序很重要：store → progress → sync → 注册表 → 学科声明 → 内容 → 学科逻辑
+     注册表要加载，这样从大厅进来的「继续上次」才认得这一页。 -->
+<script src="/shared/core/store.js?v=873bc876"></script>
+<script src="/shared/core/progress.js?v=3e91e012"></script>
+<script src="/shared/core/sync.js?v=231ca547"></script>
+<script src="/shared/core/registry.js?v=1e82e462"></script>
+<script src="subject.js?v=4ddfca25"></script>
+<script src="data/lessons.js?v=9af62ac6"></script>
+<script src="js/typing.js?v=ac64f456"></script>
+
+</body>
+</html>

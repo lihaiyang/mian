@@ -56,12 +56,12 @@ await sleep(500);
 check("大厅标题在", (await page.textContent("h1")).includes("今天想学点什么"));
 
 const cards = await page.locator(".subject-card").count();
-check("学科卡片已渲染", cards >= 6, `共 ${cards} 张`);
+check("学科卡片已渲染", cards >= 7, `共 ${cards} 张`);
 
 // ---------------------------------------------------------------- 2. 可进入的学科
 const ready = page.locator('a.subject-card[data-subject]');
 const readyCount = await ready.count();
-check("有可进入的学科", readyCount >= 2, `${readyCount} 个`);
+check("有可进入的学科", readyCount >= 3, `${readyCount} 个`);
 
 const py = page.locator('a.subject-card[data-subject="python"]');
 check("萌码 Python 卡片在", (await py.count()) === 1);
@@ -78,19 +78,19 @@ const order = await page.evaluate(() =>
        .map(el => el.getAttribute("data-subject"))
 );
 check("可进入学科的卡片顺序 = 声明顺序",
-  order.join(",") === "python,en", `实际 ${order.join(",")}`);
+  order.join(",") === "python,en,typing", `实际 ${order.join(",")}`);
 
 const allOrder = await page.evaluate(() =>
   Array.from(document.querySelectorAll(".subject-card"))
        .map(el => el.getAttribute("data-subject") || (el.querySelector(".sc-name") || {}).textContent)
 );
 check("「敬请期待」排在可进入学科之后",
-  allOrder.slice(0, 2).join(",") === "python,en", `实际 ${allOrder.slice(0, 4).join(",")}`);
+  allOrder.slice(0, 3).join(",") === "python,en,typing", `实际 ${allOrder.slice(0, 4).join(",")}`);
 
 // ---------------------------------------------------------------- 3. 敬请期待的学科
 const soon = page.locator('.subject-card[aria-disabled="true"]');
 const soonCount = await soon.count();
-check("「敬请期待」占位卡片在", soonCount >= 4, `${soonCount} 个`);
+check("「敬请期待」占位卡片在", soonCount >= 3, `${soonCount} 个`);
 check("占位卡片不是链接（点了不会进空白页）",
   (await page.locator('a.subject-card[aria-disabled="true"]').count()) === 0);
 

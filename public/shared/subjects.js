@@ -13,7 +13,8 @@
 window.MIAN_SUBJECTS = {
   manifests: [
     "/python/subject.js",
-    "/en/subject.js"
+    "/en/subject.js",
+    "/typing/subject.js"
   ],
 
   planned: [
@@ -22,12 +23,6 @@ window.MIAN_SUBJECTS = {
       tagline: "口算、竖式、应用题、图形 —— 把算术练成直觉",
       accent: "#2E9E8F", accentSoft: "#DFF3EF",
       grades: [1, 2, 3, 4, 5, 6]
-    },
-    {
-      id: "typing", name: "键盘岛", emoji: "⌨️",
-      tagline: "从盲打指法到编程符号，练出手感和速度",
-      accent: "#4A5568", accentSoft: "#E7EAF0",
-      grades: [2, 3, 4, 5, 6]
     },
     {
       id: "pinyin", name: "拼音岛", emoji: "🅰️",

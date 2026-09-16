@@ -10,9 +10,9 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%92%3C/text%3E%3C/svg%3E">
 
 <!-- 平台层样式：全站唯一一份，学科只覆盖 --accent 三个变量 -->
-<link rel="stylesheet" href="/shared/styles/tokens.css">
-<link rel="stylesheet" href="/shared/styles/base.css">
-<link rel="stylesheet" href="/shared/styles/components.css">
+<link rel="stylesheet" href="/shared/styles/tokens.css?v=c1d611fa">
+<link rel="stylesheet" href="/shared/styles/base.css?v=d7cbbc1e">
+<link rel="stylesheet" href="/shared/styles/components.css?v=cd930eb7">
 </head>
 <body>
 
@@ -59,9 +59,13 @@
 
 </div>
 
-<!-- 平台层：先注册表，再学科清单，最后启动 -->
-<script src="/shared/core/registry.js"></script>
-<script src="/shared/subjects.js"></script>
+<!-- 平台层：存储 → 注册表 → 学科清单 → 启动
+     存储层要先加载：学科 manifest 的 summary() 要靠它读本学科进度，
+     好在卡片上显示"经验 N"。（老站两个 manifest 读的是自己的历史键
+     codepanda_* / en_*，不走 Store，那是历史包袱，见 docs 的多学科设计。） -->
+<script src="/shared/core/store.js?v=873bc876"></script>
+<script src="/shared/core/registry.js?v=1e82e462"></script>
+<script src="/shared/subjects.js?v=a613772a"></script>
 <script>
 (function () {
   "use strict";
