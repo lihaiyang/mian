@@ -16,7 +16,8 @@ import re
 import subprocess
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 英语站站点根 = <仓库根>/public/en
+ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "public", "en")
 THEMES = ["colors", "numbers", "body", "family", "food", "animals",
           "clothes", "toys", "school", "weather", "transport", "home"]
 THEMES_ZH = {
@@ -39,7 +40,7 @@ def W(msg):
 
 def load():
     out = subprocess.run(
-        ["node", os.path.join(ROOT, "tools", "dump_data.mjs")],
+        ["node", os.path.join(os.path.dirname(os.path.abspath(__file__)), "dump_data.mjs")],
         capture_output=True, text=True,
     )
     if out.returncode != 0:

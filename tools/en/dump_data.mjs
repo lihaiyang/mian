@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// 把 en/data/*.js 里的纯数据倒成 JSON，供 check_content.py 校验。
-// 用法：node en/tools/dump_data.mjs > /tmp/en_data.json
+// 把 public/en/data/*.js 里的纯数据倒成 JSON，供 check_content.py 校验。
+// 用法：node tools/en/dump_data.mjs > /tmp/en_data.json
 import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+// 英语站站点根 = <仓库根>/public/en（本脚本在 tools/en/，不在站点根里）
+const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..", "public", "en");
 const DATA = path.join(ROOT, "data");
 
 const sandbox = {};

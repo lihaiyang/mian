@@ -17,7 +17,8 @@ import os
 import socketserver
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 静态根 = public/（网页文件都在这里；仓库根不再是网站根）
+ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "public")
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):

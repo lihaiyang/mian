@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "public")
 FILES = ["js/lessons.js", "js/lessons-adv.js"]
 
 TURTLE_STUB = '''

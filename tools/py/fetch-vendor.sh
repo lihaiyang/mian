@@ -5,7 +5,7 @@ set -euo pipefail
 
 VER=v0.26.2
 BASE="https://cdn.jsdelivr.net/pyodide/${VER}/full"
-DEST="$(cd "$(dirname "$0")/.." && pwd)/vendor/pyodide"
+DEST="$(cd "$(dirname "$0")/../.." && pwd)/public/vendor/pyodide"
 mkdir -p "$DEST"
 
 for f in pyodide.js pyodide.asm.js pyodide.asm.wasm python_stdlib.zip pyodide-lock.json; do

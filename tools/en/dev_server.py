@@ -3,15 +3,15 @@
 """dev_server.py —— 萌语岛本地预览服务器（只读静态文件，不写任何东西）。
 
 和仓库根目录 tools/dev_server.py 的区别：
-    * 默认端口 8799；静态根是**仓库根**，所以 /en/... 这类路径能直接访问
+    * 默认端口 8799；静态根是 **public/**（发布目录），所以 /en/... 这类路径能直接访问
     * 默认**不加** COOP / COEP（英语岛不需要 SharedArrayBuffer）；要加就传 --coop
     * 404 给一页友好的提示（含「你是不是想找」候选），不是干巴巴的 Not Found
 
 用法：
-    python3 en/tools/dev_server.py                # http://127.0.0.1:8799/en/
-    python3 en/tools/dev_server.py --port 9000
-    python3 en/tools/dev_server.py --coop         # 额外带上 COOP/COEP 两个响应头
-    python3 en/tools/dev_server.py --root .       # 换个静态根（默认仓库根）
+    python3 tools/en/dev_server.py                # http://127.0.0.1:8799/en/
+    python3 tools/en/dev_server.py --port 9000
+    python3 tools/en/dev_server.py --coop         # 额外带上 COOP/COEP 两个响应头
+    python3 tools/en/dev_server.py --root .       # 换个静态根（默认 public/）
 """
 
 import argparse
@@ -24,8 +24,10 @@ import socketserver
 import sys
 import urllib.parse
 
-EN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-REPO_ROOT = os.path.dirname(EN_ROOT)      # 静态根：仓库根，/en/... 才访问得到
+# 本脚本在 tools/en/；站点根是 <仓库根>/public，英语站在 <仓库根>/public/en
+PUBLIC_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "public")
+EN_ROOT = os.path.join(PUBLIC_ROOT, "en")
+REPO_ROOT = PUBLIC_ROOT                   # 静态根：public/，/en/... 才访问得到
 DEFAULT_PORT = 8799
 
 
@@ -154,7 +156,7 @@ def main(argv=None):
     ap.add_argument("--port", type=int, default=None, help="端口，默认 %d" % DEFAULT_PORT)
     ap.add_argument("--host", default="127.0.0.1", help="监听地址，默认 127.0.0.1")
     ap.add_argument("--coop", action="store_true", help="带上 COOP/COEP 响应头（默认不带）")
-    ap.add_argument("--root", default=REPO_ROOT, help="静态根目录，默认仓库根")
+    ap.add_argument("--root", default=REPO_ROOT, help="静态根目录，默认 public/")
     args = ap.parse_args(argv if argv is not None else sys.argv[1:])
 
     port = args.port or args.port_pos or DEFAULT_PORT
@@ -169,7 +171,7 @@ def main(argv=None):
         httpd = Server((args.host, port), handler)
     except OSError as e:
         print("✗ 端口 %d 用不了：%s" % (port, e), file=sys.stderr)
-        print("  换一个端口试试：python3 en/tools/dev_server.py --port %d" % (port + 1), file=sys.stderr)
+        print("  换一个端口试试：python3 tools/en/dev_server.py --port %d" % (port + 1), file=sys.stderr)
         return 2
 
     print("🐼 萌语岛本地预览")

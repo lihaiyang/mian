@@ -1,7 +1,8 @@
-# 萌码 Python —— Cloudflare Pages 配置
+# 萌码 Python + 萌语岛 —— Cloudflare Pages 配置
 name = "mian"
 compatibility_date = "2025-01-01"
-pages_build_output_dir = "."
+# 只有 public/ 会被发布；源码（tools/ docs/ db/ functions/ README）留在仓库根之外
+pages_build_output_dir = "public"
 
 # D1：匿名同步码账号 + 作品/配置
 [[d1_databases]]

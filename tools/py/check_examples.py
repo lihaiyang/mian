@@ -15,8 +15,9 @@ import subprocess
 import sys
 import tempfile
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# 默认检查 v1 的示例库；也可以指定路径，例如 python3 tools/check_examples.py v2/js/examples-lib.js
+ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "public")
+# 默认检查示例库；也可以指定相对路径，例如
+#   python3 tools/py/check_examples.py public/js/examples-lib.js
 JS = os.path.join(ROOT, sys.argv[1]) if len(sys.argv) > 1 else os.path.join(ROOT, "js", "examples-lib.js")
 
 TURTLE_STUB = '''

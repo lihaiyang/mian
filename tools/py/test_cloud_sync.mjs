@@ -16,7 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const ROOT = path.join(path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url)))), "public");
 const SRC = fs.readFileSync(path.join(ROOT, "js", "cloud.js"), "utf8");
 
 let failed = 0;

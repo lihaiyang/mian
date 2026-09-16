@@ -19,7 +19,8 @@ import argparse
 import os
 import sys
 
-EN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 英语站站点根 = <仓库根>/public/en
+EN_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "public", "en")
 FONT_EXTS = (".woff2", ".woff", ".ttf", ".otf", ".ttc")
 
 UPPER = [chr(c) for c in range(ord("A"), ord("Z") + 1)]

@@ -15,7 +15,8 @@ import os
 import subprocess
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 英语站站点根 = <仓库根>/public/en
+ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "public", "en")
 OUT = os.path.join(ROOT, "data", "minimal-pairs.js")
 
 # (词 A 的 id, 词 B 的 id, 这一对在练什么)
@@ -44,7 +45,7 @@ CURATED = [
 
 
 def load():
-    out = subprocess.run(["node", os.path.join(ROOT, "tools", "dump_data.mjs")],
+    out = subprocess.run(["node", os.path.join(os.path.dirname(os.path.abspath(__file__)), "dump_data.mjs")],
                          capture_output=True, text=True)
     if out.returncode != 0:
         print("dump_data.mjs 失败:", out.stderr[:400])

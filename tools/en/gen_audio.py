@@ -69,8 +69,8 @@ THEMES = ["colors", "numbers", "body", "family", "food", "animals",
 
 
 def en_root():
-    """en/ 模块根目录（tools/ 的上一级）。"""
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    """英语站站点根 = <仓库根>/public/en"""
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "public", "en")
 
 
 def jdump(obj):
@@ -158,7 +158,8 @@ def load_data(root, quiet=False):
     if not node:
         print("✗ 找不到 node，无法运行 tools/dump_data.mjs", file=sys.stderr)
         sys.exit(2)
-    dump = os.path.join(root, "tools", "dump_data.mjs")
+    # dump_data.mjs 与本脚本同在 tools/en/（不在站点根里）
+    dump = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dump_data.mjs")
     if not os.path.exists(dump):
         print("✗ 缺少 %s" % dump, file=sys.stderr)
         sys.exit(2)
