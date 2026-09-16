@@ -158,7 +158,7 @@ window.EN_WORDS["food"] = [
     syll: 2,
     sent: { en: "The carrot is orange and crunchy.", zh: "胡萝卜橙橙的、脆脆的。" },
     phonics: ["car", "rot"],
-    tips: "两个 r 中间夹着 /æ/，结尾读得很轻。"
+    tips: "重音在第一音节，/æ/ 在 rr 后面，结尾读得很轻。"
   },
   {
     id: "food_tomato",

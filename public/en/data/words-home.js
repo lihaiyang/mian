@@ -119,7 +119,7 @@ window.EN_WORDS["home"] = [
   },
   {
     id: "home_tv",
-    word: "tv",
+    word: "TV",
     ipa: "/ˌtiːˈviː/",
     zh: "电视",
     pos: "n.",

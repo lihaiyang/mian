@@ -238,7 +238,7 @@ window.EN_WORDS["body"] = [
     grade: 1,
     emoji: "✋",
     syll: 1,
-    sent: { en: "Please wash your hand before eating.", zh: "吃饭前请洗洗小手。" },
+    sent: { en: "Please wash your hands before eating.", zh: "吃饭前请洗洗小手。" },
     phonics: ["h", "a", "nd"],
     tips: "a 读 /æ/，和 cat 一样。"
   },

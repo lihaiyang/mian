@@ -83,7 +83,7 @@ window.EN_LETTERS = [
     lower: "i",
     name: "eye",
     sound: "/ɪ/",
-    emoji: "🍦",
+    emoji: "🐛",
     words: ["ink", "igloo", "insect"],
     zh: "墨水 / 冰屋 / 小虫"
   },
@@ -128,7 +128,7 @@ window.EN_LETTERS = [
     lower: "n",
     name: "en",
     sound: "/n/",
-    emoji: "🥜",
+    emoji: "👃",
     words: ["net", "nose", "nest"],
     zh: "网 / 鼻子 / 鸟巢"
   },
@@ -136,7 +136,7 @@ window.EN_LETTERS = [
     letter: "O",
     lower: "o",
     name: "oh",
-    sound: "/ɒ/",
+    sound: "/ɑː/",
     emoji: "🐙",
     words: ["ox", "octopus", "olive"],
     zh: "公牛 / 章鱼 / 橄榄"
@@ -218,9 +218,9 @@ window.EN_LETTERS = [
     lower: "x",
     name: "ex",
     sound: "/ks/",
-    emoji: "🎹",
-    words: ["xylophone", "xray", "xmas"],
-    zh: "木琴 / X 光片 / 圣诞节"
+    emoji: "📦",
+    words: ["box", "fox", "six"],
+    zh: "盒子 / 狐狸 / 六"
   },
   {
     letter: "Y",
@@ -228,7 +228,7 @@ window.EN_LETTERS = [
     name: "why",
     sound: "/j/",
     emoji: "🪀",
-    words: ["yak", "yoyo", "yam"],
+    words: ["yak", "yam", "yogurt"],
     zh: "牦牛 / 悠悠球 / 山药"
   },
   {
@@ -963,9 +963,9 @@ window.EN_PHONICS = [
         emoji: "❄️"
       },
       {
-        word: "cow",
-        blocks: ["c", "ow"],
-        emoji: "🐮"
+        word: "grow",
+        blocks: ["g", "r", "ow"],
+        emoji: "🌱"
       }
     ],
     tip: "先记住最常见的 /oʊ/，特殊的词单独记。"
@@ -1032,6 +1032,11 @@ window.EN_PHONICS = [
         word: "brown",
         blocks: ["b", "r", "ow", "n"],
         emoji: "🟤"
+      },
+      {
+        word: "cow",
+        blocks: ["c", "ow"],
+        emoji: "🐮"
       }
     ],
     tip: "把 /a/ 和 /ʊ/ 快速连起来就是 /aʊ/。"

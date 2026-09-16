@@ -46,12 +46,27 @@ const Stage = (() => {
   }
 
   function distractors(word, n) {
-    const pool = allWords().filter(w => w.id !== word.id && w.theme === word.theme);
-    const extra = allWords().filter(w => w.id !== word.id && w.theme !== word.theme);
-    const same = UI.shuffle(pool, "d" + word.id).slice(0, n - 1);
-    const need = n - 1 - same.length;
-    const other = need > 0 ? UI.shuffle(extra, "x" + word.id).slice(0, need) : [];
-    return same.concat(other);
+    // 干扰项的配图不能和正确答案、也不能彼此撞图 ——
+    // 撞了的话题目里会出现两张一模一样的图，孩子点哪张都可能被判错。
+    // family 主题里 👦 被 son / brother / nephew / boy / grandson 共用，
+    // 种子又是固定的，所以这不是"偶发"，每次进那一关都会出现。
+    // 从选干扰项这一步保证唯一，比要求数据里每张图都不重复更可靠。
+    const used = new Set([word.emoji]);
+    const take = (list, want) => {
+      const out = [];
+      UI.shuffle(list, "d" + word.id).forEach(w => {
+        if (out.length >= want) return;
+        if (used.has(w.emoji)) return;
+        used.add(w.emoji);
+        out.push(w);
+      });
+      return out;
+    };
+    const same = allWords().filter(w => w.id !== word.id && w.theme === word.theme);
+    const others = allWords().filter(w => w.id !== word.id && w.theme !== word.theme);
+    const out = take(same, n - 1);
+    if (out.length < n - 1) out.push(...take(others, n - 1 - out.length));
+    return out;
   }
 
   /* ---------------- 题型 ---------------- */
@@ -86,7 +101,12 @@ const Stage = (() => {
 
     /** 写一写：用字母块拼出单词 */
     write(word) {
-      const letters = String(word.word).toLowerCase().replace(/[^a-z]/g, "").split("");
+      // ⚠️ 多词词条（"pencil box"、"yo-yo"、"hide-and-seek"）要**保留空格和连字符**。
+      // 原来这里是 replace(/[^a-z]/g,"")，把 "pencil box" 变成 "pencilbox" ——
+      // 一个根本不存在的拼写 —— 而字母块里又没有空格，
+      // 孩子只能拼出那个错的，系统还判他对。实测 12 条中招。
+      const letters = String(word.word).toLowerCase().replace(/[^a-z -]/g, "").split("");
+      // 干扰块只从 a–z 里取，不加空格/连字符（否则会凭空多出几个空格块）
       const extra = "abcdefghijklmnopqrstuvwxyz".split("");
       const pool = letters.concat(UI.shuffle(extra.filter(c => letters.indexOf(c) === -1), "w" + word.id).slice(0, Math.min(3, Math.max(2, 6 - letters.length))));
       return {
@@ -172,7 +192,12 @@ const Stage = (() => {
       kind: "choice", type: "listen", label: "听一听", emoji: "👂",
       letter, audioKey: letter.letter + "#n",
       prompt: "听一听，是哪个字母？",
-      promptZh: letter.sound,
+      // ⚠️ 这里**不能**放 letter.sound。
+      // audioKey 的 "#n" 播的是字母的**名字**（A 读 "ay"），
+      // 而 letter.sound 是它在单词里的**发音**（A 读 /æ/）——
+      // 原来题面写 /æ/、音频放 "ay"，26 个字母**全部**对不上。
+      // 字母卡（学习页）上名字和发音都该有，但听力题只能对上一个。
+      promptZh: "听的是字母的名字，不是它在单词里的发音",
       render: "letter",
       options: options.map(l => ({ id: l.letter, emoji: l.emoji, text: l.letter, correct: l.letter === letter.letter }))
     };
@@ -742,8 +767,13 @@ const Stage = (() => {
 
   /** 挑战岛：一套 10 题的模拟卷（5 题听力 + 5 题认读） */
   function openExam(setId) {
-    const m = String(setId).match(/(\d)/);
-    const grade = m ? Math.max(1, Math.min(3, parseInt(m[1], 10))) : 2;
+    // 取**完整**序号，不是首位数字。
+    // 原来 /(\d)/ 只匹配一个字符：ex10–ex19 全被读成 1（难度退回启蒙），
+    // ex20 读成 2。实测标题就是 ex10=G1、ex20=G2，一半模拟卷难度不对。
+    const m = String(setId).match(/(\d+)/);
+    const n = m ? parseInt(m[1], 10) : 1;
+    // 20 套卷分 3 档：1–7 → G1，8–14 → G2，15–20 → G3
+    const grade = Math.max(1, Math.min(3, Math.ceil(n / 7)));
     const gradePool = allWords().filter(w => w.grade === grade);
     const pool = gradePool.length >= 10 ? gradePool : allWords();
     const chosen = UI.pick(pool, 10, "exam" + setId);

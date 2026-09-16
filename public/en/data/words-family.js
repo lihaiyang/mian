@@ -15,7 +15,7 @@ window.EN_WORDS["family"] = [
     grade: 1,
     emoji: "👨‍👩‍👧‍👦",
     syll: 3,
-    sent: { en: "I love my big family.", zh: "我爱我大家庭。" },
+    sent: { en: "I love my big family.", zh: "我爱我的大家庭。" },
     phonics: ["fam", "i", "ly"],
     tips: "重音在最前面：FAM-i-ly。"
   },
@@ -243,6 +243,7 @@ window.EN_WORDS["family"] = [
     emoji: "👱‍♀️",
     syll: 1,
     sent: { en: "Aunt Lily gives me a warm hug.", zh: "莉莉阿姨给我温暖的拥抱。" },
+    phonics: ["au", "n", "t"],
     tips: "美音读 /ænt/，和 ant（蚂蚁）同音。"
   },
   {
@@ -451,7 +452,7 @@ window.EN_WORDS["family"] = [
     grade: 2,
     emoji: "👥",
     syll: 2,
-    sent: { en: "Many people love their big family.", zh: "很多人爱他们大家庭。" },
+    sent: { en: "Many people love their big family.", zh: "很多人爱他们的大家庭。" },
     phonics: ["peo", "ple"],
     tips: "eo 读 /iː/，结尾 -ple 读 /pl/。"
   },
@@ -480,6 +481,7 @@ window.EN_WORDS["family"] = [
     emoji: "🤝",
     syll: 1,
     sent: { en: "My friend shares a sweet apple.", zh: "我的朋友分享一个甜苹果。" },
+    phonics: ["fr", "ie", "nd"],
     tips: "ie 读 /e/，这个音要特别记一记。"
   },
   {

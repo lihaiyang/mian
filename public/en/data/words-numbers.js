@@ -554,7 +554,7 @@ window.EN_WORDS["numbers"] = [
     id: "numbers_few",
     word: "few",
     ipa: "/fjuː/",
-    zh: "很少；一点点",
+    zh: "很少；几个",
     pos: "adj.",
     theme: "numbers",
     grade: 2,

@@ -424,7 +424,7 @@ window.EN_WORDS["animals"] = [
     syll: 2,
     sent: { en: "The penguin walks on the ice.", zh: "企鹅在冰上走路。" },
     phonics: ["pen", "guin"],
-    tips: "pen + guin，u 几乎不发音。"
+    tips: "pen + gwin，这里的 u 读 /w/。"
   },
   {
     id: "animals_fish",

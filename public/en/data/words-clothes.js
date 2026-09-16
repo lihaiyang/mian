@@ -360,7 +360,7 @@ window.EN_WORDS["clothes"] = [
   {
     id: "clothes_gloves",
     word: "gloves",
-    ipa: "/ɡʌvz/",
+    ipa: "/ɡlʌvz/",
     zh: "手套",
     pos: "n.",
     theme: "clothes",

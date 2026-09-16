@@ -30,6 +30,12 @@ errors = []
 warnings = []
 
 
+# 深度模式：跑那些"启发式、会误报"的检查（音节估算 / 辅音骨架）。
+# 默认不开 —— 它们产生的噪音会把精确检查的结果淹掉。
+# 用法：python3 tools/en/check_content.py --deep
+DEEP = "--deep" in sys.argv
+
+
 def E(msg):
     errors.append(msg)
 
@@ -53,6 +59,37 @@ def load():
 
 
 VOWELS = "aeiouy"
+
+
+# 拼写里的辅音字母 → 音标里可能出现的符号（宽松匹配，只用来提示）
+CONS_SYMBOLS = {
+    "b": ["b"], "c": ["k", "s"], "d": ["d"], "f": ["f"], "g": ["ɡ", "g", "dʒ"],
+    "h": ["h"], "j": ["dʒ"], "k": ["k"], "l": ["l"], "m": ["m"], "n": ["n"],
+    "p": ["p"], "q": ["k"], "r": ["r", "ɹ", "ɚ", "ɝ"], "s": ["s", "z"],
+    "t": ["t"], "v": ["v"], "w": ["w"], "x": ["ks", "ɡz"], "z": ["z"],
+}
+# 这些组合算一个音，先整体替换掉，别按字母拆
+_DIGRAPHS = ["tch", "dge", "ch", "sh", "th", "ph", "wh", "ck", "gh", "ng",
+             "qu", "kn", "wr", "mb", "gn", "ps", "pn", "rh", "sc", "ll", "ss",
+             "ff", "tt", "pp", "mm", "nn", "dd", "gg", "bb", "rr", "zz", "cc"]
+
+
+def ipa_missing_consonants(word, ipa):
+    """拼写里的辅音字母，在音标里有没有对应符号。返回找不到的那些字母。
+    只是**提示**：英语里大量不发音字母（knee 的 k、comb 的 b、castle 的 t）
+    会命中，所以调用方只当警告，人工确认。"""
+    if not word or not ipa or not ipa.startswith("/"):
+        return []
+    w = re.sub(r"[^a-z]", "", word.lower())
+    for d in sorted(_DIGRAPHS, key=len, reverse=True):
+        w = w.replace(d, "#")
+    body = ipa.strip("/")
+    missing = []
+    for ch in w:
+        syms = CONS_SYMBOLS.get(ch)
+        if syms and not any(s in body for s in syms):
+            missing.append(ch)
+    return missing
 
 
 def guess_syllables(word):
@@ -113,8 +150,11 @@ def check_words(data):
             syll = it.get("syll")
             if not isinstance(syll, int) or syll < 1:
                 E("%s: syll 必须是 ≥1 的整数（音节数）" % where)
-            elif word and abs(guess_syllables(word) - syll) >= 1 and word.lower() != word:
-                W("%s: syll=%d，但按拼写估算约 %d —— 请确认" % (where, syll, guess_syllables(word)))
+            # 音节数这里**不做拼写估算**：guess_syllables 是按字母组合猜的，
+            # 对英语大概十错一（lion/whale/eagle/crayon… 全猜错），开着只会
+            # 用噪音淹没真正的问题。要查音节请用 --deep，人工看。
+            elif DEEP and word and abs(guess_syllables(word) - syll) >= 1:
+                W("%s: syll=%d，按拼写估算约 %d —— 请人工确认" % (where, syll, guess_syllables(word)))
             sent = it.get("sent") or {}
             if not (sent.get("en") or "").strip():
                 E("%s: 缺少例句 sent.en" % where)
@@ -127,6 +167,25 @@ def check_words(data):
             ph = it.get("phonics")
             if ph is not None and not (isinstance(ph, list) and all(isinstance(x, str) and x for x in ph)):
                 E("%s: phonics 必须是字符串数组" % where)
+            elif word and isinstance(ph, list) and ph:
+                # —— 语义校验 1：phonics 拼起来必须等于单词本身 ——
+                # 这一条抓的是「音块和拼写对不上」（例如 word:"gloves" 但
+                # blocks 是 ["g","o","ves"]），孩子按音块拼会拼出别的词。
+                joined = "".join(ph).lower()
+                if joined != re.sub(r"[^a-z]", "", word.lower()):
+                    E("%s: phonics 拼起来是 %r，和单词 %r 对不上" % (where, joined, word))
+            # —— 语义校验 2：中文释义必须真的含中文 ——
+            if it.get("zh") and not re.search(r"[\u4e00-\u9fff]", it["zh"]):
+                E("%s: zh 里没有中文：%r" % (where, it["zh"]))
+            # —— 语义校验 3：辅音骨架（抓「音标漏音」）——
+            # 实测这条抓到过 gloves 的音标 /ɡʌvz/ 漏了 l。
+            # 只查辅音，不查元音（英语拼写和读音的元音对应太不规则）。
+            if DEEP:
+                miss = ipa_missing_consonants(word, ipa)
+                if miss:
+                    W("%s: 拼写里的辅音 %s 在音标 %s 里找不到对应符号"
+                      "（可能是漏音，也可能是不发音字母，需人工判断）"
+                      % (where, "/".join(miss), ipa))
             if it.get("rhyme") is not None and not isinstance(it["rhyme"], list):
                 E("%s: rhyme 必须是数组" % where)
     return total, seen
@@ -164,7 +223,11 @@ def check_phonics(data):
             if not re.fullmatch(r"[a-z]+", w or ""):
                 E("字母 %s 的例词 %r 必须是小写纯字母" % (l.get("letter"), w))
             elif not w.startswith(l.get("lower", "?")):
-                W("字母 %s 的例词 %r 不是以该字母开头" % (l.get("letter"), w))
+                # X 是**例外**：英语里 x 的 /ks/ 几乎只出现在词尾
+                # （box / fox / six）。硬要求"例词以该字母开头"，
+                # 只会把 xylophone（x 读 /z/）这种反例塞进来，反而教错。
+                if l.get("lower") != "x":
+                    W("字母 %s 的例词 %r 不是以该字母开头" % (l.get("letter"), w))
     if len(ph) < 30:
         W("EN_PHONICS 只有 %d 关（目标 30）" % len(ph))
     ids = set()

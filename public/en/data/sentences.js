@@ -60,7 +60,9 @@ window.EN_SENTENCES = [
     blanks: [
       { word: "Mum", emoji: "👩", zh: "妈妈" },
       { word: "Dad", emoji: "👨", zh: "爸爸" },
-      { word: "teacher", emoji: "👩‍🏫", zh: "老师" }
+      // 原来是 teacher → "Good morning, teacher!" 是中式英语：
+      // 英语里不拿 teacher 当称呼，要么叫名字（Miss Li），要么说 class。
+      { word: "Miss Li", emoji: "👩‍🏫", zh: "李老师" }
     ],
     reply: { q: "Who do you greet in the morning?", a: "Good morning, ___!", qzh: "早上你向谁问好？" }
   },
