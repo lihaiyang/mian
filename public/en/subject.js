@@ -34,7 +34,9 @@
   Platform.register({
     id: "en",
     name: "萌语岛",
-    emoji: "🐼",
+    // 注意：不用 🐼 —— 萌码 Python 已经用了熊猫，
+    // 大厅里两张卡同图标会让孩子分不清。岛 + 旅行手账的风格用 🌴 更贴。
+    emoji: "🌴",
     tagline: "每天 15 分钟：听 → 说 → 读 → 写 → 玩，单词自动进记忆盒",
     url: "/en/",
     accent: "#6A4C93",

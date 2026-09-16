@@ -177,7 +177,11 @@
 
     var html = resumeHtml();
 
-    html += '<h2 class="section-title">今天学点什么？</h2>';
+    // 这里不放可见标题：大厅的 <h1>「今天想学点什么？」已经承担了这个角色，
+    // 再来一个同样的标题就成了重复。但读屏用户仍需要一个区块标签，
+    // 所以放一个视觉隐藏的 h2。
+    html += '<h2 class="sr-only">可以学习的学科</h2>';
+
     if (!ready.length) {
       html += '<div class="note">还没有可进入的学科。</div>';
     } else {
