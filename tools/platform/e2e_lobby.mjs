@@ -71,6 +71,22 @@ const en = page.locator('a.subject-card[data-subject="en"]');
 check("萌语岛卡片在", (await en.count()) === 1);
 check("英语卡片指向 /en/（PWA 路径不能变）", (await en.getAttribute("href")) === "/en/");
 
+// 卡片顺序必须由 shared/subjects.js 的声明决定，不能由"哪个 manifest 先下载完"决定。
+// （之前用 Promise.all 时顺序会飘，这里钉住它，防止回归。）
+const order = await page.evaluate(() =>
+  Array.from(document.querySelectorAll("a.subject-card[data-subject]"))
+       .map(el => el.getAttribute("data-subject"))
+);
+check("可进入学科的卡片顺序 = 声明顺序",
+  order.join(",") === "python,en", `实际 ${order.join(",")}`);
+
+const allOrder = await page.evaluate(() =>
+  Array.from(document.querySelectorAll(".subject-card"))
+       .map(el => el.getAttribute("data-subject") || (el.querySelector(".sc-name") || {}).textContent)
+);
+check("「敬请期待」排在可进入学科之后",
+  allOrder.slice(0, 2).join(",") === "python,en", `实际 ${allOrder.slice(0, 4).join(",")}`);
+
 // ---------------------------------------------------------------- 3. 敬请期待的学科
 const soon = page.locator('.subject-card[aria-disabled="true"]');
 const soonCount = await soon.count();

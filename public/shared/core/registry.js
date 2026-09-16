@@ -73,6 +73,7 @@
       accentSoft: manifest.accentSoft || "",
       grades: manifest.grades || [],
       ready: !isPlanned,                 // ready:false = 占位（"敬请期待"）
+      order: 0,                          // 展示顺序，由 boot() 按声明顺序赋值
       capabilities: manifest.capabilities || [],
       // 可选：学科自己的一句短标（例如"每天 15 分钟"），显示在卡片底部
       feedbackNote: manifest.feedbackNote || "",
@@ -229,12 +230,33 @@
 
   function boot(config, rootId) {
     var cfg = config || {};
-    (cfg.planned || []).forEach(function (m) {
+
+    // 「计划中」的学科排在真实学科后面（order 1000 起）
+    (cfg.planned || []).forEach(function (m, i) {
       register(Object.assign({}, m, { ready: false }));
+      if (subjects.length) subjects[subjects.length - 1].order = 1000 + i;
     });
 
+    // 真实学科**按 subjects.js 里声明的顺序**依次加载。
+    //
+    // 这里刻意用串行而不是 Promise.all —— 卡片顺序必须由声明决定，
+    // 不能由"哪个文件先下载完"决定。之前用 Promise.all 时，
+    // 萌语岛会时不时跑到萌码 Python 前面（截图才发现）。
+    // 每个 manifest 只有几百字节，串行的代价可以忽略。
     var list = cfg.manifests || [];
-    return Promise.all(list.map(loadScript)).then(function () {
+    var chain = Promise.resolve();
+    list.forEach(function (src, i) {
+      chain = chain.then(function () {
+        var before = subjects.length;
+        return loadScript(src).then(function () {
+          // 这个 manifest 在加载过程中自己注册，把新登记的都标成本次序号
+          for (var k = before; k < subjects.length; k++) subjects[k].order = i;
+        });
+      });
+    });
+
+    return chain.then(function () {
+      subjects.sort(function (a, b) { return a.order - b.order; });
       renderLobby(rootId);
       return subjects.length;
     });
