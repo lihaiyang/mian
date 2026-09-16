@@ -37,6 +37,11 @@ const URL = BASE + "/en/index.html";
 // 1. 首屏
 await page.goto(URL, { waitUntil: "domcontentloaded" });
 await page.waitForSelector("#hud .hud-chip", { timeout: 15000 }).catch(() => {});
+// ⚠️ HUD 渲染得很早，但**岛屿地图要等数据文件加载完**才渲染。
+// 只等 HUD 就去数 .island-card，在真实 CDN 上（数据文件要走网络）会数到 0，
+// 于是"地图 hero / 六座岛 / 今日任务"三项会假失败——本地因为文件在磁盘上太快，
+// 反而一直是绿的。这里显式等地图渲染出来再断言。
+await page.waitForSelector("#islandMap .island-card", { timeout: 30000 }).catch(() => {});
 check("页面标题正确", (await page.title()).includes("萌语岛"));
 check("顶栏 HUD 渲染", await page.locator("#hud .hud-chip").count() >= 3);
 check("底部导航 5 个入口", await page.locator("#tabbar .tab").count() === 5);
