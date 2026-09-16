@@ -65,13 +65,12 @@ check("有可进入的学科", readyCount >= 3, `${readyCount} 个`);
 
 const py = page.locator('a.subject-card[data-subject="python"]');
 check("萌码 Python 卡片在", (await py.count()) === 1);
-check("Python 卡片指向老站（数据在那边）",
-  (await py.getAttribute("href")) === "https://mian.lihaiyang.net/");
+check("Python 卡片指向本站 /python/", (await py.getAttribute("href")) === "/python/");
 
 const en = page.locator('a.subject-card[data-subject="en"]');
 check("萌语岛卡片在", (await en.count()) === 1);
-check("英语卡片指向老站的 /en/（PWA 装在这边）",
-  (await en.getAttribute("href")) === "https://mian.lihaiyang.net/en/");
+check("英语卡片指向本站 /en/（PWA 的 scope 绑在这）",
+  (await en.getAttribute("href")) === "/en/");
 
 // 卡片顺序必须由 shared/subjects.js 的声明决定，不能由"哪个 manifest 先下载完"决定。
 // （之前用 Promise.all 时顺序会飘，这里钉住它，防止回归。）
@@ -81,6 +80,14 @@ const order = await page.evaluate(() =>
 );
 check("可进入学科的卡片顺序 = 声明顺序",
   order.join(",") === "python,en,typing", `实际 ${order.join(",")}`);
+
+// 所有学科都在本站：卡片里不能出现别的域名（曾短暂指向过老站，钉死防回归）
+const offsite = await page.evaluate(() =>
+  Array.from(document.querySelectorAll("a.subject-card[href]"))
+       .map(el => el.getAttribute("href"))
+       .filter(h => /^https?:/i.test(h))
+);
+check("没有任何卡片指向外部站点", offsite.length === 0, offsite.join(","));
 
 const allOrder = await page.evaluate(() =>
   Array.from(document.querySelectorAll(".subject-card"))
