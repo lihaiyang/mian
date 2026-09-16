@@ -32,7 +32,7 @@ async function newDevice(name) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } });
   const page = await ctx.newPage();
   page.on("pageerror", (e) => pageErrors.push(name + ": " + e.message));
-  await page.goto(BASE + "/v2/index.html", { waitUntil: "domcontentloaded" });
+  await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 60000 });
   await sleep(1400);
   if (await page.isVisible("#confirmModal.active")) await page.click("#btnConfirmCancel");

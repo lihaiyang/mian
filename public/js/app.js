@@ -17,6 +17,41 @@ window.App = (() => {
   // 存储 key
   const CLOSED_TABS_KEY = "codepanda_closed_tabs_v1";
 
+  // ================= 学堂模式（v2） =================
+  // 学堂把「学习面板」放进左栏，编辑器与运行舞台原地复用（不搬 DOM、不换实例）。
+  // 工坊的自动保存 / 标签渲染在学堂模式下要让位给「学堂草稿」。
+  function isLearnMode() {
+    return document.body.classList.contains("mode-learn");
+  }
+
+  // 进学堂前：先把工坊里正在编辑的内容写回文件，别丢孩子的作品
+  function enterLearnMode() {
+    try {
+      const content = CodeEditor.getValue();
+      if (content) FileManager.updateActiveContent(content);
+    } catch (e) {}
+  }
+
+  // 回工坊：把编辑区恢复成「我的作品」里当前文件的内容
+  function exitLearnMode() {
+    try {
+      const file = FileManager.getActiveFile();
+      if (file) CodeEditor.setValue(file.content);
+      const files = FileManager.getFiles();
+      renderEditorTabs(files, file ? file.id : null);
+      renderFileList(files, file ? file.id : null);
+    } catch (e) { console.warn("恢复工坊编辑器失败", e); }
+  }
+
+  // 内容落点：工坊写文件，学堂写草稿
+  function persistContent(content) {
+    if (isLearnMode()) {
+      if (typeof Learn !== "undefined" && Learn.noteEditorChange) Learn.noteEditorChange(content);
+      return;
+    }
+    FileManager.updateActiveContent(content);
+  }
+
   function init() {
     // 0. 恢复已关闭标签状态
     try {
@@ -285,12 +320,21 @@ window.App = (() => {
   }
 
   // 由 python-runner 在运行成功时调用
+  function snapshotKey() {
+    if (isLearnMode() && typeof Learn !== "undefined" && Learn.currentLearnId) {
+      const id = Learn.currentLearnId();
+      if (id) return "learn:" + id;
+    }
+    const file = FileManager.getActiveFile();
+    return file ? file.id : "";
+  }
+
   function saveSnapshot() {
     try {
-      const file = FileManager.getActiveFile();
-      if (!file) return;
+      const key = snapshotKey();
+      if (!key) return;
       const all = readSnapshots();
-      all[file.id] = CodeEditor.getValue();
+      all[key] = CodeEditor.getValue();
       localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(all));
     } catch (e) {
       // 快照失败不影响主流程
@@ -316,7 +360,8 @@ window.App = (() => {
     if (activeId) closedTabIds.delete(activeId);
     renderEditorTabs(files, activeId);
     const activeFile = FileManager.getActiveFile();
-    if (activeFile) {
+    // 学堂模式下编辑区里是「学堂草稿」，不能被作品库的文件内容覆盖
+    if (activeFile && !isLearnMode()) {
       CodeEditor.setValue(activeFile.content);
     }
   }
@@ -337,6 +382,19 @@ window.App = (() => {
     listElem.innerHTML = "";
 
     folders.forEach(folder => {
+      // 「示例宝库」不放文件了：它现在是通往宝库（145 个示例，沙盒里打开）的入口，
+      // 这样左栏和右上角按钮指的是同一个东西，不会再出现「同名两处、各有各的副本」。
+      if (folder.builtin) {
+        const entry = document.createElement("button");
+        entry.className = "folder-entry";
+        entry.title = "打开示例宝库：145 个示例，含 12 个小游戏（在学习中心里随手改、随手跑）";
+        entry.innerHTML = '<span class="folder-emoji">🎁</span><span class="folder-name">示例宝库</span>' +
+          '<span class="folder-entry-go">点开玩 ›</span>';
+        entry.addEventListener("click", () => openGallery());
+        listElem.appendChild(entry);
+        return;
+      }
+
       const inFolder = files.filter(f => (f.folderId || myFolderId) === folder.id);
       const isCollapsed = !!collapsedMap[folder.id];
 
@@ -550,7 +608,7 @@ window.App = (() => {
 
   // 移动到文件夹的小选单
   function showFolderMenu(anchor, file) {
-    showFloatingMenu(anchor, FileManager.getFolders().map(folder => ({
+    showFloatingMenu(anchor, FileManager.getFolders().filter(f => !f.builtin).map(folder => ({
       label: folder.emoji + " " + folder.name + (folder.id === file.folderId ? "（当前）" : ""),
       disabled: folder.id === file.folderId,
       fn: () => {
@@ -661,14 +719,13 @@ window.App = (() => {
     if (btnGalleryReset) {
       btnGalleryReset.addEventListener("click", () => {
         showConfirmModal(
-          "⚠️ 注意啦！",
-          "恢复示例宝库会【替换掉你现在的所有文件】哦！<br>想保留自己的代码的话，先点「取消」，用左侧 📦 打包下载备份~<br><br>确定要恢复示例宝库吗？",
+          "♻️ 还原全部示例？",
+          "会把你在示例上改过的内容清掉，示例回到最初的样子。<br>" +
+          "你自己写的作品<b>不受影响</b>（那些在左侧「我的作品」里）。<br><br>确定要还原吗？",
           () => {
-            closedTabIds.clear();
-            saveClosedTabs();
-            FileManager.resetToDefault();
+            const n = (typeof Learn !== "undefined" && Learn.resetExampleDrafts) ? Learn.resetExampleDrafts() : 0;
             closeGalleryModal();
-            showToast("🎉 示例宝库已重新装满！", "🎁");
+            showToast(n ? ("🎉 已还原 " + n + " 个示例") : "👍 示例本来就是原版的，不用还原", "🎁");
             SoundEffects.playSuccess();
           }
         );
@@ -775,6 +832,8 @@ window.App = (() => {
     const tabTurtle = document.getElementById("tabBtnTurtle");
     tabConsole.addEventListener("click", () => switchToTab("console"));
     tabTurtle.addEventListener("click", () => switchToTab("turtle"));
+    const tabJudge = document.getElementById("tabBtnJudge");
+    if (tabJudge) tabJudge.addEventListener("click", () => switchToTab("judge"));
 
     // 清空输出
     document.getElementById("btnClearOutput").addEventListener("click", () => {
@@ -928,9 +987,9 @@ window.App = (() => {
     const btnSnapshot = document.getElementById("btnSnapshot");
     if (btnSnapshot) {
       btnSnapshot.addEventListener("click", () => {
-        const file = FileManager.getActiveFile();
-        if (!file) return;
-        const snap = readSnapshot(file.id);
+        const key = snapshotKey();
+        if (!key) return;
+        const snap = readSnapshot(key);
         if (!snap) { showToast("还没有成功运行的记录哦，先点 🚀 运行一次吧！", "💡"); return; }
         if (snap === CodeEditor.getValue()) { showToast("当前代码就是上次成功的版本呀~", "👍"); return; }
         showConfirmModal(
@@ -1006,20 +1065,27 @@ window.App = (() => {
     activeTab = tabName;
     const btnConsole = document.getElementById("tabBtnConsole");
     const btnTurtle = document.getElementById("tabBtnTurtle");
+    const btnJudge = document.getElementById("tabBtnJudge");
     const viewConsole = document.getElementById("consoleView");
     const viewTurtle = document.getElementById("turtleView");
+    const viewJudge = document.getElementById("judgeView");
 
-    if (tabName === "console") {
-      btnConsole.classList.add("active");
-      btnTurtle.classList.remove("active");
-      viewConsole.style.display = "flex";
-      viewTurtle.style.display = "none";
-    } else {
-      btnTurtle.classList.add("active");
-      btnConsole.classList.remove("active");
-      viewTurtle.style.display = "flex";
-      viewConsole.style.display = "none";
+    const show = (which) => {
+      btnConsole.classList.toggle("active", which === "console");
+      btnTurtle.classList.toggle("active", which === "turtle");
+      if (btnJudge) btnJudge.classList.toggle("active", which === "judge");
+      viewConsole.style.display = which === "console" ? "flex" : "none";
+      viewTurtle.style.display = which === "turtle" ? "flex" : "none";
+      if (viewJudge) viewJudge.style.display = which === "judge" ? "flex" : "none";
+    };
+
+    if (tabName === "turtle") {
+      show("turtle");
       requestAnimationFrame(() => TurtleEngine.fit());
+    } else if (tabName === "judge") {
+      show("judge");
+    } else {
+      show("console");
     }
   }
 
@@ -1030,33 +1096,58 @@ window.App = (() => {
       showToast("📝 代码空空如也，先写两行代码再运行吧！", "💡");
       return;
     }
-    // 运行前自动保存
-    FileManager.updateActiveContent(code);
+    // 运行前自动保存（学堂模式下写进草稿，不动作品库）
+    persistContent(code);
     PythonRunner.run(code);
   }
 
   function saveCurrentFile() {
     const content = CodeEditor.getValue();
-    FileManager.updateActiveContent(content);
-    showToast("💾 保存成功！你的代码安然无恙~", "🌟");
+    persistContent(content);
+    if (isLearnMode() && typeof Learn !== "undefined" && Learn.flushDraft) Learn.flushDraft();
+    showToast(isLearnMode() ? "💾 学堂草稿已保存（想去作品库就点「📌 存进作品库」）" : "💾 保存成功！你的代码安然无恙~", "🌟");
     SoundEffects.playSuccess();
   }
 
-  // ================= 趣味宝库（分类示例库） =================
-  let galleryCategory = "basic";
+  // ================= 🎁 示例宝库（弹窗里展示全部分类与教学示例） =================
+  // 这里有 145 个示例：库里 132 个（含 12 个小游戏）+ 内置 13 个，
+  // 分类统一成 8 组（和学习中心用的是同一套），点开会在学习中心的沙盒里打开。
+  let galleryCategory = "all";
 
   function renderGallery() {
     const tabs = document.getElementById("galleryTabs");
     const list = document.getElementById("galleryList");
-    if (!tabs || !list || typeof DEFAULT_EXAMPLES === "undefined") return;
-    const cats = typeof EXAMPLE_CATEGORIES !== "undefined" ? EXAMPLE_CATEGORIES : [];
-    if (cats.length && !cats.some(c => c.id === galleryCategory)) galleryCategory = cats[0].id;
+    if (!tabs || !list) return;
 
+    if (typeof Learn === "undefined" || !Learn.getAllExamples) {
+      list.innerHTML = '<div class="gallery-empty">示例宝库还没准备好，刷新一下页面试试~</div>';
+      return;
+    }
+    // 示例库是懒加载的：第一次打开先把内容拉下来
+    if (!Learn.examplesReady()) {
+      list.innerHTML = '<div class="gallery-empty">📦 正在打开示例宝箱…</div>';
+      Learn.loadExamples().then(() => renderGallery()).catch(() => {
+        list.innerHTML = '<div class="gallery-empty">😢 示例库没加载出来，检查一下网络再试吧~</div>';
+      });
+      return;
+    }
+
+    const cats = Learn.getGalleryCategories();
+    const items = Learn.getAllExamples();
     tabs.innerHTML = "";
+
+    const allBtn = document.createElement("button");
+    allBtn.className = "gallery-tab" + (galleryCategory === "all" ? " active" : "");
+    allBtn.textContent = "🎁 全部 " + items.length;
+    allBtn.addEventListener("click", () => { galleryCategory = "all"; renderGallery(); SoundEffects.playPop(); });
+    tabs.appendChild(allBtn);
+
     cats.forEach(cat => {
+      const n = items.filter(ex => ex.group === cat.id).length;
+      if (!n) return;
       const btn = document.createElement("button");
       btn.className = "gallery-tab" + (cat.id === galleryCategory ? " active" : "");
-      btn.textContent = cat.emoji + " " + cat.name;
+      btn.textContent = cat.emoji + " " + cat.name + " " + n;
       btn.addEventListener("click", () => {
         galleryCategory = cat.id;
         renderGallery();
@@ -1065,30 +1156,28 @@ window.App = (() => {
       tabs.appendChild(btn);
     });
 
-    const meta = typeof EXAMPLE_META !== "undefined" ? EXAMPLE_META : {};
-    const items = DEFAULT_EXAMPLES.filter(ex => ((meta[ex.id] || {}).category || "basic") === galleryCategory);
+    const shown = galleryCategory === "all" ? items : items.filter(ex => ex.group === galleryCategory);
     list.innerHTML = "";
-    if (!items.length) {
-      list.innerHTML = "<div class=\"gallery-empty\">这个分类还在准备中，先玩别的吧~</div>";
+    if (!shown.length) {
+      list.innerHTML = '<div class="gallery-empty">这个分类还在准备中，先玩别的吧~</div>';
       return;
     }
-    items.forEach(ex => {
-      const info = meta[ex.id] || {};
+    shown.forEach(ex => {
       const card = document.createElement("button");
       card.className = "gallery-item";
       const head = document.createElement("div");
       head.className = "gallery-item-head";
       const nameEl = document.createElement("span");
       nameEl.className = "gallery-item-name";
-      nameEl.textContent = ex.name.replace(/\.py$/, "");
+      nameEl.textContent = ex.emoji + " " + ex.title;
       const starEl = document.createElement("span");
       starEl.className = "gallery-item-star";
-      starEl.textContent = "⭐".repeat(Math.max(1, Math.min(3, info.level || 1)));
+      starEl.textContent = "⭐".repeat(Math.max(1, Math.min(3, ex.level || 1)));
       head.appendChild(nameEl);
       head.appendChild(starEl);
       const descEl = document.createElement("div");
       descEl.className = "gallery-item-desc";
-      descEl.textContent = info.desc || "点开看看这个作品吧";
+      descEl.textContent = ex.desc || "点开看看这个作品吧";
       card.appendChild(head);
       card.appendChild(descEl);
       card.addEventListener("click", () => openExample(ex));
@@ -1097,6 +1186,7 @@ window.App = (() => {
   }
 
   function openGallery() {
+    galleryCategory = "all";
     renderGallery();
     document.getElementById("galleryModal").classList.add("active");
     SoundEffects.playPop();
@@ -1106,23 +1196,27 @@ window.App = (() => {
     document.getElementById("galleryModal").classList.remove("active");
   }
 
-  // 打开示例：已有同名文件就直接用（保留孩子的改动），没有才新建
+  // 打开示例：内置示例直接用现成的文件；库里的示例在学习中心沙盒里打开（不弄乱作品库）
   function openExample(ex) {
+    closeGalleryModal();
+    if (typeof Learn !== "undefined" && Learn.openExampleInSandbox) {
+      Learn.openExampleInSandbox(ex.id);
+      showToast("🎁 已打开示例：" + ex.title + "（可以随手改、随手跑）", "🎁");
+      SoundEffects.playSuccess();
+      return;
+    }
+    // 兜底：没有学习中心时按老办法开成文件
     const files = FileManager.getAllFiles();
     let target = files.find(f => f.name === ex.name);
-    if (!target) {
-      target = FileManager.createFile(ex.name, ex.content);
-    } else {
-      FileManager.setActiveFile(target.id);
-    }
+    if (!target) target = FileManager.createFile(ex.name || (ex.title + ".py"), ex.code);
+    else FileManager.setActiveFile(target.id);
     if (target) {
       closedTabIds.delete(target.id);
       saveClosedTabs();
       const active = FileManager.getActiveFile();
       if (active) CodeEditor.setValue(active.content);
     }
-    closeGalleryModal();
-    showToast("🎁 已打开：" + ex.name.replace(/\.py$/, ""), "🎁");
+    showToast("🎁 已打开：" + (ex.title || ex.name), "🎁");
     SoundEffects.playSuccess();
   }
 
@@ -1306,7 +1400,8 @@ window.App = (() => {
     if (!editorHasUserEdits()) return false;
     const content = CodeEditor.getValue();
     if (!content) return false;
-    FileManager.updateActiveContent(content);
+    persistContent(content);
+    if (isLearnMode() && typeof Learn !== "undefined" && Learn.flushDraft) Learn.flushDraft();
     return true;
   }
 
@@ -1371,6 +1466,11 @@ window.App = (() => {
 
   return {
     init,
+    openGallery,
+    isLearnMode,
+    enterLearnMode,
+    exitLearnMode,
+    persistContent,
     openMyPanel,
     switchPanelTab,
     closeMyPanel,

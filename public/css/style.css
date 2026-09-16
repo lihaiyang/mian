@@ -2574,6 +2574,418 @@ body.dark-mode .award-stat { background: #1E293B; border-color: #334155; }
 }
 .learn-top-btn:hover { transform: translateY(-1px); }
 
+/* ============================================================
+   🎓 学堂模式（v2）：把学习面板放进工作台左栏，编辑器与运行舞台原地复用
+   —— 顶栏保持原样，只有「工作区」换一种模式
+   ============================================================ */
+
+/* ---------- 1. 模式开关：默认全部隐藏学堂专属 UI ---------- */
+.learn-bar,
+.learn-panel,
+.learn-task-bar,
+.learn-action-bar,
+.learn-lesson-host,
+.judge-view,
+.learn-only { display: none; }
+
+/* 学堂模式：藏起工坊专属 UI，亮出学堂 UI */
+body.mode-learn .filetree-panel { display: none; }
+body.mode-learn .editor-tabs-bar { display: none; }
+body.mode-learn .snippets-bar { display: none; }
+body.mode-learn .learn-bar { display: flex; }
+body.mode-learn .learn-panel { display: flex; }
+body.mode-learn .learn-task-bar { display: flex; }
+body.mode-learn .learn-action-bar { display: flex; }
+body.mode-learn .learn-only { display: inline-flex; }
+body.mode-learn .app-workspace { grid-template-columns: 350px minmax(0, 1fr) 330px; }
+
+/* 学习地图 / 成就这类“整页”内容：编辑器与输出让位 */
+body.mode-learn.learn-wide .app-workspace { grid-template-columns: minmax(0, 1fr); }
+body.mode-learn.learn-wide .editor-panel,
+body.mode-learn.learn-wide .output-panel { display: none; }
+body.mode-learn.learn-wide .learn-panel { border-right: none; }
+
+/* ---------- 2. 学堂标签条（顶栏下面的一条） ---------- */
+.learn-bar {
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: linear-gradient(90deg, #EEF0FF 0%, #FDF2F8 100%);
+  border-bottom: 2px solid #DDD6FE;
+  flex-wrap: wrap;
+}
+.learn-bar-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.learn-tab {
+  border: none; background: transparent; cursor: pointer;
+  padding: 7px 12px; border-radius: 999px;
+  font-size: 13px; font-weight: 800; color: #4C1D95;
+  font-family: var(--font-ui);
+  transition: background .15s ease;
+}
+.learn-tab:hover { background: rgba(91, 95, 237, .14); }
+.learn-tab.active { background: #5B5FED; color: #FFF; box-shadow: 0 4px 12px rgba(91, 95, 237, .3); }
+.learn-bar-hud { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.learn-exit-btn {
+  border: 2px solid #C4B5FD; background: #FFF; color: #5B21B6;
+  padding: 6px 14px; border-radius: 999px; cursor: pointer;
+  font-size: 12.5px; font-weight: 800; font-family: var(--font-ui);
+}
+.learn-exit-btn:hover { background: #5B5FED; border-color: #5B5FED; color: #FFF; }
+body.dark-mode .learn-bar { background: linear-gradient(90deg, #232838 0%, #2A2438 100%); border-color: #4338CA; }
+body.dark-mode .learn-tab { color: #C7D2FE; }
+body.dark-mode .learn-exit-btn { background: #1E293B; border-color: #4338CA; color: #C7D2FE; }
+
+/* HUD 元素（等级 / 经验条 / 战果） */
+.hud-level { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; color: #5B21B6; white-space: nowrap; }
+.hud-emoji { font-size: 15px; }
+.hud-bar { width: 80px; height: 8px; border-radius: 999px; background: #DDD6FE; overflow: hidden; }
+.hud-bar > span { display: block; height: 100%; background: linear-gradient(90deg, #6366F1, #EC4899); }
+.hud-num { font-size: 11.5px; font-weight: 700; color: #6D28D9; white-space: nowrap; }
+body.dark-mode .hud-level, body.dark-mode .hud-num { color: #C7D2FE; }
+body.dark-mode .hud-bar { background: #4338CA; }
+
+/* ---------- 3. 学习面板（左栏） ---------- */
+.learn-panel {
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: #FBFCFF;
+}
+.learn-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 10px 16px;
+}
+body.dark-mode .learn-panel { background: #151B28; }
+
+.panel-mini-head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; font-weight: 800; color: var(--text-main);
+  padding: 4px 2px 9px;
+  position: sticky; top: -10px; z-index: 2;
+  background: inherit;
+}
+.panel-mini-head > span { margin-left: auto; font-size: 11px; color: var(--text-muted); font-weight: 700; }
+.panel-mini-title { font-family: var(--font-code); color: var(--primary); }
+.panel-mini-count { font-size: 11px; color: var(--text-muted); }
+body.dark-mode .panel-mini-head { color: #E2E8F0; }
+
+.learn-mini-btn {
+  border: 2px solid var(--border-color); background: #FFF; color: var(--text-main);
+  padding: 3px 9px; border-radius: 9px; cursor: pointer;
+  font-size: 11px; font-weight: 800; font-family: var(--font-ui);
+}
+.learn-mini-btn:hover { border-color: var(--primary); color: var(--primary); }
+body.dark-mode .learn-mini-btn { background: #1E293B; color: #E2E8F0; border-color: #334155; }
+.learn-note { font-size: 11.5px; color: var(--text-muted); margin-top: 8px; line-height: 1.6; }
+
+/* ---------- 4. 教程目录 ---------- */
+.lesson-toc { display: flex; flex-direction: column; }
+.lesson-unit-head {
+  display: flex; justify-content: space-between; gap: 6px;
+  font-size: 11.5px; font-weight: 800; color: var(--text-muted);
+  padding: 9px 4px 4px; border-top: 1px dashed var(--border-color);
+}
+.lesson-unit-head:first-child { border-top: none; }
+.lesson-item {
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  padding: 7px 8px; border: none; background: transparent; cursor: pointer;
+  border-radius: 9px; text-align: left; font-family: var(--font-ui);
+}
+.lesson-item:hover { background: var(--primary-light); }
+.lesson-item.active { background: var(--primary-light); box-shadow: inset 0 0 0 2px var(--primary); }
+.lesson-item.done .lesson-item-title { color: var(--success); }
+.lesson-item-emoji { font-size: 14px; }
+.lesson-item-title { flex: 1; font-size: 12px; font-weight: 700; color: var(--text-main); line-height: 1.35; }
+.lesson-item-state { font-size: 11px; }
+body.dark-mode .lesson-item-title { color: #E2E8F0; }
+
+/* ---------- 5. 题目卡 ---------- */
+.task-card {
+  background: #FFF; border: 2px solid var(--border-soft); border-radius: 14px;
+  padding: 12px 13px;
+}
+body.dark-mode .task-card { background: #1E293B; border-color: #334155; }
+.task-title { font-size: 14.5px; font-weight: 900; color: var(--text-main); line-height: 1.4; }
+.task-ok { font-size: 11px; color: var(--success); font-weight: 800; }
+.task-meta { font-size: 11px; color: var(--text-muted); margin: 5px 0 8px; }
+.task-body { font-size: 12.5px; line-height: 1.75; color: var(--text-main); white-space: pre-wrap; }
+.task-sample { margin-top: 10px; }
+.task-sample-title { font-size: 12px; font-weight: 800; margin-bottom: 5px; }
+.task-sample-row { margin-bottom: 6px; }
+.task-sample-row > span { font-size: 10.5px; font-weight: 800; color: var(--text-muted); }
+.task-sample-row pre,
+.task-fold pre {
+  margin: 3px 0 0; padding: 8px 10px; border-radius: 9px;
+  background: #0F172A; color: #E2E8F0; font-family: var(--font-code);
+  font-size: 11.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-all;
+}
+.task-note { font-size: 11px; color: var(--text-muted); margin-top: 6px; line-height: 1.6; }
+.task-fold { margin-top: 9px; border-radius: 10px; background: #FFFBEB; border: 2px solid #FDE68A; padding: 8px 10px; }
+.task-fold summary { cursor: pointer; font-size: 12px; font-weight: 800; color: #92400E; }
+.task-fold > div { font-size: 12px; color: #78350F; line-height: 1.7; margin-top: 6px; }
+.task-verdict {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 10px; padding: 9px 11px; border-radius: 11px;
+  font-size: 12.5px; font-weight: 800;
+}
+.task-verdict.pass { background: #DCFCE7; color: #166534; }
+.task-verdict.fail { background: #FEE2E2; color: #991B1B; }
+.task-verdict .learn-mini-btn { margin-left: auto; }
+body.dark-mode .task-title, body.dark-mode .task-body { color: #E2E8F0; }
+
+/* 练习列表里的“当前题”高亮 */
+.ex-row.current { background: var(--primary-light); border-color: var(--primary); }
+
+/* ---------- 6. 编辑器列上的学堂条 ---------- */
+.learn-task-bar {
+  align-items: center; gap: 8px;
+  padding: 6px 10px;
+  background: #F5F3FF;
+  border-bottom: 2px solid #DDD6FE;
+  font-size: 12px;
+}
+.learn-task-crumb { font-weight: 800; color: #5B21B6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.learn-task-progress { margin-left: auto; font-size: 11px; color: #7C3AED; font-weight: 700; white-space: nowrap; }
+body.dark-mode .learn-task-bar { background: #241F3A; border-color: #4338CA; }
+body.dark-mode .learn-task-crumb { color: #C7D2FE; }
+
+.learn-action-bar {
+  align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 7px 10px;
+  background: #FFF;
+  border-top: 2px solid var(--border-soft);
+}
+body.dark-mode .learn-action-bar { background: #1E293B; border-color: #334155; }
+.learn-act {
+  border: 2px solid var(--border-color); background: #FFF; color: var(--text-main);
+  padding: 6px 12px; border-radius: 10px; cursor: pointer;
+  font-size: 12.5px; font-weight: 800; font-family: var(--font-ui);
+}
+.learn-act i { font-style: normal; font-size: 10px; opacity: .6; font-weight: 700; }
+.learn-act:hover { border-color: var(--primary); color: var(--primary); }
+.learn-act.primary { background: linear-gradient(135deg, #5B5FED, #7C3AED); color: #FFF; border-color: transparent; }
+.learn-act.success { background: linear-gradient(135deg, #10B981, #059669); color: #FFF; border-color: transparent; }
+.learn-act.primary:hover, .learn-act.success:hover { color: #FFF; transform: translateY(-1px); }
+.learn-act-status { margin-left: auto; font-size: 11.5px; font-weight: 700; color: var(--text-muted); }
+.learn-next-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 10px; border-radius: 999px;
+  background: #DCFCE7; color: #166534; font-size: 12px; font-weight: 800;
+  animation: chipPop .3s ease;
+}
+body.dark-mode .learn-act { background: #1E293B; color: #E2E8F0; border-color: #334155; }
+body.dark-mode .learn-act.primary, body.dark-mode .learn-act.success { color: #FFF; }
+
+/* ---------- 7. 教程正文（编辑器上方，左目录右讲解+沙盒） ---------- */
+.learn-lesson-host {
+  flex-direction: column;
+  max-height: 44%;
+  min-height: 120px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: #FFFDF7;
+  border-bottom: 2px solid #FDE68A;
+}
+.learn-lesson-host.folded { max-height: 46px; overflow: hidden; }
+body.dark-mode .learn-lesson-host { background: #1B1A24; border-color: #8A6D1F; }
+.lesson-main-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.lesson-head-emoji { font-size: 26px; }
+.lesson-head-text { flex: 1; min-width: 0; }
+.lesson-head-title { font-size: 16px; font-weight: 900; color: var(--text-main); }
+.lesson-head-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
+.lesson-head-meta b.ok { color: var(--success); }
+.learn-collapse-btn {
+  border: 2px solid var(--border-color); background: #FFF; color: var(--text-muted);
+  padding: 3px 9px; border-radius: 9px; cursor: pointer; font-size: 11px; font-weight: 800;
+  font-family: var(--font-ui);
+}
+.lesson-code-head .lesson-code-actions { float: right; display: inline-flex; gap: 6px; }
+body.dark-mode .lesson-head-title { color: #F1F5F9; }
+
+/* ---------- 8. 批改视图（输出面板第三个视图） ---------- */
+.judge-view {
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  background: var(--bg-app);
+}
+body.dark-mode .judge-view { background: #0F1420; }
+.judge-body { display: block; }
+.judge-view .judge-result { margin-top: 0; }
+
+/* ---------- 9. 模拟考结算 ---------- */
+.exam-result {
+  border-radius: 14px; padding: 16px; text-align: center; margin-bottom: 12px;
+  border: 2px solid var(--border-soft); background: #FFF;
+}
+.exam-result.pass { background: linear-gradient(135deg, #F0FDF4, #DCFCE7); border-color: #BBF7D0; }
+.exam-result.fail { background: linear-gradient(135deg, #FEF2F2, #FEE2E2); border-color: #FECACA; }
+.exam-result-score { font-size: 40px; font-weight: 900; color: var(--primary); line-height: 1; }
+.exam-result-score span { font-size: 15px; margin-left: 2px; }
+.exam-result-text { font-size: 13px; font-weight: 700; margin-top: 8px; color: var(--text-main); }
+.exam-result-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
+body.dark-mode .exam-result { background: #1E293B; border-color: #334155; }
+body.dark-mode .exam-result-text { color: #E2E8F0; }
+
+/* ---------- 10. 学堂草稿提示 ---------- */
+.path-drafts { margin-top: 16px; padding: 12px; border-radius: 14px; background: #FFF7ED; border: 2px dashed #FDBA74; }
+.path-drafts-tip { font-size: 12px; color: #9A3412; line-height: 1.7; }
+body.dark-mode .path-drafts { background: #2A2118; border-color: #9A3412; }
+
+/* ---------- 11. 窄屏降级 ---------- */
+@media (max-width: 1180px) {
+  body.mode-learn .app-workspace { grid-template-columns: 300px minmax(0, 1fr) 270px; }
+}
+@media (max-width: 900px) {
+  body.mode-learn .app-workspace { grid-template-columns: minmax(0, 1fr); }
+  body.mode-learn .learn-panel { max-height: 38vh; }
+  body.mode-learn .learn-lesson-host { max-height: 34vh; }
+  body.mode-learn .output-panel { min-height: 320px; }
+  .learn-bar { padding: 6px 8px; }
+  .learn-bar-hud { display: none; }
+}
+
+/* ---------- 12. 学堂细节打磨 ---------- */
+/* 上课时孩子主要是「读」，讲解区默认给大一点 */
+.learn-lesson-host { max-height: 58%; min-height: 160px; }
+/* 学堂里底部有操作条，提示泡泡往上挪一点，别压住按钮 */
+body.mode-learn .toast-box { bottom: 84px; }
+/* 教程讲解里的标题和代码块更紧凑一点 */
+.learn-lesson-host .lesson-block-title { margin: 10px 0 5px; }
+.learn-lesson-host .lesson-code { font-size: 12px; }
+/* 学习地图在整页模式下留白更舒服 */
+body.learn-wide .learn-panel-body { padding: 16px 22px 28px; }
+
+/* ============================================================
+   13. 布局 v2：可拖拽分隔条 + 三种布局 + 对照原版 + 专注写代码
+   ============================================================ */
+
+/* 讲解区高度改由 JS 按比例设置（不再固定 58%），分隔条可上下拖 */
+.learn-lesson-host {
+  flex: 0 0 auto;
+  max-height: none;
+  min-height: 0;
+  height: 50%;
+}
+.learn-lesson-host.folded { height: 46px !important; min-height: 46px; overflow: hidden; }
+
+/* 讲解区 / 编辑器之间的分隔条 */
+.learn-splitter {
+  display: none;
+  position: relative;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  height: 12px;
+  cursor: ns-resize;
+  background: #EEF2FF;
+  border-top: 1px solid #DDD6FE;
+  border-bottom: 1px solid #DDD6FE;
+  touch-action: none;
+  user-select: none;
+}
+body.mode-learn .learn-splitter.show { display: flex; }
+.learn-splitter:hover, .learn-splitter.dragging { background: #DDD6FE; }
+.learn-splitter-grip { width: 54px; height: 4px; border-radius: 999px; background: #A5B4FC; }
+.learn-splitter-badge { position: absolute; right: 10px; font-size: 10.5px; font-weight: 800; color: #5B21B6; }
+body.dark-mode .learn-splitter { background: #241F3A; border-color: #4338CA; }
+body.dark-mode .learn-splitter-grip { background: #6366F1; }
+body.learn-dragging { cursor: ns-resize; }
+body.learn-dragging * { user-select: none !important; }
+
+/* 代码行：编辑器 +（可选的）原版对照栏 */
+.learn-code-row { display: flex; flex-direction: row; flex: 1 1 auto; min-height: 0; }
+.learn-code-row > .editor-body-wrapper { flex: 1 1 auto; min-width: 0; min-height: 0; }
+body.mode-learn .learn-code-row > .editor-body-wrapper { min-height: 220px; }
+
+.learn-compare-host {
+  display: none;
+  flex: 0 0 min(44%, 520px);
+  flex-direction: column;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 10px 12px;
+  background: #F8FAFC;
+  border-left: 2px solid var(--border-soft);
+}
+.learn-compare-host.show { display: flex; }
+.compare-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; color: var(--text-main); margin-bottom: 7px; }
+.compare-head .learn-mini-btn { margin-left: auto; }
+.compare-tip { font-size: 11px; color: var(--text-muted); margin-top: 9px; line-height: 1.65; }
+.learn-compare-host .lesson-code { font-size: 11.5px; }
+body.dark-mode .learn-compare-host { background: #0F172A; border-color: #334155; }
+body.dark-mode .compare-head { color: #E2E8F0; }
+
+/* 任务条上的三种布局按钮 */
+.learn-layout-group { display: none; gap: 3px; padding: 2px; border-radius: 10px; background: #EDE9FE; }
+body.mode-learn .learn-layout-group.show { display: inline-flex; }
+.learn-layout-btn {
+  border: none; background: transparent; cursor: pointer;
+  width: 28px; height: 22px; border-radius: 7px; font-size: 13px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.learn-layout-btn:hover { background: #DDD6FE; }
+.learn-layout-btn.active { background: #5B5FED; box-shadow: 0 2px 6px rgba(91, 95, 237, .35); }
+body.dark-mode .learn-layout-group { background: #312E81; }
+body.dark-mode .learn-layout-btn.active { background: #6366F1; }
+
+#btnCompare, #btnFocus { display: none; }
+body.mode-learn #btnCompare.show, body.mode-learn #btnFocus.show { display: inline-flex; }
+
+/* 专注写代码：其它面板全部让位 */
+body.learn-focus .app-header { display: none; }
+body.learn-focus .learn-bar { display: none; }
+body.learn-focus .learn-panel { display: none; }
+body.learn-focus .output-panel { display: none; }
+body.learn-focus .app-workspace { grid-template-columns: minmax(0, 1fr); }
+body.learn-focus .learn-task-bar { background: #EEF2FF; border-bottom-color: #A5B4FC; }
+body.learn-focus .learn-lesson-host { border-bottom-color: #A5B4FC; }
+body.dark-mode.learn-focus .learn-task-bar { background: #241F3A; }
+
+/* 「讲解优先」：代码区收成一条可点的提示栏 */
+.learn-code-row.collapsed {
+  flex: 0 0 34px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: #F1F5F9;
+  border-top: 2px dashed var(--border-color);
+}
+.learn-code-row.collapsed > .editor-body-wrapper,
+.learn-code-row.collapsed > .learn-compare-host { display: none; }
+.learn-code-row.collapsed::after {
+  content: "⌨️ 代码区已收起 · 点这里或按 Alt+2 展开编辑器";
+  font-size: 12px; font-weight: 800; color: var(--text-muted);
+}
+.learn-code-row.collapsed:hover::after { color: var(--primary); }
+body.dark-mode .learn-code-row.collapsed { background: #1E293B; border-color: #334155; }
+
+/* 「示例宝库」入口（左栏）：不是文件夹，点开是宝库弹窗 */
+.folder-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - 12px);
+  margin: 6px;
+  padding: 9px 10px;
+  border: 2px solid #DDD6FE;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #EEF0FF 0%, #FDF2F8 100%);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  text-align: left;
+  transition: transform .14s ease, box-shadow .14s ease;
+}
+.folder-entry:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(91, 95, 237, .18); }
+.folder-entry .folder-emoji { font-size: 15px; }
+.folder-entry .folder-name { font-size: 12.5px; font-weight: 800; color: #4C1D95; }
+.folder-entry-go { margin-left: auto; font-size: 10.5px; font-weight: 800; color: #7C3AED; }
+body.dark-mode .folder-entry { background: linear-gradient(135deg, #232838, #2A2438); border-color: #4338CA; }
+body.dark-mode .folder-entry .folder-name { color: #C7D2FE; }
+
 /* 确认弹窗永远盖在别的弹窗之上（它是「在已打开的弹窗上再问一句」的对话框）。
    否则从「示例宝库」里点还原时，确认框会被宝库弹窗压住，按钮点不到。 */
 #confirmModal { z-index: 300; }

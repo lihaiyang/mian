@@ -130,6 +130,15 @@ const CodeEditor = (() => {
     }
   }
 
+  // 内容落点：工坊模式下写进作品库的文件，学堂模式下写进「学堂草稿」
+  function persistContent(text) {
+    if (window.App && window.App.persistContent) {
+      window.App.persistContent(text);
+    } else if (typeof FileManager !== "undefined") {
+      FileManager.updateActiveContent(text);
+    }
+  }
+
   function init(textareaElement) {
     fallbackTextarea = textareaElement;
 
@@ -195,7 +204,7 @@ const CodeEditor = (() => {
           // 和「最后装载进来的内容」比对：不一样说明是用户敲的
           // （云同步的 30 秒自动保存靠它判断能不能回写，别把刚拉下来的新内容盖掉）
           editorDirty = content !== lastLoadedValue;
-          FileManager.updateActiveContent(content);
+          persistContent(content);
           if (window.App && window.App.showAutoSaveIndicator) {
             window.App.showAutoSaveIndicator();
           }
@@ -215,7 +224,7 @@ const CodeEditor = (() => {
     textareaElement.addEventListener("input", () => {
       updateStatusBar();
       editorDirty = textareaElement.value !== lastLoadedValue;
-      FileManager.updateActiveContent(textareaElement.value);
+      persistContent(textareaElement.value);
     });
 
     textareaElement.addEventListener("keydown", (e) => {
@@ -412,7 +421,7 @@ const CodeEditor = (() => {
 
     if (count > 0) {
       setValue(fixed);
-      FileManager.updateActiveContent(fixed);
+      persistContent(fixed);
       SoundEffects.playSuccess();
       return { success: true, count };
     }

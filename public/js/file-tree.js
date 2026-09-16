@@ -33,8 +33,9 @@ const FileManager = (() => {
 
   function clone(obj) { return JSON.parse(JSON.stringify(obj)); }
 
+  // 「示例宝库」排第一个：小朋友进来第一眼就看到可以玩的例子
   function defaultFolders() {
-    return [clone(MY_FOLDER), clone(EXAMPLES_FOLDER)];
+    return [clone(EXAMPLES_FOLDER), clone(MY_FOLDER)];
   }
 
   function isExampleId(id) {
@@ -51,6 +52,12 @@ const FileManager = (() => {
     if (!folders.length) folders = defaultFolders();
     if (!folders.some(f => f.id === EXAMPLES_FOLDER.id)) {
       folders.push(clone(EXAMPLES_FOLDER));
+    }
+    // 老版本存的顺序里「示例宝库」在后面，这里统一提到第一位
+    const exIdx = folders.findIndex(f => f.id === EXAMPLES_FOLDER.id);
+    if (exIdx > 0) {
+      const ex = folders.splice(exIdx, 1)[0];
+      folders.unshift(ex);
     }
     const ids = folders.map(f => f.id);
     files.forEach(f => {
@@ -91,6 +98,11 @@ const FileManager = (() => {
     }
 
     ensureFolders();
+    migrateExampleFiles();     // 老版本把示例当文件放在工作区，这里收进宝库（改过的会保留下来）
+    if (!files.length) {
+      resetToDefault();
+      return;
+    }
     activeFileId = localStorage.getItem(activeKey()) || files[0].id;
     if (!files.find(f => f.id === activeFileId)) {
       activeFileId = files[0].id;
@@ -98,12 +110,48 @@ const FileManager = (() => {
     saveToStorage();          // 迁移结果立刻落盘
   }
 
-  // 重置回初始示例库（全部放进「示例宝库」，孩子自己的文件夹清空）
+  // 示例统一放在「🎁 示例宝库」（学习中心沙盒里打开），工作区只留孩子自己的作品。
+  // 老版本把 13 个示例当文件放在工作区里，这里把它们收走；
+  // 如果孩子改动过某个示例，就把它留成「我的作品」里的普通文件，绝不丢东西。
+  function migrateExampleFiles() {
+    if (!files.length) return 0;
+    const defaults = (typeof DEFAULT_EXAMPLES !== "undefined") ? DEFAULT_EXAMPLES : [];
+    const kept = [];
+    let removed = 0;
+    let saved = 0;
+    files.forEach(f => {
+      if (!isExampleId(f.id)) { kept.push(f); return; }
+      const def = defaults.find(d => d.id === f.id);
+      if (def && (f.content || "") !== def.content) {
+        // 改过的示例：变成孩子自己的作品保留下来
+        kept.push({
+          id: "file_saved_" + f.id,
+          name: "我改过的_" + String(f.name || "示例.py").replace(/^[0-9]+[_\-\s]*/, ""),
+          content: f.content,
+          folderId: myFolderId()
+        });
+        saved++;
+      } else {
+        removed++;
+      }
+    });
+    if (!removed && !saved) return 0;
+    files = kept;
+    console.info("示例已收进「示例宝库」：移除 " + removed + " 个内置示例文件，保留 " + saved + " 个改动过的");
+    return removed;
+  }
+
+  // 新用户的工作区：一个空白起步文件（示例都去「🎁 示例宝库」里玩）
   function resetToDefault() {
     folders = defaultFolders();
-    collapsed = { f_examples: true };
-    files = clone(DEFAULT_EXAMPLES);
-    files.forEach(f => { f.folderId = EXAMPLES_FOLDER.id; });
+    collapsed = {};
+    files = [{
+      // id 固定：两台设备的起步文件是同一行，登录同步时不会出现两个同名文件
+      id: "file_welcome",
+      name: "我的第一个程序.py",
+      content: "# 🌟 欢迎来到萌码 Python！\n# 在这里写下你的第一行代码吧：\n\nprint(\"你好，Python！\")\n",
+      folderId: myFolderId()
+    }];
     activeFileId = files[0].id;
     saveToStorage();
     notifyChange();
@@ -270,6 +318,9 @@ const FileManager = (() => {
       notifyChange();
       return true;
     },
+
+    // 把旧的示例文件收进宝库（供界面初始化后调用一次）
+    migrateExampleFiles,
 
     // 某个文件夹里的文件
     getFilesIn(folderId) {

@@ -87,7 +87,7 @@ const PythonRunner = (() => {
 
   function startWorker() {
     // 版本号要和 index.html 里的 ?v= 保持一致：CDN 会缓存 /js/*，换版本号才能真正刷新
-    worker = new Worker('js/python-worker.js?v=20260913g');
+    worker = new Worker('js/python-worker.js?v=20260913b');
     worker.addEventListener('message', handleWorkerMessage);
     worker.addEventListener('error', (e) => {
       console.error('Worker error:', e);
@@ -374,6 +374,7 @@ const PythonRunner = (() => {
         reportProgress(true);
         // 记录「上次成功运行」的代码，便于孩子改坏后一键复原
         try { if (window.App && window.App.saveSnapshot) window.App.saveSnapshot(); } catch (e) {}
+        try { if (window.Learn && window.Learn.onRunFinished) window.Learn.onRunFinished(true); } catch (e) {}
         try { ConfettiFX.celebrate(); } catch (e) {}
         break;
 

@@ -7,11 +7,11 @@
   <link rel="icon" href="data:,">
   
   <!-- CodeMirror 核心与 Python 语法高亮样式 -->
-  <link rel="stylesheet" href="vendor/codemirror/codemirror.min.css" data-page-node-id="F6m5S0eWVsUeraOTNQriYe">
-  <link rel="stylesheet" href="vendor/codemirror/show-hint.min.css">
+  <link rel="stylesheet" href="/vendor/codemirror/codemirror.min.css" data-page-node-id="F6m5S0eWVsUeraOTNQriYe">
+  <link rel="stylesheet" href="/vendor/codemirror/show-hint.min.css">
   
   <!-- 全局自定义少儿样式 -->
-  <link rel="stylesheet" href="css/style.css?v=20260914k" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
+  <link rel="stylesheet" href="css/style.css?v=20260915a" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
 </head>
 <body data-page-node-id="MABBDhhrP5uEOfEzmMJlsw">
 
@@ -56,9 +56,9 @@
       </button>
 
       <!-- 示例库重置 -->
-      <button class="header-btn" id="btnResetDemos" title="恢复所有好玩的初始示例代码" data-page-node-id="98KQCKeXC37G73yST2L2YO">
+      <button class="header-btn" id="btnResetDemos" title="打开示例宝库：145 个示例，含 12 个小游戏" data-page-node-id="98KQCKeXC37G73yST2L2YO">
         <span data-page-node-id="lVHTuDGxYeBRsQwWM8oe5G">🎁</span>
-        <span data-page-node-id="2gVHTI6TQbOSrHzu2YnxIk">趣味宝库</span>
+        <span data-page-node-id="2gVHTI6TQbOSrHzu2YnxIk">示例宝库</span>
       </button>
 
       <!-- 主题切换 -->
@@ -70,8 +70,27 @@
     </div>
   </header>
 
+  <!-- ================= 学堂模式：顶部标签条（只在学堂模式显示，上面的顶栏保持原样） ================= -->
+  <div class="learn-bar" id="learnBar">
+    <div class="learn-bar-tabs" id="learnTabs">
+      <button class="learn-tab active" data-tab="path">🗺️ 学习地图</button>
+      <button class="learn-tab" data-tab="lesson">📚 教程</button>
+      <button class="learn-tab" data-tab="example">🎁 示例</button>
+      <button class="learn-tab" data-tab="exercise">✏️ 练习</button>
+      <button class="learn-tab" data-tab="exam">📝 模拟考</button>
+      <button class="learn-tab" data-tab="award">🏆 成就</button>
+    </div>
+    <div class="learn-bar-hud" id="learnHud"></div>
+    <button class="learn-exit-btn" id="btnLearnExit" title="回到创作工坊（学习进度和草稿都会保留）">⏸ 回到工坊</button>
+  </div>
+
   <!-- ================= 主工作区三栏布局 ================= -->
   <main class="app-workspace" data-page-node-id="0EIP2qBStjSEMGA4P9cf8v">
+
+    <!-- 0. 学堂模式的左栏：学习地图 / 教程 / 示例 / 题目卡（工坊模式下不显示） -->
+    <aside class="workspace-panel learn-panel" id="learnPanel">
+      <div class="learn-panel-body" id="learnBody"></div>
+    </aside>
 
     <!-- 1. 左侧：文件树与积木代码栏 -->
     <aside class="workspace-panel filetree-panel" data-page-node-id="fbabFUzmDy81AUl19ERHKb">
@@ -107,6 +126,23 @@
     <!-- 2. 中间：代码编辑器 -->
     <section class="workspace-panel editor-panel" data-page-node-id="DtdgelaInDm5rXAV3bkLFr">
       <!-- 顶部文件标签栏 -->
+      <!-- 学堂模式：正在学什么 / 正在做哪一题 + 布局控制（工坊模式下隐藏） -->
+      <div class="learn-task-bar" id="learnTaskBar">
+        <span class="learn-task-crumb" id="learnTaskCrumb">✏️ 练习</span>
+        <span class="learn-task-progress" id="learnTaskProgress"></span>
+
+        <!-- 教程的三种布局：📖 讲解优先 / ⚖️ 各一半 / ⌨️ 代码优先（也可以直接拖分隔条） -->
+        <span class="learn-layout-group" id="learnLayoutGroup">
+          <button class="learn-layout-btn" data-act="layout" data-mode="read" title="讲解优先：讲解 70%，代码 30%（Alt+1）">📖</button>
+          <button class="learn-layout-btn" data-act="layout" data-mode="half" title="各一半：讲解 50%，代码 50%（Alt+2）">⚖️</button>
+          <button class="learn-layout-btn" data-act="layout" data-mode="code" title="代码优先：讲解收起，编辑器全高（Alt+3）">⌨️</button>
+        </span>
+
+        <button class="learn-mini-btn" id="btnCompare" data-act="compare" title="把原版示例代码并排放在右边，方便对照">↔ 对照原版</button>
+        <button class="learn-mini-btn" id="btnFocus" data-act="focus" title="专注写代码：把其它面板都收起来（Esc 退出）">⛶ 专注</button>
+        <button class="learn-mini-btn" id="btnLearnSaveToLib" title="把这段代码存进「我的作品库」">📌 存进作品库</button>
+      </div>
+
       <div class="editor-tabs-bar" data-page-node-id="obdF8mTs2l523HROhzQ6yI">
         <div class="editor-tabs-list" id="editorTabsList" data-page-node-id="emzM7mGJQgBEMOJzggaXuw">
           <!-- 动态渲染标签 -->
@@ -160,6 +196,12 @@
       </div>
 
       <!-- 编辑器底部信息 -->
+      <!-- 学堂模式：贴手的操作条（工坊模式下隐藏） -->
+      <div class="learn-action-bar" id="learnActionBar">
+        <!-- 按钮由 js/learn.js 按当前内容（练习/教程/示例/模拟考）动态生成 -->
+        <span class="learn-act-status" id="learnActStatus"></span>
+      </div>
+
       <div class="editor-status-bar" data-page-node-id="rLk2gQ0xaHwmkTlDqPJa0P">
         <div data-page-node-id="avFBgqfA4WQXOjvuml7wAh">
           <span id="cursorPos" data-page-node-id="lfV81yl2ZWPYm3GstXWS8F">第 1 行, 第 1 列</span> | 
@@ -188,6 +230,9 @@
           </button>
           <button class="output-tab-btn" id="tabBtnTurtle" data-page-node-id="wYybYBlunUJMuCMO5Zc2JV">
             <span data-page-node-id="kOasgWFNNUSlA5FhaLeL2p">🐢 海龟画布</span>
+          </button>
+          <button class="output-tab-btn learn-only" id="tabBtnJudge" title="看看这一题批改得怎么样">
+            <span>📝 批改</span>
           </button>
         </div>
 
@@ -275,6 +320,11 @@
         </div>
       </div>
 
+      <!-- 3.3 视图 C：批改结果（学堂模式用） -->
+      <div class="judge-view" id="judgeView">
+        <div class="judge-body" id="judgeBody"></div>
+      </div>
+
     </section>
   </main>
 
@@ -311,13 +361,13 @@
   <div class="modal-overlay" id="galleryModal">
     <div class="modal-card gallery-card">
       <div class="modal-title">
-        <span>🎁 趣味宝库</span>
+        <span>🎁 示例宝库</span>
       </div>
-      <div class="modal-desc">挑一个喜欢的作品点开就能玩，<b>不会弄丢你自己的代码</b>。想让宝库重新装满，用下面的「恢复初始示例」。</div>
+      <div class="modal-desc">共 <b>145</b> 个示例（含 12 个小游戏），按分类挑一个点开就能玩。示例都在<b>学习中心</b>里打开，随手改、随手跑，<b>不会弄丢你自己的作品</b>；左侧「🎁 示例宝库」和这个按钮是同一个入口。</div>
       <div class="gallery-tabs" id="galleryTabs"></div>
       <div class="gallery-list" id="galleryList"></div>
       <div class="modal-footer">
-        <button class="header-btn" id="btnGalleryReset" title="用初始示例替换当前所有文件（会先确认）">♻️ 恢复初始示例</button>
+        <button class="header-btn" id="btnGalleryReset" title="把示例改回最初的样子（你自己的作品不受影响）">♻️ 还原全部示例</button>
         <button class="btn-run-magic" id="btnGalleryClose" style="padding:6px 18px; font-size:13px;">关闭</button>
       </div>
     </div>
@@ -385,30 +435,6 @@
     </div>
   </div>
 
-  <!-- ================= 弹窗：学习中心（教程 / 示例 / 练习 / 模拟考 / 成就） ================= -->
-  <div class="modal-overlay" id="learnModal">
-    <div class="modal-card learn-card">
-      <div class="learn-head">
-        <div class="learn-head-title">
-          <span class="learn-head-emoji">🎓</span>
-          <span>萌码学习中心</span>
-          <span class="learn-head-tip">自己学 Python，为 GESP 做准备</span>
-        </div>
-        <div class="learn-hud" id="learnHud"></div>
-        <button class="learn-close" id="learnClose" title="关闭学习中心">✕</button>
-      </div>
-      <div class="learn-tabs" id="learnTabs">
-        <button class="learn-tab active" data-tab="path">🗺️ 学习地图</button>
-        <button class="learn-tab" data-tab="lesson">📚 教程</button>
-        <button class="learn-tab" data-tab="example">🎁 示例</button>
-        <button class="learn-tab" data-tab="exercise">✏️ 练习</button>
-        <button class="learn-tab" data-tab="exam">📝 模拟考</button>
-        <button class="learn-tab" data-tab="award">🏆 成就</button>
-      </div>
-      <div class="learn-body" id="learnBody"></div>
-    </div>
-  </div>
-
   <!-- ================= 炫彩通知小泡泡 ================= -->
   <div class="toast-box" id="toastBox" data-page-node-id="6qIoeipxlRgpMlcnI9x99W">
     <span id="toastIcon" data-page-node-id="daRqEznTKjdg1aIar9ic3v">🎉</span>
@@ -417,27 +443,27 @@
 
   <!-- ================= 第三方依赖库 ================= -->
   <!-- CodeMirror 核心脚本与组件 -->
-  <script src="vendor/codemirror/codemirror.min.js"></script>
-  <script src="vendor/codemirror/python.min.js"></script>
-  <script src="vendor/codemirror/closebrackets.min.js"></script>
-  <script src="vendor/codemirror/matchbrackets.min.js"></script>
-  <script src="vendor/codemirror/show-hint.min.js"></script>
+  <script src="/vendor/codemirror/codemirror.min.js"></script>
+  <script src="/vendor/codemirror/python.min.js"></script>
+  <script src="/vendor/codemirror/closebrackets.min.js"></script>
+  <script src="/vendor/codemirror/matchbrackets.min.js"></script>
+  <script src="/vendor/codemirror/show-hint.min.js"></script>
   <!-- 五彩纸屑庆祝特效 -->
-  <script src="vendor/confetti.min.js"></script>
+  <script src="/vendor/confetti.min.js"></script>
 
   <!-- ================= 自定义业务脚本模块 ================= -->
-  <script src="js/audio-confetti.js?v=20260914k"></script>
-  <script src="js/examples.js?v=20260914k"></script>
-  <script src="js/turtle-canvas.js?v=20260914k"></script>
-  <script src="js/zip-writer.js?v=20260914k"></script>
-  <script src="js/poster.js?v=20260914k"></script>
-  <script src="js/python-runner.js?v=20260914k"></script>
-  <script src="js/editor.js?v=20260914k"></script>
-  <script src="js/file-tree.js?v=20260914k"></script>
-  <script src="js/progress.js?v=20260914k"></script>
-  <script src="js/cloud.js?v=20260914k"></script>
-  <script src="js/learn.js?v=20260914k"></script>
-  <script src="js/app.js?v=20260914k"></script>
+  <script src="js/audio-confetti.js?v=20260915a"></script>
+  <script src="js/examples.js?v=20260915a"></script>
+  <script src="js/turtle-canvas.js?v=20260915a"></script>
+  <script src="js/zip-writer.js?v=20260915a"></script>
+  <script src="js/poster.js?v=20260915a"></script>
+  <script src="js/python-runner.js?v=20260915a"></script>
+  <script src="js/editor.js?v=20260915a"></script>
+  <script src="js/file-tree.js?v=20260915a"></script>
+  <script src="js/progress.js?v=20260915a"></script>
+  <script src="js/cloud.js?v=20260915a"></script>
+  <script src="js/learn.js?v=20260915a"></script>
+  <script src="js/app.js?v=20260915a"></script>
 
 </body>
 </html>
