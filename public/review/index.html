@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>今日复习 · 萌学园</title>
+<meta name="description" content="把各个学科做错的东西放在一起复习：数学错题、英语错词、汉字认错的字，按到期时间安排。">
+<meta name="theme-color" content="#F8F5F1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%81%3C/text%3E%3C/svg%3E">
+
+<link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
+<link rel="stylesheet" href="/shared/styles/base.css?v=3c099506">
+<link rel="stylesheet" href="/shared/styles/components.css?v=2264217d">
+<link rel="stylesheet" href="/shared/styles/chrome.css?v=c0c00792">
+<link rel="stylesheet" href="css/review.css?v=0b0c5132">
+
+<style>
+  /* 复习页是平台页面，不属于任何学科 —— 用一个中性偏暖的主色 */
+  :root { --accent: #6A4C93; --accent-soft: #EDE4F5; --accent-ink: #FFFFFF; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header id="topbar">
+    <a class="topbar-back" href="/">← 大厅</a>
+  </header>
+  <script src="/shared/core/topbar.js?v=e382f937"></script>
+  <script src="/shared/core/account-ui.js?v=74e0317f"></script>
+  <script>
+    Topbar.mount({
+      mount: "#topbar", emoji: "🔁", name: "今日复习",
+      status: [{ id: "btnSync", tone: "off", emoji: "☁️", label: "云同步", title: "云同步" }],
+      settings: [{ id: "btnAccount", emoji: "☁️", label: "账号与云同步" }]
+    });
+    if (window.AccountUI) {
+      var ab = document.getElementById("btnAccount");
+      if (ab) ab.addEventListener("click", function () { AccountUI.open(); });
+      var pill = document.getElementById("btnSync");
+      if (pill) {
+        pill.dataset.accBound = "1";
+        pill.addEventListener("click", function () { AccountUI.open(); });
+        var st = AccountUI.status();
+        Topbar.setStatus("btnSync", st.loggedIn
+          ? { tone: "ok", label: "已登录", title: "已登录（" + st.code + "）" }
+          : { tone: "off", label: "云同步", title: "还没开启云同步" });
+      }
+      window.addEventListener("mian:account-changed", function (ev) {
+        var s = (ev.detail) || AccountUI.status();
+        Topbar.setStatus("btnSync", s.loggedIn
+          ? { tone: "ok", label: "已登录", title: "已登录（" + s.code + "）" }
+          : { tone: "off", label: "云同步", title: "还没开启云同步" });
+      });
+    }
+  </script>
+
+  <main class="page-body rv-body">
+
+    <!-- 概览 -->
+    <section class="rv-summary" id="summary">
+      <div class="rv-sum-item"><b id="sumDue">0</b><span>今天要复习</span></div>
+      <div class="rv-sum-item"><b id="sumTotal">0</b><span>盒子里共</span></div>
+      <div class="rv-sum-item"><b id="sumDone">0</b><span>刚刚复习了</span></div>
+    </section>
+    <div class="rv-subjects" id="bySubject"></div>
+
+    <!-- 复习卡 -->
+    <section class="rv-card" id="cardBox" hidden>
+      <div class="rv-progress">
+        <div class="rv-bar"><i id="barFill"></i></div>
+        <span class="rv-count" id="qCount"></span>
+      </div>
+
+      <div class="rv-from" id="cardFrom"></div>
+      <div class="rv-front" id="cardFront"></div>
+
+      <div class="rv-back" id="cardBack" hidden>
+        <div class="rv-answer" id="cardAnswer"></div>
+        <div class="rv-hint" id="cardHint"></div>
+      </div>
+
+      <div class="rv-actions" id="actionsFront">
+        <button type="button" class="btn" id="btnShow" style="width:100%">看答案</button>
+      </div>
+      <div class="rv-actions" id="actionsBack" hidden>
+        <button type="button" class="btn ghost" id="btnNo" style="flex:1">再想想</button>
+        <button type="button" class="btn" id="btnYes" style="flex:1">✅ 记住了</button>
+      </div>
+    </section>
+
+    <!-- 空 / 结束 -->
+    <section class="rv-card rv-done" id="doneBox">
+      <div class="rv-done-ico" id="doneIco">🎉</div>
+      <h2 id="doneTitle">今天没有要复习的</h2>
+      <p class="rv-done-sub" id="doneSub">
+        去各个学科做题，做错的会自动进这里的盒子。
+        隔一天、两天、四天……它会自己回来找你。
+      </p>
+      <div class="rv-actions" style="justify-content:center">
+        <a class="btn ghost" href="/">回大厅挑一个学科</a>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="page-foot">
+    <p>复习节奏：答对往后推（1 天 → 2 天 → 4 天 → 7 天 → 15 天），答错回到第二天。</p>
+  </footer>
+</div>
+
+<script src="/shared/core/store.js?v=873bc876"></script>
+<script src="/shared/core/progress.js?v=acdd9b68"></script>
+<script src="/shared/core/srs.js?v=d4b0684f"></script>
+<script src="/shared/core/sync.js?v=70663565"></script>
+<script src="/shared/core/registry.js?v=0d6e477b"></script>
+<script src="js/review.js?v=851be267"></script>
+
+</body>
+</html>

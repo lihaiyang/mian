@@ -11,7 +11,7 @@
 
 <!-- 平台层样式：全站唯一一份，学科只覆盖 --accent 三个变量 -->
 <link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
-<link rel="stylesheet" href="/shared/styles/base.css?v=393d5261">
+<link rel="stylesheet" href="/shared/styles/base.css?v=3c099506">
 <link rel="stylesheet" href="/shared/styles/components.css?v=2264217d">
 <link rel="stylesheet" href="/shared/styles/chrome.css?v=c0c00792">
 </head>
@@ -31,7 +31,7 @@
     </span>
     <span class="topbar-spacer"></span>
     <span class="topbar-actions">
-      <!-- 家长中心是 M6 的内容，先把入口摆上，点了给一句说明而不是死链 -->
+      <!-- 家长中心：各科进度、连续打卡、需要多练的、可打印 A4 周报 -->
       <a class="btn ghost sm" href="/parent/" id="parentLink">👨‍👩‍👧 家长中心</a>
     </span>
     <!-- 设置：账号与同步是全域的东西，放在大厅最顺手 -->
@@ -56,6 +56,18 @@
       <h1>今天想学点什么？</h1>
       <p>挑一个进去就行。学过的会记住，下次回来接着上次的地方。</p>
     </section>
+
+    <!-- 跨学科复习：记忆盒里有到期卡片时才出现（由下面的脚本控制显示）。
+         它把数学错题、英语错词放在同一个队列里，按到期时间过 ——
+         没有这一条，几个学科就只是几个互不相干的网站。 -->
+    <a class="resume" id="reviewEntry" href="/review/" hidden>
+      <span class="resume-emoji" aria-hidden="true">🔁</span>
+      <span class="resume-text">
+        <span class="resume-label" id="reviewLabel">今天有卡片到期</span>
+        <span class="resume-name">复习一下</span>
+      </span>
+      <span class="resume-go">开始 →</span>
+    </a>
 
     <!-- 学科卡片由 shared/core/registry.js 依据 shared/subjects.js 渲染 -->
     <div id="lobby">
@@ -84,6 +96,7 @@
      好在卡片上显示"经验 N"。（老站两个 manifest 读的是自己的历史键
      codepanda_* / en_*，不走 Store，那是历史包袱，见 docs 的多学科设计。） -->
 <script src="/shared/core/store.js?v=873bc876"></script>
+<script src="/shared/core/srs.js?v=d4b0684f"></script>
 <script src="/shared/core/topbar.js?v=e382f937"></script>
 <script src="/shared/core/account-ui.js?v=74e0317f"></script>
 <script src="/shared/core/registry.js?v=0d6e477b"></script>
@@ -106,15 +119,28 @@
     if (note) note.textContent = st.loggedIn ? "已登录" : "未开启";
   }
 
-  // 家长中心还没做（M6），先给一句明确的说明，不要给死链
-  var pl = document.getElementById("parentLink");
-  if (pl) {
-    pl.addEventListener("click", function (ev) {
-      ev.preventDefault();
-      alert("家长中心还在建设中。\n\n做好之后，你可以在这里一眼看到孩子在所有学科的学习情况"
-          + "（各科用时、掌握程度、薄弱点、连续打卡），还能打印成 A4 周报。");
-    });
-  }
+  // ---- 跨学科复习入口 ----
+  // 记忆盒里有到期卡片才显示。数学错题、英语错词都往里放，
+  // 所以这里的数字是**所有学科加起来**今天要复习的量。
+  (function () {
+    if (typeof SRS === "undefined" || !SRS.stats) return;
+    var st = SRS.stats();
+    if (!st.due) return;
+    var el = document.getElementById("reviewEntry");
+    if (!el) return;
+    var lab = document.getElementById("reviewLabel");
+    if (lab) {
+      var subs = Object.keys(st.bySubject || {}).filter(function (k) {
+        return st.bySubject[k].due > 0;
+      });
+      lab.textContent = "今天有 " + st.due + " 张卡到期" +
+        (subs.length > 1 ? "（来自 " + subs.length + " 个学科）" : "");
+    }
+    el.hidden = false;
+  })();
+
+  // 家长中心已经做好了（F2）：各科进度、连续打卡、需要多练的、可打印周报。
+  // 这里不再拦点击 —— 之前那个「还在建设中」的 alert 已经过时了。
 
   if (typeof Platform === "undefined" || !Platform.boot) {
     document.getElementById("lobby").innerHTML =

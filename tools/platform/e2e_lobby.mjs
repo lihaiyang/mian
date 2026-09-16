@@ -144,7 +144,7 @@ for (const live of liveNames) {
 check("已去掉的学科不在占位区（C++）", !soonText.includes("C++"));
 
 // ---------------------------------------------------------------- 4. 没访问过时不该有「继续上次」
-check("首次访问不显示「继续上次」", (await page.locator(".resume").count()) === 0);
+check("首次访问不显示「继续上次」", (await page.locator(".resume[data-subject]").count()) === 0);
 
 // ---------------------------------------------------------------- 5. 进入学科 + 继续上次
 await page.locator('a.subject-card[data-subject="typing"]').click();
@@ -161,9 +161,9 @@ check("打字学科可用", (await page.locator(".ty-lesson").count()) >= 17,
 await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
 await page.waitForSelector(".subject-card", { timeout: 15000 });
 await sleep(400);
-check("回大厅出现「继续上次」", (await page.locator(".resume").count()) === 1);
-if (await page.locator(".resume").count()) {
-  check("「继续上次」指向打字", (await page.locator(".resume").getAttribute("href")) === "/typing/");
+check("回大厅出现「继续上次」", (await page.locator(".resume[data-subject]").count()) === 1);
+if (await page.locator(".resume[data-subject]").count()) {
+  check("「继续上次」指向打字", (await page.locator(".resume[data-subject]").getAttribute("href")) === "/typing/");
 }
 
 // ---------------------------------------------------------------- 6. 无障碍与错误

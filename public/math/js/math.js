@@ -211,6 +211,12 @@
     } else {
       S.streak = 0;
       S.wrong.push({ q: it.q, a: it.a, gave: given, tip: it.tip });
+      // 做错的题进**跨学科记忆盒**：隔 1/2/4/7/15 天自己回来找你。
+      // 放进去的是"题目 + 答案 + 提示"三件套，所以复习页完全不用知道
+      // 数学岛的任何事 —— 这就是把记忆盒做成平台级的好处。
+      if (typeof SRS !== "undefined") {
+        SRS.add({ subject: "math", id: it.id, front: it.q, back: it.a, hint: it.tip });
+      }
       $("answer").className = "ma-input wrong";
       $("feedback").className = "ma-feedback no";
       $("feedback").innerHTML = "🤔 差一点点。正确答案是 <b>" + esc(it.a) + "</b><br>" + esc(it.tip || "");
@@ -236,6 +242,10 @@
     S.answered++;
     S.streak = 0;
     S.wrong.push({ q: it.q, a: it.a, gave: "（跳过）", tip: it.tip });
+    // 跳过的也进记忆盒 —— "不会"比"做错"更该再见到一次
+    if (typeof SRS !== "undefined") {
+      SRS.add({ subject: "math", id: it.id, front: it.q, back: it.a, hint: it.tip });
+    }
     $("feedback").className = "ma-feedback no";
     $("feedback").innerHTML = "答案是 <b>" + esc(it.a) + "</b><br>" + esc(it.tip || "");
     $("answer").disabled = true;

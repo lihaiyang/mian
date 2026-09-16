@@ -1,0 +1,104 @@
+/* ============================================================================
+ * 家长中心 · 样式
+ * 给大人看，所以排版偏"报告"：表格、留白、可打印。
+ * ========================================================================== */
+
+.pa-body { max-width: 880px; }
+
+.pa-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4); flex-wrap: wrap; }
+.pa-head h1 { font-size: var(--fs-hero); text-wrap: balance; }
+.pa-date { color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+
+.pa-note {
+  margin-top: var(--s3);
+  padding: var(--s3) var(--s4);
+  background: var(--paper-3);
+  border-radius: var(--r-block);
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+}
+
+.pa-h2 { margin: var(--s7) 0 var(--s3); font-size: var(--fs-h2); text-wrap: balance; }
+.pa-sub { margin-bottom: var(--s3); color: var(--ink-soft); font-size: var(--fs-sm); line-height: 1.7; }
+
+.pa-card {
+  padding: var(--s4) var(--s5);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-1);
+}
+
+/* 总览 */
+.pa-overview {
+  margin-top: var(--s5);
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: var(--s3);
+  text-align: center;
+}
+.pa-ov-item b { display: block; font-size: 34px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.pa-ov-item span { color: var(--muted); font-size: var(--fs-xs); }
+
+/* 表格 */
+.pa-tablewrap { padding: 0; overflow-x: auto; }
+.pa-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.pa-table th, .pa-table td {
+  padding: 10px var(--s4);
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.pa-table th { color: var(--muted); font-size: var(--fs-xs); font-weight: 700; }
+.pa-table tr:last-child td { border-bottom: 0; }
+.pa-table td.num { font-variant-numeric: tabular-nums; }
+.pa-table td.name { font-weight: 700; }
+.pa-table .pa-idle { color: var(--muted); }
+
+.pa-bar { display: inline-block; width: 84px; height: 6px; background: var(--paper-3); border-radius: var(--r-chip); overflow: hidden; vertical-align: middle; margin-right: 8px; }
+.pa-bar i { display: block; height: 100%; background: var(--accent); }
+
+/* 需要多练的 */
+.pa-weak-group { margin-bottom: var(--s4); }
+.pa-weak-group:last-child { margin-bottom: 0; }
+.pa-weak-title { margin-bottom: var(--s2); color: var(--ink-soft); font-size: var(--fs-sm); font-weight: 700; }
+.pa-weak-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.pa-weak-item {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 4px 10px;
+  background: var(--paper-3);
+  border-radius: var(--r-chip);
+  font-size: var(--fs-sm);
+}
+.pa-weak-item i { color: var(--line-strong); font-style: normal; }
+.pa-weak-item b { color: var(--accent); font-weight: 700; }
+.pa-weak-item span { color: var(--muted); font-size: var(--fs-xs); }
+.pa-empty { color: var(--muted); font-size: var(--fs-sm); text-align: center; padding: var(--s4) 0; }
+
+.pa-tips ul { margin: 0; padding-left: 1.2em; }
+.pa-tips li { margin-bottom: 8px; color: var(--ink-soft); font-size: var(--fs-sm); line-height: 1.7; }
+.pa-tips li:last-child { margin-bottom: 0; }
+.pa-tips b { color: var(--ink); }
+
+/* ---------------------------------------------------------------- 打印 */
+
+@media print {
+  body { background: #fff !important; }
+  .topbar, .page-foot, .pa-tips, .modal-overlay { display: none !important; }
+  .page-body { max-width: none; padding: 0 !important; }
+  .pa-card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
+  .pa-h2 { margin-top: 10mm; }
+  .pa-head h1 { font-size: 22pt; }
+  .pa-weak-item { border: 1px solid #ddd; background: #fafafa; }
+  @page { size: A4 portrait; margin: 14mm; }
+}
+
+/* ---------------------------------------------------------------- 窄屏 */
+
+@media (max-width: 720px) {
+  .pa-overview { grid-template-columns: repeat(2, 1fr); }
+  .pa-ov-item b { font-size: 26px; }
+  .pa-card { padding: var(--s3) var(--s4); }
+  .pa-table th, .pa-table td { padding: 8px var(--s3); }
+  .pa-head h1 { font-size: var(--fs-h1); }
+}

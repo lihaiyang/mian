@@ -69,6 +69,27 @@ const Stage = (() => {
     return out;
   }
 
+  /* ---------------- 跨学科记忆盒 ----------------
+     英语**自己**有一套单词记忆盒（en/js/srs.js，挂在 window.SRS）——
+     它做得很好，继续管"单词什么时候该复习"。
+     这里额外把做错的词也放进**平台级**记忆盒（window.MianSRS，
+     由 shared/core/srs.js 提供），这样「今日复习」那一页能把
+     数学错题、英语错词放在同一个队列里按到期时间过。
+
+     为什么不直接用 window.SRS：英语页后加载的 en/js/srs.js 会把它覆盖掉，
+     平台那份必须走别名。 */
+  function toSharedBox(word, correct) {
+    if (correct || !word || !window.MianSRS) return;
+    try {
+      window.MianSRS.add({
+        subject: "en", id: word.id,
+        front: word.word || "",
+        back: (word.zh || "") + (word.ipa ? "　" + word.ipa : ""),
+        hint: word.tips || (word.sent && word.sent.en) || ""
+      });
+    } catch (e) { /* 记忆盒不是关键路径，出错不该打断答题 */ }
+  }
+
   /* ---------------- 题型 ---------------- */
   const types = {
     /** 听音选图 */
@@ -349,6 +370,7 @@ const Stage = (() => {
       AudioFX.playWrong();
       record(false, firstTry);
       if (q.word) Progress.markWord(q.word.id, false);
+      toSharedBox(q.word, false);        // 同时进跨学科记忆盒
       const right = q.options.find(o => o.correct);
       const rb = buttons.find(b => b.getAttribute("aria-label") === (right && right.text));
       if (rb) rb.classList.add("correct");
@@ -537,6 +559,7 @@ const Stage = (() => {
         AudioFX.playWrong();
         Progress.markSpell(false);
         if (q.word) Progress.markWord(q.word.id, false);
+        toSharedBox(q.word, false);      // 同时进跨学科记忆盒
         record(false, misses === 1);
         if (misses >= 2) {
           feedback(host, false, "正确的拼法是 " + answer + "，跟着读一遍就好 🐼");

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家长中心 · 萌学园</title>
+<meta name="description" content="一眼看到孩子在所有学科的学习情况：各科进度、连续打卡、需要多练的地方，可以打印成 A4 周报。">
+<meta name="theme-color" content="#F8F5F1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%91%A8%E2%80%8D%F0%9F%91%A9%E2%80%8D%F0%9F%91%A7%3C/text%3E%3C/svg%3E">
+
+<link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
+<link rel="stylesheet" href="/shared/styles/base.css?v=3c099506">
+<link rel="stylesheet" href="/shared/styles/components.css?v=2264217d">
+<link rel="stylesheet" href="/shared/styles/chrome.css?v=c0c00792">
+<link rel="stylesheet" href="css/parent.css?v=8db97c18">
+
+<style>
+  /* 家长中心是给大人看的，用一个沉一点的主色 */
+  :root { --accent: #4A5568; --accent-soft: #EDEFF3; --accent-ink: #FFFFFF; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header id="topbar">
+    <a class="topbar-back" href="/">← 大厅</a>
+  </header>
+  <script src="/shared/core/topbar.js?v=e382f937"></script>
+  <script src="/shared/core/account-ui.js?v=74e0317f"></script>
+  <script>
+    Topbar.mount({
+      mount: "#topbar", emoji: "👨‍👩‍👧", name: "家长中心",
+      actions: [{ id: "btnPrint", label: "打印周报", emoji: "🖨️" }],
+      status: [{ id: "btnSync", tone: "off", emoji: "☁️", label: "云同步", title: "云同步" }],
+      settings: [{ id: "btnAccount", emoji: "☁️", label: "账号与云同步" }]
+    });
+    if (window.AccountUI) {
+      var ab = document.getElementById("btnAccount");
+      if (ab) ab.addEventListener("click", function () { AccountUI.open(); });
+      var pill = document.getElementById("btnSync");
+      if (pill) {
+        pill.dataset.accBound = "1";
+        pill.addEventListener("click", function () { AccountUI.open(); });
+        var st = AccountUI.status();
+        Topbar.setStatus("btnSync", st.loggedIn
+          ? { tone: "ok", label: "已登录", title: "已登录（" + st.code + "）" }
+          : { tone: "off", label: "云同步", title: "还没开启云同步" });
+      }
+    }
+  </script>
+
+  <main class="page-body pa-body">
+
+    <div class="pa-head">
+      <h1>学习周报</h1>
+      <div class="pa-date" id="paDate"></div>
+    </div>
+
+    <p class="pa-note">
+      这些数字来自孩子这台设备上的学习记录（开了云同步的话，别的设备上的也在）。
+      我们<b>不收集</b>姓名、手机号，也没有账号密码 —— 只有一个孩子自己保管的同步码。
+    </p>
+
+    <!-- 总览 -->
+    <section class="pa-card pa-overview">
+      <div class="pa-ov-item"><b id="ovStreak">0</b><span>连续打卡（天）</span></div>
+      <div class="pa-ov-item"><b id="ovSubjects">0</b><span>用过的学科</span></div>
+      <div class="pa-ov-item"><b id="ovDays">0</b><span>有记录的天数</span></div>
+      <div class="pa-ov-item"><b id="ovBox">0</b><span>复习盒里</span></div>
+    </section>
+
+    <!-- 各学科 -->
+    <h2 class="pa-h2">各学科情况</h2>
+    <div class="pa-card pa-tablewrap">
+      <table class="pa-table" id="subjTable">
+        <thead>
+          <tr>
+            <th>学科</th><th>等级</th><th>经验</th>
+            <th>徽章</th><th>奖牌</th><th>练过</th><th>最近</th>
+          </tr>
+        </thead>
+        <tbody id="subjBody"></tbody>
+      </table>
+    </div>
+
+    <!-- 需要多练的 -->
+    <h2 class="pa-h2">需要多练的</h2>
+    <p class="pa-sub">
+      这些是做错过的题 / 认错的词。系统会按「隔 1 天 → 2 天 → 4 天 → 7 天 → 15 天」
+      的节奏让它们回来，答对一次往后走一格，答错回到第二天。
+      下面列的是<b>还没掌握</b>（盒子最浅）的那些。
+    </p>
+    <div class="pa-card" id="weakBox">
+      <div class="pa-empty">还没有做错过的题 —— 或者已经都掌握了。</div>
+    </div>
+
+    <!-- 怎么用 -->
+    <h2 class="pa-h2">可以这样陪</h2>
+    <div class="pa-card pa-tips">
+      <ul>
+        <li><b>每天 15 分钟</b>比周末补两小时有用。连续打卡看的是"来过"，不是"学多久"。</li>
+        <li>上面「需要多练的」可以直接在 <a href="/review/">今日复习</a> 里一屏过完，数学和英语混在一起。</li>
+        <li>数学岛和汉字岛都能<b>打印</b>：口算练一练、田字格字帖，纸上练比屏幕更护眼。</li>
+        <li>英语的单词卡也能打印（在萌语岛的「我的」里）。</li>
+      </ul>
+    </div>
+
+  </main>
+
+  <footer class="page-foot">
+    <p>萌学园 · 数据都在孩子自己的设备上 · 不收集姓名和手机号</p>
+  </footer>
+</div>
+
+<script src="/shared/core/store.js?v=873bc876"></script>
+<script src="/shared/core/srs.js?v=d4b0684f"></script>
+<script src="/shared/core/progress.js?v=acdd9b68"></script>
+<script src="/shared/subjects.js?v=ea8cf8c8"></script>
+<script src="js/parent.js?v=c8b4f076"></script>
+
+</body>
+</html>

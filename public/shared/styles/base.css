@@ -5,6 +5,13 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* hidden 属性必须是"最高优先级地不显示"。
+   浏览器给 [hidden] 的默认样式是 display:none，但**特异性极低** ——
+   任何带类名的规则（.resume { display:flex } 之类）都会把它盖掉，
+   于是"用 hidden 控制显隐"的代码静默失效（元素照样显示）。
+   实测踩过：大厅的「今日复习」入口明明加了 hidden，还是一直露在外面。 */
+[hidden] { display: none !important; }
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {

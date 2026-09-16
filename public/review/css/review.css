@@ -1,0 +1,96 @@
+/* ============================================================================
+ * 今日复习 · 平台页面样式
+ * 复习页不属于任何学科，所以它只用平台令牌 + 自己的一点排布。
+ * ========================================================================== */
+
+.rv-body { max-width: 760px; }
+
+/* 概览 */
+.rv-summary {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: var(--s3);
+  padding: var(--s4);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-1);
+}
+.rv-sum-item { text-align: center; }
+.rv-sum-item b { display: block; font-size: 30px; font-variant-numeric: tabular-nums; color: var(--accent); }
+.rv-sum-item span { color: var(--muted); font-size: var(--fs-xs); }
+
+.rv-subjects { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
+.rv-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-chip);
+  background: var(--paper-2);
+  color: var(--ink-soft);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.rv-chip b { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+/* 复习卡 */
+.rv-card {
+  margin-top: var(--s5);
+  padding: var(--s5);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-2);
+}
+
+.rv-progress { display: flex; align-items: center; gap: var(--s3); }
+.rv-bar { flex: 1; height: 8px; background: var(--paper-3); border-radius: var(--r-chip); overflow: hidden; }
+.rv-bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: var(--r-chip); }
+.rv-count { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+
+.rv-from {
+  margin-top: var(--s4);
+  color: var(--muted); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .5px;
+}
+
+.rv-front {
+  margin-top: var(--s2);
+  padding: var(--s5) var(--s4);
+  background: var(--paper-3);
+  border-radius: var(--r-block);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: center;
+  word-break: break-word;
+  text-wrap: balance;
+  min-height: 96px;
+  display: grid; place-items: center;
+}
+
+.rv-back { margin-top: var(--s4); }
+.rv-answer {
+  padding: var(--s4);
+  background: var(--accent-soft);
+  border-radius: var(--r-block);
+  color: var(--accent);
+  font-size: 24px;
+  font-weight: 700;
+  text-align: center;
+  word-break: break-word;
+}
+.rv-hint { margin-top: var(--s3); color: var(--ink-soft); font-size: var(--fs-sm); line-height: 1.6; text-align: center; }
+
+.rv-actions { display: flex; gap: var(--s3); margin-top: var(--s4); }
+
+/* 结束 / 空 */
+.rv-done { text-align: center; }
+.rv-done-ico { font-size: 52px; line-height: 1; }
+.rv-done h2 { margin-top: var(--s3); font-size: var(--fs-h1); text-wrap: balance; }
+.rv-done-sub { margin-top: var(--s3); color: var(--ink-soft); font-size: var(--fs-sm); line-height: 1.7; }
+
+@media (max-width: 620px) {
+  .rv-card { padding: var(--s4); }
+  .rv-front { font-size: 22px; min-height: 80px; }
+  .rv-answer { font-size: 20px; }
+  .rv-sum-item b { font-size: 24px; }
+}
