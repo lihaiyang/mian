@@ -15,7 +15,8 @@ window.MIAN_SUBJECTS = {
     "/python/subject.js",
     "/en/subject.js",
     "/typing/subject.js",
-    "/math/subject.js"
+    "/math/subject.js",
+    "/cn/subject.js"
   ],
 
   planned: [
@@ -24,12 +25,6 @@ window.MIAN_SUBJECTS = {
       tagline: "声母韵母、四声、拼读 —— 听准了才读得对",
       accent: "#E8735A", accentSoft: "#FCE8E3",
       grades: [1, 2]
-    },
-    {
-      id: "chinese", name: "汉字岛", emoji: "📖",
-      tagline: "认字、笔顺、组词、古诗、阅读理解",
-      accent: "#C4562F", accentSoft: "#F9E7DE",
-      grades: [1, 2, 3, 4, 5, 6]
     }
   ]
 };

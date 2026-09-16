@@ -124,12 +124,19 @@ const soonText = await page.evaluate(() =>
   Array.from(document.querySelectorAll('.subject-card[aria-disabled="true"]'))
        .map(el => el.textContent).join(" | ")
 );
-for (const name of ["拼音岛", "汉字岛"]) {
+// 占位区的学科名也从声明里取 —— 写死列表的话，每上线一个学科就要改一次测试
+// （键盘岛、数学岛、汉字岛上线时都各红过一次）。
+const plannedNames = await page.evaluate(() =>
+  (window.MIAN_SUBJECTS.planned || []).map(p => p.name));
+for (const name of plannedNames) {
   check(`占位里有「${name}」`, soonText.includes(name));
 }
-// 已经上线的学科不该再出现在占位里。
-// 这条以前写死的是「键盘岛」，数学岛上线时它就成了漏网的 —— 改成列表。
-for (const live of ["键盘岛", "数学岛"]) {
+// 反过来：已经上线的学科不该再出现在占位里。名字同样从卡片上取。
+const liveNames = await page.evaluate(() =>
+  Array.from(document.querySelectorAll("a.subject-card[data-subject] .sc-name"))
+       .map(el => el.textContent.trim()));
+check("至少有一个学科已上线", liveNames.length > 0, liveNames.join(","));
+for (const live of liveNames) {
   check(`已上线的学科不在占位区（${live}）`, !soonText.includes(live));
 }
 // C++ 岛已经从产品里去掉了（2026-09 决定）。这条断言是**反向**的：

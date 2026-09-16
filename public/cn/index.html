@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>汉字岛 · 字表与词表 · 萌学园</title>
+<meta name="description" content="3500 常用字的字表和词表：查拼音、笔画、部首、释义和常用组词，还能一键生成田字格字帖打印。">
+<meta name="theme-color" content="#F8F5F1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%96%3C/text%3E%3C/svg%3E">
+
+<!-- 平台层样式 -->
+<link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
+<link rel="stylesheet" href="/shared/styles/base.css?v=393d5261">
+<link rel="stylesheet" href="/shared/styles/components.css?v=2264217d">
+<link rel="stylesheet" href="/shared/styles/chrome.css?v=c0c00792">
+<!-- 本学科特有样式 -->
+<link rel="stylesheet" href="css/cn.css?v=a7ae65f5">
+
+<style>
+  :root { --accent: #C4562F; --accent-soft: #F9E7DE; --accent-ink: #FFFFFF; }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#grid">跳到字表</a>
+
+<div class="page">
+
+  <header id="topbar">
+    <!-- 脚本没跑起来时的兜底 -->
+    <a class="topbar-back" href="/">← 大厅</a>
+  </header>
+  <script src="/shared/core/topbar.js?v=e382f937"></script>
+  <script src="/shared/core/account-ui.js?v=74e0317f"></script>
+  <script>
+    Topbar.mount({
+      mount: "#topbar", emoji: "📖", name: "汉字岛",
+      actions: [
+        { id: "btnSheet", label: "字帖", emoji: "🖨️" },
+        { id: "btnProgress", label: "我的进度", emoji: "📊" }
+      ],
+      status: [{ id: "btnSync", tone: "off", emoji: "☁️", label: "云同步", title: "云同步：还没开启" }],
+      settings: [{ id: "btnAccount", emoji: "☁️", label: "账号与云同步" }]
+    });
+    if (window.AccountUI) {
+      var ab = document.getElementById("btnAccount");
+      if (ab) ab.addEventListener("click", function () { AccountUI.open(); });
+      var pill = document.getElementById("btnSync");
+      if (pill) {
+        pill.dataset.accBound = "1";
+        pill.addEventListener("click", function () { AccountUI.open(); });
+        var st = AccountUI.status();
+        Topbar.setStatus("btnSync", st.loggedIn
+          ? { tone: "ok", label: "已登录", title: "已登录（" + st.code + "）" }
+          : { tone: "off", label: "云同步", title: "还没开启云同步，点我开启" });
+      }
+      window.addEventListener("mian:account-changed", function (ev) {
+        var s = (ev.detail) || AccountUI.status();
+        Topbar.setStatus("btnSync", s.loggedIn
+          ? { tone: "ok", label: "已登录", title: "已登录（" + s.code + "）" }
+          : { tone: "off", label: "云同步", title: "还没开启云同步" });
+      });
+    }
+  </script>
+
+  <main class="page-body">
+
+    <!-- 说明：这是给家长/老师用的工具，不是给孩子刷题的 -->
+    <div class="cn-intro">
+      <b>给家长和老师用的字表</b>
+      <span>3500 个常用字。查拼音、笔画、部首、常用组词，选中一批字可以生成田字格字帖打印出来。</span>
+    </div>
+
+    <!-- 搜索 + 筛选 -->
+    <div class="cn-tools">
+      <div class="cn-search">
+        <span aria-hidden="true">🔍</span>
+        <input id="q" type="search" placeholder="输入一个汉字，或拼音（如 shui / shuǐ）"
+               autocomplete="off" aria-label="搜索汉字或拼音">
+        <button type="button" id="btnClear" class="cn-clear" aria-label="清空">×</button>
+      </div>
+
+      <div class="cn-filters">
+        <div class="cn-filter">
+          <span class="cn-flabel">级别</span>
+          <div class="cn-chips" id="levelChips"></div>
+        </div>
+        <div class="cn-filter">
+          <span class="cn-flabel">笔画</span>
+          <div class="cn-chips" id="strokeChips"></div>
+        </div>
+        <div class="cn-filter">
+          <span class="cn-flabel">部首</span>
+          <div class="cn-chips" id="radicalChips"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cn-layout">
+      <!-- 左：字格 -->
+      <section class="cn-gridwrap">
+        <div class="cn-count" id="count"></div>
+        <div class="cn-grid" id="grid" role="listbox" aria-label="汉字表"></div>
+        <div class="cn-more" id="more"></div>
+      </section>
+
+      <!-- 右：详情 + 字帖篮 -->
+      <aside class="cn-side">
+        <div class="cn-card" id="detail">
+          <div class="cn-empty">点左边的字看详情</div>
+        </div>
+
+        <div class="cn-card cn-basket">
+          <div class="cn-basket-head">
+            <b>字帖篮</b>
+            <span class="cn-muted" id="basketCount">0 个字</span>
+          </div>
+          <div class="cn-basket-list" id="basketList"></div>
+          <button type="button" class="btn" id="btnMakeSheet" style="width:100%">🖨️ 生成字帖</button>
+          <button type="button" class="btn ghost sm" id="btnClearBasket" style="width:100%;margin-top:8px">清空</button>
+          <div class="cn-muted" style="font-size:12px;margin-top:8px">
+            生成后按浏览器打印即可。田字格按 A4 排版，一张 40 格。
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="page-foot">
+    <p>字表来自 3500 个常用字（按使用频率分级）；拼音、笔画、部首、释义与组词来自公开词典数据。</p>
+  </footer>
+</div>
+
+<!-- ================= 字帖（可打印） ================= -->
+<div class="cn-sheet-overlay" id="sheetOverlay" hidden>
+  <div class="cn-sheet-bar">
+    <b>字帖预览</b>
+    <span class="cn-muted" id="sheetInfo"></span>
+    <span style="flex:1"></span>
+    <button type="button" class="btn" id="btnPrint">🖨️ 打印</button>
+    <button type="button" class="btn ghost" id="btnCloseSheet">关闭</button>
+  </div>
+  <div class="cn-sheet" id="sheet"></div>
+</div>
+
+<!-- ================= 进度弹窗 ================= -->
+<div class="modal-overlay" id="progressModal">
+  <div class="modal-card" style="max-width:520px;max-height:82vh;overflow:auto">
+    <div class="modal-title"><span>📊 我的进度</span></div>
+    <div class="cn-pf-level">
+      <div><b id="pfLevel">Lv.1</b><div class="cn-muted" id="pfTitle">初来乍到</div></div>
+      <div class="cn-pf-bar"><i id="pfBar"></i></div>
+      <div class="cn-muted" style="font-size:12px"><span id="pfXp"></span> XP</div>
+    </div>
+    <div class="cn-muted" style="margin-top:10px;font-size:13px">连续打卡 <b id="pfStreak">0</b> 天</div>
+    <div class="cn-sec-title">📋 今日任务</div>
+    <div id="pfDaily"></div>
+    <div class="cn-sec-title">🎖️ 徽章 <span class="cn-muted" id="pfBadgeCount"></span></div>
+    <div class="cn-badges" id="pfBadges"></div>
+    <div class="cn-sec-title">🏅 奖牌 <span class="cn-muted" id="pfMedalCount"></span></div>
+    <div class="cn-medals" id="pfMedals"></div>
+    <div class="modal-footer"><button class="btn ghost" data-close type="button">关闭</button></div>
+  </div>
+</div>
+
+<script src="/shared/core/store.js?v=873bc876"></script>
+<script src="/shared/core/progress.js?v=acdd9b68"></script>
+<script src="/shared/core/sync.js?v=70663565"></script>
+<script src="/shared/core/registry.js?v=0d6e477b"></script>
+<script src="subject.js?v=534eea36"></script>
+<script src="data/index.js?v=dedee97b"></script>
+<script src="js/cn.js?v=dd191c15"></script>
+
+</body>
+</html>
