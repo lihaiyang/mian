@@ -1,11 +1,35 @@
-# 萌码 Python + 萌语岛 —— Cloudflare Pages 配置
-name = "mian"
+# 萌学园平台版 —— Cloudflare Pages 配置
+#
+# ⚠️⚠️ 这个文件在 platform 分支上和 main 分支不一样，合并前务必看清楚 ⚠️⚠️
+#
+# 两个项目、两个数据库，完全隔离：
+#
+#   main 分支（线上老站，给孩子们在用）
+#     name = "mian"            D1 = mian-db            → https://mian.lihaiyang.net
+#
+#   platform 分支（平台版，还在建设中）
+#     name = "mian-platform"   D1 = mian-platform-db   → https://mian-platform.pages.dev
+#
+# 为什么必须分成两个库：平台版要大改同步层（M1），而老站里有孩子们真实的
+# 作品和进度。共用一个库的话，平台版的一次错误写入就可能毁掉这些数据。
+#
+# 🚨 合并 platform → main 时：**不要把这个文件的 d1_databases 段一起合过去**，
+#    否则老站在下一次部署时会被悄悄切到新库，孩子们会看到"进度全没了"。
+#    这是本项目最危险的一类事故。合并时请保留 main 的 mian-db 绑定。
+#    （将来真要迁移老站数据，应该单独做一次带双写校验的迁移，见
+#      docs/多学科平台架构设计.md 第 5.3 节。）
+#
+# 部署命令：
+#   platform 分支 → wrangler pages deploy public --project-name mian-platform --branch platform
+#   main 分支     → wrangler pages deploy public --project-name mian --branch main
+
+name = "mian-platform"
 compatibility_date = "2025-01-01"
 # 只有 public/ 会被发布；源码（tools/ docs/ db/ functions/ README）留在仓库根之外
 pages_build_output_dir = "public"
 
-# D1：匿名同步码账号 + 作品/配置
+# 平台版自己的 D1（与老站的 mian-db 完全隔离）
 [[d1_databases]]
 binding = "DB"
-database_name = "mian-db"
-database_id = "c716860a-ddc2-4b6c-9236-d105e51bf446"
+database_name = "mian-platform-db"
+database_id = "25882942-96ac-4142-a371-dd524147a5c5"
