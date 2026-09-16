@@ -166,9 +166,11 @@
 
   function liveStats() {
     var el = S.startedAt ? (Date.now() - S.startedAt) / 1000 : 0;
-    var min = el / 60;
     var correct = S.state.filter(function (x) { return x === true; }).length;
-    var wpm = min > 0.02 ? (correct / 5) / min : 0;
+    // 时间下限按 1 秒算：否则刚打两个字就会算出几百 WPM 的荒唐值。
+    // 也别用"太小就显示 0"——那会让孩子一边打字一边看到 0，像是坏了。
+    var min = Math.max(el, 1) / 60;
+    var wpm = S.startedAt ? (correct / 5) / min : 0;
     var acc = S.keys ? Math.max(0, (S.keys - S.errors) / S.keys * 100) : 100;
     var pct = S.chars.length ? Math.round(S.idx / S.chars.length * 100) : 0;
     return { wpm: wpm, acc: acc, pct: pct, seconds: el, correct: correct };
