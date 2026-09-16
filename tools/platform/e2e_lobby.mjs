@@ -55,8 +55,16 @@ await sleep(500);
 
 check("大厅标题在", (await page.textContent("h1")).includes("今天想学点什么"));
 
+// 张数不再写死数字。以前写的是 `>= 7`，删掉 C++ 岛之后就红了 ——
+// 加/删学科本来就不该弄红测试。改成和学科清单对账：
+// 渲染张数必须等于「已上线 manifest 数 + 占位 planned 数」。
+const expected = await page.evaluate(() => {
+  const s = window.MIAN_SUBJECTS || {};
+  return (s.manifests || []).length + (s.planned || []).length;
+});
 const cards = await page.locator(".subject-card").count();
-check("学科卡片已渲染", cards >= 7, `共 ${cards} 张`);
+check("学科卡片张数 = 清单里的学科数", cards === expected && cards > 0,
+      `渲染 ${cards} 张 / 清单 ${expected} 个`);
 
 // ---------------------------------------------------------------- 2. 可进入的学科
 const ready = page.locator('a.subject-card[data-subject]');
@@ -108,11 +116,14 @@ const soonText = await page.evaluate(() =>
   Array.from(document.querySelectorAll('.subject-card[aria-disabled="true"]'))
        .map(el => el.textContent).join(" | ")
 );
-for (const name of ["数学岛", "拼音岛", "汉字岛", "C++ 工坊"]) {
+for (const name of ["数学岛", "拼音岛", "汉字岛"]) {
   check(`占位里有「${name}」`, soonText.includes(name));
 }
 // 键盘岛已经上线了，不该再出现在占位里
 check("已上线的学科不在占位区", !soonText.includes("键盘岛"));
+// C++ 岛已经从产品里去掉了（2026-09 决定）。这条断言是**反向**的：
+// 防止以后有人照着旧文档/旧设计稿把它又抄回来。
+check("已去掉的学科不在占位区（C++）", !soonText.includes("C++"));
 
 // ---------------------------------------------------------------- 4. 没访问过时不该有「继续上次」
 check("首次访问不显示「继续上次」", (await page.locator(".resume").count()) === 0);

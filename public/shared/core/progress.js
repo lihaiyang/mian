@@ -48,6 +48,7 @@
   var ns = null;              // 存储命名空间
   var cache = null;           // 当前档案的 stats 缓存
   var cacheKey = null;
+  var cacheSig = "";          // 缓存内容的签名，用来判断 save() 是不是真改了东西
   var listeners = [];
 
   // ---------------------------------------------------------------- 基础
@@ -106,7 +107,7 @@
   function switchProfile(id) {
     if (!profiles().some(function (p) { return p.id === id; })) return false;
     ns.set("profile", id);
-    cache = null; cacheKey = null;
+    cache = null; cacheKey = null; cacheSig = "";
     emitChange();
     return true;
   }
@@ -155,12 +156,22 @@
 
   function statsKey() { return "stats__" + profileId(); }
 
+  /** 内容签名：判断「这次保存是不是真的改了东西」。
+   *  刻意**不含** updated / syncedAt —— 那两个是同步元数据，不是学习内容。 */
+  function contentSig(s) {
+    return JSON.stringify([
+      s.xp, s.counters, s.days, s.streak, s.badges,
+      s.medals, s.missions, s.daily, s.best
+    ]);
+  }
+
   function load() {
     var k = statsKey();
     if (cache && cacheKey === k) return cache;
     cacheKey = k;
     var s = ns.get(k, null);
     cache = normalize(s);
+    cacheSig = contentSig(cache);
     return cache;
   }
 
@@ -182,8 +193,26 @@
     return base;
   }
 
-  function save(s) {
-    s.updated = now();
+  /**
+   * 保存。**只有内容真的变了才推进 updated** —— 这是丢数据 bug 的修复，别再改回去。
+   *
+   * 原来的写法是无条件 `s.updated = now()`。而页面一加载就会 save() 一次
+   * （初始化 / 补齐默认字段），于是 importRow 的守卫 `stamp < cur.updated`
+   * 会把**所有**云端行判成「比本地旧」而拒绝。结果：
+   *   · 跨设备恢复永远不生效（换了设备看着像"进度全没了"）
+   *   · 更糟的是紧接着的一次推送会拿本地的空进度、以"更新的时间戳"
+   *     覆盖云端（服务端是行级 LWW，照收不误）—— 真的丢数据
+   *
+   * opts.keepUpdated —— 导入远端数据时用。解码/合并本身不是「本地编辑」，
+   * 不能推进 updated，否则下一次远端更新又会被判成旧的。
+   */
+  function save(s, opts) {
+    opts = opts || {};
+    var sig = contentSig(s);
+    if (!opts.keepUpdated && (sig !== cacheSig || opts.force)) {
+      s.updated = now();
+    }
+    cacheSig = sig;
     ns.set(statsKey(), s);
     cache = s;
     cacheKey = statsKey();
@@ -469,7 +498,12 @@
 
   function exportRow() {
     var s = load();
-    return { stats_json: JSON.stringify(s), updated_at: s.updated || now() };
+    // 这里**不能**回退成 now()。
+    // 如果本地从没改过（updated 还是 0），推上去的时间戳必须保持 0，
+    // 服务端 LWW 才不会用这份空进度覆盖云端已有的真实进度。
+    // 原来的 `s.updated || now()` 会让「新设备一登录」就把云端进度清零 ——
+    // 因为 sync() 是先推后拉。
+    return { stats_json: JSON.stringify(s), updated_at: Number(s.updated) || 0 };
   }
 
   function importRow(row) {
@@ -488,14 +522,18 @@
     merged.medals = Array.from(new Set(cur.medals.concat(merged.medals)));
     merged.missions = Object.assign({}, cur.missions, merged.missions);
     merged.syncedAt = stamp;
-    save(merged);
+    // 导入不是「本地编辑」：updated 取两边较大的那个，并用 keepUpdated
+    // 阻止 save() 把它刷成 now()。否则下一次远端更新会被
+    // `stamp < cur.updated` 判成旧的而拒绝。
+    merged.updated = Math.max(cur.updated || 0, Number(remote.updated) || 0);
+    save(merged, { keepUpdated: true });
     emitChange();
     return true;
   }
 
   function reset() {
     ns.del(statsKey());
-    cache = null; cacheKey = null;
+    cache = null; cacheKey = null; cacheSig = "";
     emitChange();
   }
 
@@ -510,8 +548,14 @@
   function init() {
     if (!def) { console.warn("[Progress] init() 之前要先 define()"); return; }
     var s = load();
+    // ⚠️ 这里必须 keepUpdated。
+    // rollDaily() 是「按本地日期算出来的派生状态」——每台设备都会自己算一遍，
+    // 不是孩子的成就。如果这里推进 updated，那么「打开一次页面」就会让本地
+    // 看起来比云端新，于是 importRow 把云端进度全部拒绝，紧接着一次推送
+    // 再把云端覆盖成空。空档案第一次打开时 daily.date 从 "" 变成今天，
+    // 正好会踩中这条路径。
     rollDaily(s);
-    save(s);
+    save(s, { keepUpdated: true });
     emitChange();
   }
 

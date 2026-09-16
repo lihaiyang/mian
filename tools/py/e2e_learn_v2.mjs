@@ -26,6 +26,14 @@ function check(name, ok, extra = "") {
   if (!ok) failed++;
 }
 
+/** 打开 Python 顶栏的 ⚙️ 设置菜单。
+ *  顶栏从 6 个控件收敛成 3 个之后，「示例宝库」「我的档案」「夜间模式」
+ *  都搬进了这个菜单 —— 点它们之前必须先开菜单，否则元素是隐藏的、点不到。 */
+async function openPyMenu() {
+  await page.click("#pyGear");
+  await page.waitForSelector("#pyMenu:not([hidden])", { timeout: 5000 });
+}
+
 const browser = await chromium.launch({ channel: process.env.PW_CHANNEL || "chrome" });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const pageErrors = [];
@@ -377,9 +385,11 @@ await sleep(500);
 check("工坊模式下编辑仍然写进文件",
   (await page.evaluate(() => (FileManager.getActiveFile() || {}).content)).includes("工坊里改一改"));
 
-// ---------- 🎁 示例宝库（右上角按钮 + 弹窗分类 + 打开进沙盒） ----------
-check("右上角按钮叫「示例宝库」", (await page.textContent("#btnResetDemos")).includes("示例宝库"));
-check("左栏「示例宝库」是宝库入口（和右上角是同一个东西）",
+// ---------- 🎁 示例宝库（⚙️ 菜单入口 + 弹窗分类 + 打开进沙盒） ----------
+// 入口从顶栏搬进了 ⚙️ 设置菜单。内容没有藏起来：学习中心 → 🎁 示例 是同一个宝库。
+await openPyMenu();
+check("⚙️ 菜单里有「示例宝库」", (await page.textContent("#btnResetDemos")).includes("示例宝库"));
+check("左栏「示例宝库」是宝库入口（和菜单里是同一个东西）",
   (await page.evaluate(() => (document.querySelector(".folder-entry .folder-name") || {}).textContent)) === "示例宝库");
 check("工作区里不再有内置示例文件（示例只住在宝库里）",
   (await page.evaluate(() => FileManager.getFiles().filter(f => /^ex_/.test(f.id)).length)) === 0);
@@ -418,6 +428,7 @@ const hasExampleDraft = () => page.evaluate((id) => {
   return !!all[id];
 }, exampleOpened);
 check("改示例会产生学堂草稿", await hasExampleDraft());
+await openPyMenu();
 await page.click("#btnResetDemos");
 await page.waitForSelector("#galleryList .gallery-item", { timeout: 20000 });
 await page.click("#btnGalleryReset");

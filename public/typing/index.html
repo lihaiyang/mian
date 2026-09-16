@@ -12,9 +12,9 @@
 <link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
 <link rel="stylesheet" href="/shared/styles/base.css?v=393d5261">
 <link rel="stylesheet" href="/shared/styles/components.css?v=2264217d">
-<link rel="stylesheet" href="/shared/styles/chrome.css?v=b3dec025">
+<link rel="stylesheet" href="/shared/styles/chrome.css?v=77cc90e4">
 <!-- 本学科特有样式 -->
-<link rel="stylesheet" href="css/typing.css?v=bf24ce57">
+<link rel="stylesheet" href="css/typing.css?v=3ac090f0">
 
 <style>
   /* 学科主色：只覆盖这三个变量，其余全用平台令牌 */
@@ -32,18 +32,49 @@
     <!-- 脚本没跑起来时的兜底：回大厅的链接必须一直在 -->
     <a class="topbar-back" href="/">← 大厅</a>
   </header>
-  <script src="/shared/core/topbar.js?v=998a682b"></script>
+  <script src="/shared/core/topbar.js?v=e382f937"></script>
   <script>
     Topbar.mount({
       mount: "#topbar", emoji: "⌨️", name: "键盘岛",
+      // 「我的进度」是主操作，留在明面上
       actions: [
-        { id: "btnProgress", label: "我的进度", emoji: "📊" },
-        { id: "btnSync",     label: "云同步",   emoji: "☁️" }
+        { id: "btnProgress", label: "我的进度", emoji: "📊" }
+      ],
+      // 云同步从「一个按钮」改成「状态胶囊」：它首先是状态，其次才是入口。
+      // id 保持 btnSync 不变，typing.js 的 bindModal 不用改。
+      status: [
+        { id: "btnSync", tone: "off", emoji: "☁️", label: "云同步", title: "云同步：还没开启" }
       ]
     });
   </script>
 
   <main class="page-body">
+
+    <!-- 触摸设备提示。
+         打字练的是**实体键盘上的手指位置**，屏幕上画的那张键盘图是指法示意，
+         点它不会输入。以前没有这句话：孩子在平板上看到一块很像键盘的图，
+         本能去点，什么都不会发生 —— 没有报错、没有提示，只会认为页面坏了。
+
+         CSS 负责在触摸设备上显示它（不依赖 JS）；一旦真的收到物理按键
+         （说明接了蓝牙键盘），下面这段 JS 会自动把它收起来。 -->
+    <div class="ty-touch-note" id="touchNote">
+      <span class="ty-touch-ico" aria-hidden="true">⌨️</span>
+      <span class="ty-touch-text">
+        <b>打字练习需要实体键盘</b>
+        手机 / 平板请先用蓝牙接一个键盘，或者换电脑打开。
+        下面的键盘图只是指法示意，点它不会输入。
+      </span>
+      <a class="btn ghost sm" href="/">换个学科</a>
+    </div>
+    <script>
+      // 收到物理按键 = 键盘可用 → 提示自动收起（只认第一次）
+      document.addEventListener("keydown", function once() {
+        var n = document.getElementById("touchNote");
+        if (n) n.classList.add("kb-ok");
+        document.removeEventListener("keydown", once);
+      });
+    </script>
+
     <div class="ty-layout">
 
       <!-- 左：阶段与关卡 -->
@@ -177,12 +208,12 @@
      顺序很重要：store → progress → sync → 注册表 → 学科声明 → 内容 → 学科逻辑
      注册表要加载，这样从大厅进来的「继续上次」才认得这一页。 -->
 <script src="/shared/core/store.js?v=873bc876"></script>
-<script src="/shared/core/progress.js?v=3e91e012"></script>
+<script src="/shared/core/progress.js?v=6fe55df1"></script>
 <script src="/shared/core/sync.js?v=231ca547"></script>
 <script src="/shared/core/registry.js?v=0d6e477b"></script>
 <script src="subject.js?v=4ddfca25"></script>
 <script src="data/lessons.js?v=9af62ac6"></script>
-<script src="js/typing.js?v=42f00621"></script>
+<script src="js/typing.js?v=168f8a66"></script>
 
 </body>
 </html>

@@ -1,5 +1,5 @@
 /* ============================================================================
- * 萌学园 · 页面骨架层（顶栏 / 页脚等「每一页都有」的东西）
+ * 萌学园 · 页面骨架层（顶栏等「每一页都有」的东西）
  *
  * 为什么单独一个文件，而不是并进 components.css：
  * Python 和英语站各自有 3000 行 / 900 行的自有组件样式，它们的 class 名
@@ -17,16 +17,21 @@
  *     → 引不引实测逐像素一致；既然没作用就不引：
  *       两套东西同时定义同一批 class，只会让人分不清哪个生效。
  *
- * 顶栏样式只有这一份，改这里所有页面一起变。
- *
+ * 顶栏的形态和契约写在 shared/core/topbar.js 的开头注释里，这里只管样式。
  * 依赖：只依赖 tokens.css 的变量，不依赖任何组件。
  * ========================================================================== */
+
+/* ---------------------------------------------------------------- 顶栏主体 */
 
 .topbar {
   position: sticky; top: 0; z-index: 30;
   display: flex; align-items: center; gap: var(--s3);
   min-height: 58px;
-  padding: var(--s2) var(--s5);
+  /* 顶部安全区。只有 /en/ 声明了 viewport-fit=cover（它会真的铺到刘海下面），
+     其余页面 env() 解析成 0，所以这一条对所有页面都安全。
+     没有它的话 iPhone 上「← 大厅」会整块落在状态栏 / 刘海里 ——
+     而那是全站唯一的回大厅入口。 */
+  padding: calc(var(--s2) + env(safe-area-inset-top, 0px)) var(--s5) var(--s2);
   /* 先用纯色垫底，再用 color-mix 做半透明；老 WebView 不支持时自动降级 */
   background: rgba(255, 255, 255, .88);
   background: color-mix(in srgb, var(--paper-2) 86%, transparent);
@@ -78,26 +83,166 @@
   background: var(--accent-soft);
   font-size: 17px; line-height: 1;
 }
-/* 窄屏上学科名可以省略，但「← 大厅」永远保留 */
 .topbar-brand .tb-name { overflow: hidden; text-overflow: ellipsis; }
+
+/* 「学科名 · 当前子页」里的子页那一段。
+   以前四个页面的标题都是写死的学科名，孩子进了「复习」也看不出自己在哪。 */
+.tb-section {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  min-width: 0;
+  color: var(--ink-soft);
+  font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.tb-section .tb-dot { color: var(--line-strong); font-weight: 400; }
+.tb-section[hidden] { display: none; }
 
 .topbar-spacer { flex: 1 1 auto; min-width: var(--s2); }
 
-/* 右侧操作区：学科自己往里塞按钮，换行时也不挤坏顶栏 */
+/* 学科主操作（最多 2 个） */
 .topbar-actions {
   display: flex; align-items: center; gap: var(--s2);
   flex: 0 1 auto;
   min-width: 0;
 }
 
+/* ---------------------------------------------------------------- 状态胶囊 */
+
+.topbar-status {
+  display: flex; align-items: center; gap: var(--s2);
+  flex: 0 0 auto;
+}
+
+/* 状态里**包含同步**。不要再另开一个同步按钮 ——
+   Python 以前就是「小熊猫档案」和「开启同步」两个按钮点开同一个面板。 */
+.status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-chip);
+  background: var(--paper-2);
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease),
+              background var(--dur-fast) var(--ease),
+              scale var(--dur-fast) var(--ease);
+}
+.status-pill:hover { background: var(--paper-3); }
+.status-pill:active { scale: var(--press); }
+.status-pill .sp-ico { font-size: 13px; line-height: 1; }
+
+.status-pill[data-tone="ok"]   { border-color: color-mix(in srgb, var(--ok) 42%, var(--line));   color: var(--ok); }
+.status-pill[data-tone="warn"] { border-color: color-mix(in srgb, var(--warn) 48%, var(--line)); color: var(--warn); }
+.status-pill[data-tone="bad"]  { border-color: color-mix(in srgb, var(--bad) 48%, var(--line));  color: var(--bad); }
+.status-pill[data-tone="off"]  { color: var(--muted); }
+/* 加载中：呼吸。让孩子知道"它在动"，而不是卡住了 */
+.status-pill[data-tone="busy"] .sp-ico { animation: tb-breathe 1.2s ease-in-out infinite; }
+@keyframes tb-breathe { 0%, 100% { opacity: 1 } 50% { opacity: .3 } }
+@media (prefers-reduced-motion: reduce) {
+  .status-pill[data-tone="busy"] .sp-ico { animation: none; }
+}
+
+/* ---------------------------------------------------------------- HUD 插槽 */
+
+/* 学科把自己的状态节点搬进来（英语站的星星 / 火焰 / 卡片 / 小朋友）。
+   用搬节点而不是重建：那个 #hud 每次路由切换都会被学科自己 innerHTML 重绘，
+   重建出来的副本下一次就被抹掉了。 */
+.topbar-hud {
+  display: flex; align-items: center; gap: var(--s2);
+  flex: 0 1 auto; min-width: 0;
+}
+.topbar-hud:empty { display: none; }
+
+/* ---------------------------------------------------------------- 设置菜单 */
+
+.topbar-settings { position: relative; flex: 0 0 auto; }
+
+.topbar-gear {
+  display: grid; place-items: center;
+  width: 36px; height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-chip);
+  background: var(--paper-2);
+  font-size: 16px; line-height: 1;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease),
+              scale var(--dur-fast) var(--ease);
+}
+.topbar-gear:hover { background: var(--paper-3); }
+.topbar-gear:active { scale: var(--press); }
+.topbar-gear[aria-expanded="true"] { background: var(--accent-soft); border-color: var(--accent); }
+
+.settings-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 40;
+  min-width: 208px;
+  padding: var(--s2);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-block);
+  box-shadow: var(--sh-3);
+}
+.settings-menu[hidden] { display: none; }
+
+.settings-item {
+  display: flex; align-items: center; gap: var(--s3);
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--s3);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+.settings-item:hover { background: var(--paper-3); text-decoration: none; }
+.settings-item:active { scale: var(--press); }
+.settings-item .sm-ico { flex: 0 0 auto; font-size: 16px; line-height: 1; }
+.settings-item .sm-label { flex: 1; }
+.settings-item .sm-note { color: var(--muted); font-size: var(--fs-xs); }
+.settings-sep { height: 1px; margin: var(--s2) var(--s3); background: var(--line); }
+
+/* ---------------------------------------------------------------- 窄屏收敛
+   收敛顺序（先丢最不重要的）：
+     720px 收紧内边距 → 620px 操作只留图标、状态只留圆点 → 480px 收起学科名和子页
+   「← 大厅」在 480px 以下只剩箭头，但它**永远不消失**。 */
+
 @media (max-width: 720px) {
-  .topbar { padding: var(--s2) var(--s3); gap: var(--s2); }
+  /* ⚠️ 这里必须把顶部安全区再算一次。
+     用 `padding` 简写会把上面那条 calc(env(safe-area-inset-top)) 整个覆盖掉 ——
+     手机上就退回 8px，iPhone 的「← 大厅」又掉进刘海里了。 */
+  .topbar {
+    padding: calc(var(--s2) + env(safe-area-inset-top, 0px)) var(--s3) var(--s2);
+    gap: var(--s2);
+  }
   .topbar-back { padding: 0 var(--s3); }
   .topbar-actions { gap: 6px; }
+  .topbar-status { gap: 6px; }
+  .status-pill { padding: 0 8px; }
 }
-/* 很窄时把学科名藏起来，只留图标 + 返回（宁可少显示，也不要换行挤烂）。
-   大厅（.topbar--keep-name）只有品牌 + 一个按钮，放得下，所以保留名字。 */
-@media (max-width: 420px) {
-  .topbar-brand .tb-name { display: none; }
+
+@media (max-width: 620px) {
+  .topbar-actions .tb-label { display: none; }
+  .topbar-actions .btn { padding: 0 10px; }
+  .status-pill .sp-label { display: none; }
+  .status-pill { padding: 0 9px; }
+}
+
+@media (max-width: 480px) {
+  .topbar-brand .tb-name,
+  .tb-section { display: none; }
+  /* 大厅只有品牌 + 一个按钮，放得下，所以保留名字 */
   .topbar--keep-name .topbar-brand .tb-name { display: inline; }
+  .topbar-back .tb-back-label { display: none; }
+  .topbar-back { padding: 0 10px; }
 }

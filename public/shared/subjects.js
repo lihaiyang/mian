@@ -35,12 +35,6 @@ window.MIAN_SUBJECTS = {
       tagline: "认字、笔顺、组词、古诗、阅读理解",
       accent: "#C4562F", accentSoft: "#F9E7DE",
       grades: [1, 2, 3, 4, 5, 6]
-    },
-    {
-      id: "cpp", name: "C++ 工坊", emoji: "⚙️",
-      tagline: "从 Python 再往前一步：类型、数组、算法",
-      accent: "#0F766E", accentSoft: "#DCF2EF",
-      grades: [5, 6]
     }
   ]
 };

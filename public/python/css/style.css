@@ -1218,10 +1218,12 @@ body.dark-mode .turtle-canvas-container {
 
 /* 响应式调整 */
 @media (max-width: 1180px) {
-  /* 顶栏空间紧张时隐藏引擎状态药丸 */
-  .engine-status-pill {
-    display: none;
-  }
+  /* 空间紧张时只留下圆点，**不要整个藏掉**。
+     引擎首次要下载约 13.6 MB、通常 5 秒左右，孩子看不到状态就分不清
+     是在加载还是卡住了。以前这条写的是 display:none —— 连 iPad（1024px）
+     都看不到引擎状态，等于把最需要反馈的那批设备排除在外。 */
+  .engine-status-pill #statusText { display: none; }
+  .engine-status-pill { padding: 3px 7px; }
 }
 
 @media (max-width: 1024px) {
@@ -2592,13 +2594,16 @@ body.dark-mode .award-stat { background: #1E293B; border-color: #334155; }
 
 /* 顶栏「学习中心」按钮：比其它按钮更醒目一点 */
 .learn-top-btn {
-  background: linear-gradient(135deg, var(--accent) 0%, #A855F7 100%) !important;
+  /* 用平台的主色实底按钮，不用原来的「靛蓝→紫」渐变 + 主色光晕：
+     顶栏里已经有同步、引擎、设置三样东西，再来一个饱和渐变会喧宾夺主。
+     它仍然是唯一的实底按钮，主次关系靠「实底 vs 描边」而不是靠颜色堆叠。 */
+  background: var(--accent) !important;
   color: #FFFFFF !important;
   border-color: transparent !important;
   font-weight: 800;
-  box-shadow: 0 4px 12px var(--primary-glow);
+  box-shadow: var(--shadow-sm);
 }
-.learn-top-btn:hover { transform: translateY(-1px); }
+.learn-top-btn:hover { transform: translateY(-1px); filter: brightness(1.06); }
 
 /* ============================================================
    🎓 学堂模式（v2）：把学习面板放进工作台左栏，编辑器与运行舞台原地复用
@@ -3094,9 +3099,65 @@ body.dark-mode .sync-btn.is-error { background: #3B1D1D; }
   .filetree-panel .panel-tools { flex-wrap: wrap; }
 }
 
-/* 更窄（常见手机竖屏 390px）：顶栏再让一步 */
+/* ============================================================================
+   顶栏对齐（2026-09）—— 结构和类名向平台顶栏契约看齐
+   ---------------------------------------------------------------------------
+   重构前顶栏堆了 6 个控件，云同步还占了两个。现在只有：
+     左边：← 大厅 + 🐼 萌码 Python + 当前子页
+     右边：[🎓 学习中心] [引擎状态] [☁️ 同步] [⚙️]
+   不常用的（我的档案 / 示例宝库 / 夜间模式）搬进了 ⚙️ 菜单。
+   id 一个都没改，所以 cloud.js / app.js / python-runner.js 的绑定全部照旧。
+   ========================================================================== */
+
+/* 状态区：引擎状态和云同步挨在一起，和左边的操作区分开 */
+.header-status {
+  display: flex; align-items: center; gap: 8px;
+  min-width: 0;
+}
+
+/* 子页标题接在品牌名后面。
+   ⚠️ 品牌名是渐变文字（-webkit-text-fill-color: transparent），
+   子页标题不能跟着透明，否则会看不见 —— 这里显式把颜色给回来。 */
+.brand-section .tb-section {
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  -webkit-text-fill-color: currentColor;
+}
+.brand-section .tb-section .tb-dot { color: var(--border-strong, var(--border-color)); }
+
+/* 云同步：从「一个按钮」变成状态胶囊，高度和引擎状态对齐 */
+.sync-btn { height: 28px; padding: 0 10px; }
+.sync-btn .sync-dot { font-size: 12px; }
+.sync-btn .sync-label { font-size: 11px; }
+
+/* 引擎状态收一收：它是状态，不该和「学习中心」一样抢眼 */
+.engine-status-pill { padding: 3px 9px; font-size: 11px; }
+
+/* 设置菜单里的「我的档案」那一行 */
+.settings-item #userAvatar { font-size: 17px; }
+
+/* 很窄：顶栏只留图标。注意「← 大厅」永远不消失（chrome.css 负责） */
 @media (max-width: 480px) {
+  /* .user-chip 已经不存在了（搬进设置菜单），这条留着防止旧缓存页面错位 */
   .user-chip { display: none !important; }
   .engine-status-pill #statusText { display: none; }
   .editor-panel { min-height: 58vh; }
+  .header-status { gap: 6px; }
+}
+
+/* ============================================================================
+   触摸设备：把「只靠 hover 才出现」的功能放出来
+   ---------------------------------------------------------------------------
+   .folder-head 上的「新建文件 / 改名 / 删除」原来是 :hover 才 display:flex。
+   触摸屏上 :hover 不会触发，而且点文件夹行会 toggleFolder() **重绘整个列表**，
+   连 tap 产生的"粘性 hover"都会被换成新节点 —— 实测真实触摸点两次也出不来。
+
+   结果：孩子在平板上**无法在文件夹里新建文件、无法给文件夹改名、无法删除文件夹**。
+   这三个按钮一直在 DOM 里，只是永远看不见。
+
+   触摸设备上让它们常显，并让出计数角标的位置（和 hover 时的处理一致）。
+   ========================================================================== */
+@media (hover: none), (pointer: coarse) {
+  .folder-head .folder-actions { display: flex; }
+  .folder-head .folder-count { display: none; }
 }

@@ -203,6 +203,8 @@
 
     $("stageTitle").textContent = l.stage;
     $("lessonTitle").textContent = l.title;
+    // 顶栏也显示当前在练哪一关 —— 否则孩子在关卡里看不出自己在哪
+    if (window.Topbar) Topbar.setSection(l.title);
     $("lessonDesc").textContent = l.desc;
     $("lessonTip").textContent = l.tip || "";
     $("lessonTip").style.display = l.tip ? "" : "none";

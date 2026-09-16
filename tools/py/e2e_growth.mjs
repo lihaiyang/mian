@@ -75,7 +75,11 @@ if (await page.isVisible("#confirmModal.active")) {
 }
 check("新手引导可关闭", !(await page.isVisible("#confirmModal.active")));
 
-// 3. 打开成长面板（顶栏头像）→ 等级卡 / 每日任务 / 奖牌 / 徽章
+// 3. 打开成长面板 → 等级卡 / 每日任务 / 奖牌 / 徽章
+//    「我的档案」已经从顶栏搬进 ⚙️ 设置菜单（顶栏 6 个控件收敛成 3 个），
+//    所以要先开菜单再点里头那一项。
+await page.click("#pyGear");
+await page.waitForSelector("#pyMenu:not([hidden])", { timeout: 5000 });
 await page.click("#btnUserChip");
 await sleep(300);
 check("成长面板打开", await page.isVisible("#myPanel .level-card"));

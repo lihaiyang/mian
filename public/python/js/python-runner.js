@@ -68,7 +68,7 @@ const PythonRunner = (() => {
   // ================= 初始化 =================
   function init() {
     if (worker) return;
-    updateStatus("loading", "正在召唤 Python 3.12 魔法引擎... ✨");
+    updateStatus("loading", "加载中");
 
     try {
       inputSab = new SharedArrayBuffer(SAB_SIZE * 4);
@@ -76,7 +76,8 @@ const PythonRunner = (() => {
       interruptSab = new SharedArrayBuffer(8);   // [0]=SIGINT 信号, [1]=用户停止标志
       interruptBuf = new Int32Array(interruptSab);
     } catch (e) {
-      updateStatus("error", "⚠️ 浏览器不支持 SharedArrayBuffer，请升级浏览器");
+      updateStatus("error", "不支持",
+        "这个浏览器不支持运行 Python 需要的 SharedArrayBuffer。请换用较新的 Chrome / Edge / Safari。");
       return;
     }
 
@@ -91,7 +92,7 @@ const PythonRunner = (() => {
     worker.addEventListener('message', handleWorkerMessage);
     worker.addEventListener('error', (e) => {
       console.error('Worker error:', e);
-      updateStatus("error", "⚠️ Python 引擎遇到异常");
+      updateStatus("error", "出错", "Python 引擎遇到异常，刷新页面通常能恢复。");
       if (isRunning) {
         appendLog("error", "❌ Python 引擎出现异常，请点击「运行代码」重试");
         finishRun();
@@ -111,7 +112,7 @@ const PythonRunner = (() => {
     isRunning = false;
     setRunButtonState(false);
     hideTerminalInput();
-    updateStatus("loading", "正在重新启动 Python 引擎... ✨");
+    updateStatus("loading", "重启中");
     startWorker();
   }
 
@@ -265,7 +266,7 @@ const PythonRunner = (() => {
     switch (data.type) {
       case 'ready':
         isReady = true;
-        updateStatus("ready", "🟢 Python 3.12 魔法就绪！");
+        updateStatus("ready", "就绪");
         break;
 
       case 'judge-result': {
@@ -464,7 +465,7 @@ const PythonRunner = (() => {
         }
         setTimeout(waitReady, 200);
       };
-      updateStatus("loading", "正在准备 Python 引擎，马上就能批改…");
+      updateStatus("loading", "准备中");
       waitReady();
     });
   }
@@ -696,12 +697,22 @@ const PythonRunner = (() => {
     });
   }
 
-  function updateStatus(state, text) {
+  // 顶栏空间有限：标签只放最短的状态词，完整说明放 title（悬停可看）。
+  // 圆点颜色已经在表达状态了，文字再重复一遍就太占地方。
+  const STATUS_TITLE = {
+    loading: "正在加载 Python 3.12 引擎（首次打开要下载约 13.6 MB，通常 5 秒左右）",
+    ready:   "Python 3.12 引擎已就绪，可以运行代码了",
+    error:   "Python 引擎没能启动"
+  };
+
+  function updateStatus(state, text, title) {
     const dot = document.getElementById("statusDot");
     const label = document.getElementById("statusText");
     if (!dot || !label) return;
     dot.className = "status-dot " + (state === "ready" ? "" : state);
     label.textContent = text;
+    const pill = document.getElementById("engineStatusPill");
+    if (pill) pill.title = title || STATUS_TITLE[state] || text;
   }
 
   function showTerminalInput() {

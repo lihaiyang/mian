@@ -123,7 +123,13 @@
 }
 .ty-text .ch { border-radius: 3px; transition: background var(--dur) var(--ease); }
 .ty-text .ch.ok  { color: var(--ok); }
-.ty-text .ch.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 18%, transparent); }
+.ty-text .ch.bad {
+  color: var(--bad);
+  /* 兜底在前：老浏览器不认 color-mix() 会整条丢掉后面的声明，
+     那就退回这个纯色，而不是变成透明（透明会让红字压在白底上，仍可读） */
+  background: #F7D4D4;
+  background: color-mix(in srgb, var(--bad) 18%, transparent);
+}
 .ty-text .ch.cur {
   background: var(--accent);
   color: var(--accent-ink);
@@ -177,10 +183,20 @@
   transform: translateY(1px);
   border-bottom-width: 1px;
 }
-/* 热力图：错得越多越红 */
-.kbd-key.heat-1 { background: color-mix(in srgb, var(--bad) 18%, var(--paper-2)); }
-.kbd-key.heat-2 { background: color-mix(in srgb, var(--bad) 38%, var(--paper-2)); }
-.kbd-key.heat-3 { background: color-mix(in srgb, var(--bad) 58%, var(--paper-2)); color: #fff; }
+/* 热力图：错得越多越红。
+   ⚠️ 每一档都先给一个**纯色兜底**再写 color-mix()。
+   原因：color-mix() 不支持时（Chrome<111 / Safari<16.2，微信内置浏览器
+   在安卓 8–12 的存量机型大多在这区间）后面的声明会被整条丢掉，
+   背景退回 .kbd-key 的 var(--paper-2)=白色 —— 而 color:#fff 是另一条
+   独立声明、不受影响，于是变成**白字白底、对比度 1.0**：
+   错得最多的那个键恰恰显示成一个空白方块，信息不是变丑，是反了。 */
+.kbd-key.heat-1 { background: #F2D6D6; background: color-mix(in srgb, var(--bad) 18%, var(--paper-2)); }
+.kbd-key.heat-2 { background: #E7ACAC; background: color-mix(in srgb, var(--bad) 38%, var(--paper-2)); }
+.kbd-key.heat-3 {
+  background: #C97A7A;
+  background: color-mix(in srgb, var(--bad) 58%, var(--paper-2));
+  color: #fff;
+}
 .kbd-key.next.heat-1, .kbd-key.next.heat-2, .kbd-key.next.heat-3 {
   background: var(--accent); color: var(--accent-ink);
 }
@@ -312,6 +328,32 @@
   border-radius: var(--r-block);
   font-size: var(--fs-sm);
 }
+/* ---------------------------------------------------------------- 触摸设备提示 */
+
+/* 默认不显示：电脑用户完全看不到它，也不需要 JS 参与。
+   只在触摸设备（没有 hover / 指针是粗的）上出现。 */
+.ty-touch-note { display: none; }
+
+@media (hover: none), (pointer: coarse) {
+  .ty-touch-note {
+    display: flex; align-items: center; gap: var(--s3);
+    margin-bottom: var(--s4);
+    padding: var(--s3) var(--s4);
+    background: var(--warn-soft);
+    /* 兜底在前，color-mix 失败时仍有描边 */
+    border: 1px solid #E8C99A;
+    border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--line));
+    border-radius: var(--r-card);
+    color: var(--ink);
+    font-size: var(--fs-sm);
+  }
+  /* 收到物理按键说明接了键盘，JS 会加上这个类把提示收起来 */
+  .ty-touch-note.kb-ok { display: none; }
+}
+.ty-touch-ico { flex: 0 0 auto; font-size: 24px; line-height: 1; }
+.ty-touch-text { flex: 1; min-width: 0; line-height: 1.5; }
+.ty-touch-text b { display: block; margin-bottom: 2px; }
+
 .muted { color: var(--muted); }
 
 /* ---------------------------------------------------------------- 窄屏收敛

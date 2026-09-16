@@ -10,77 +10,115 @@
   <link rel="stylesheet" href="/vendor/codemirror/codemirror.min.css" data-page-node-id="F6m5S0eWVsUeraOTNQriYe">
   <link rel="stylesheet" href="/vendor/codemirror/show-hint.min.css">
   
-  <!-- 平台层：设计令牌 + 顶栏样式。
-       只引这两个，**不引** base.css / components.css ——
+  <!-- 平台层：设计令牌 + 顶栏样式 + 顶栏脚本。
+       只引这两个样式表，**不引** base.css / components.css ——
        Python 有自己的组件系统（3000 行），组件层的 .chip / .section-title
-       会误伤它（它用了这些 class 名但没自己定义）。见 shared/styles/chrome.css -->
+       会误伤它（它用了这些 class 名但没自己定义）。见 shared/styles/chrome.css
+
+       topbar.js 在这里同步加载（不是 defer）：下面 header 之后的内联脚本
+       要用 Topbar.bindMenu 接上「⚙️ 设置菜单」的开合。 -->
+  <script src="/shared/core/topbar.js?v=e382f937"></script>
   <link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
-  <link rel="stylesheet" href="/shared/styles/chrome.css?v=b3dec025">
+  <link rel="stylesheet" href="/shared/styles/chrome.css?v=77cc90e4">
 
   <!-- 全局自定义少儿样式。它开头的 :root 已经把变量接到平台令牌上了，
        所以下面 3000 行布局不用改就换了质感。 -->
-  <link rel="stylesheet" href="css/style.css?v=7c85552d" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
+  <link rel="stylesheet" href="css/style.css?v=bc4134b5" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
 </head>
 <body data-page-node-id="MABBDhhrP5uEOfEzmMJlsw">
 
-  <!-- ================= 顶部导航与控制栏 ================= -->
-  <header class="app-header" data-page-node-id="QBborKtDQEFyecJYM4Kvfl">
+  <!-- ================= 顶部导航与控制栏 =================
+       全平台顶栏长得一样：左边「← 大厅 + 学科 + 当前子页」，右边「主操作 + 状态 + 设置」。
+
+       这一页**没有**用 shared/core/topbar.js 去渲染整条顶栏，因为这里每个控件
+       都被自己的 JS 绑着（cloud.js 更新同步状态、python-runner.js 更新引擎状态、
+       app.js 绑点击）。所以做法是：结构和类名对齐顶栏契约，**id 一个都不动**。
+
+       重构前这里堆了 6 个控件，而且云同步占了两个（「小熊猫档案」和
+       「开启同步」点开的是同一个面板）。现在：
+         · 两个同步控件合并成一个状态胶囊（id 仍是 btnSyncNow）
+         · 引擎大药丸收成小状态胶囊
+         · 示例宝库 / 夜间模式 / 我的档案 搬进 ⚙️ 设置菜单（id 不变）
+         · 只有「学习中心」留在明面上 —— 那是课程入口，是主操作 -->
+  <header class="app-header" id="pyTopbar">
     <div class="brand-section" data-page-node-id="07ly9LXeqeI2svdJJKlCAZ">
       <!-- 回大厅。以前这一页一个链接都没有，孩子进来就出不去了 -->
-      <a class="topbar-back" id="btnBackLobby" href="/" title="回到大厅，换一个学科">
-        <span class="tb-arrow" aria-hidden="true">←</span><span>大厅</span>
+      <a class="topbar-back" id="btnBackLobby" href="/" aria-label="回到大厅" title="回到大厅，换一个学科">
+        <span class="tb-arrow" aria-hidden="true">←</span>
+        <span class="tb-back-label">大厅</span>
       </a>
       <div class="brand-logo-wrap" title="点击探索更多" data-page-node-id="6JMoVfCLjCEiocGolK3pAc">
         <span data-page-node-id="aWoi3eL2wjScEBbekdGp76">🐼</span>
       </div>
-      <div data-page-node-id="fSH5emo0kLuxiIUkfWlEoe">
-        <h1 class="brand-title" data-page-node-id="0UVLh29it8vUMJYHEPDGcT">
-          萌码 Python <span class="brand-badge" data-page-node-id="GasbrTJEoztHjYKUvNeyhv">少儿探索版</span>
-        </h1>
-      </div>
+      <h1 class="brand-title" data-page-node-id="0UVLh29it8vUMJYHEPDGcT">
+        萌码 Python <span class="brand-badge" data-page-node-id="GasbrTJEoztHjYKUvNeyhv">少儿探索版</span>
+      </h1>
+      <!-- 当前子页（工坊 / 学习中心 / 某一课）。由 app.js 更新，孩子才知道自己在哪 -->
+      <span class="tb-section" id="pySection" hidden></span>
     </div>
 
     <!-- 核心运行与主要操作 -->
     <div class="header-actions" data-page-node-id="2E5QH4EX70tCF0wSaRFhpI">
-      <!-- 当前小朋友：头像 + 昵称 + 云同步状态（点开云同步面板） -->
-      <button class="header-btn user-chip" id="btnUserChip" title="云同步 / 我的档案">
-        <span class="user-avatar" id="userAvatar">🐼</span>
-        <span class="user-name" id="userName">小朋友</span>
-        <span class="cloud-dot" id="cloudDot">☁️</span>
+
+      <!-- 主操作：学习中心（教程 / 示例 / 练习 / 模拟考） -->
+      <button class="header-btn learn-top-btn" id="btnOpenLearnTop" title="打开学习中心：跟着教程学、做练习、模拟考">
+        <span aria-hidden="true">🎓</span>
+        <span class="tb-label">学习中心</span>
       </button>
 
-      <!-- 云同步：显示同步状态，点一下立即同步 -->
-      <button class="header-btn sync-btn" id="btnSyncNow" title="云同步">
-        <span class="sync-dot" id="syncDot">☁️</span>
-        <span class="sync-label" id="syncLabel">开启同步</span>
-      </button>
+      <!-- ---- 状态区：引擎 + 云同步 ---- -->
+      <div class="header-status">
+        <!-- 引擎状态：原来是个占掉半个顶栏的大药丸，收成小胶囊 -->
+        <div class="engine-status-pill" id="engineStatusPill" title="基于 WebAssembly 的完整 Python 3 引擎" data-page-node-id="e5VYOvrETS4CQjE2YDQpU2">
+          <span class="status-dot loading" id="statusDot" data-page-node-id="CdKCpnLEI76036Kv5bckhp"></span>
+          <span id="statusText" data-page-node-id="tyni87kGQ4mvx6hGjBH9r1">魔法引擎加载中...</span>
+        </div>
 
-      <!-- 引擎状态小药丸 -->
-      <div class="engine-status-pill" id="engineStatusPill" title="基于 WebAssembly 的完整 Python 3 引擎" data-page-node-id="e5VYOvrETS4CQjE2YDQpU2">
-        <span class="status-dot loading" id="statusDot" data-page-node-id="CdKCpnLEI76036Kv5bckhp"></span>
-        <span id="statusText" data-page-node-id="tyni87kGQ4mvx6hGjBH9r1">魔法引擎加载中...</span>
+        <!-- 云同步：合并了原来的「小熊猫档案」和「开启同步」。
+             id 仍是 btnSyncNow → app.js 的点击绑定和 cloud.js 的
+             renderSyncButton() 都不用改；#userAvatar / #userName / #cloudDot
+             搬进了下面的设置菜单，cloud.js 的 renderChip() 照样找得到。 -->
+        <button class="header-btn sync-btn" id="btnSyncNow" title="云同步">
+          <span class="sync-dot" id="syncDot">☁️</span>
+          <span class="sync-label" id="syncLabel">开启同步</span>
+        </button>
       </div>
 
-      <!-- 学习中心：教程 / 示例 / 练习 / 模拟考，一键进入 -->
-      <button class="header-btn learn-top-btn" id="btnOpenLearnTop" title="打开学习中心：跟着教程学、做练习、模拟考">
-        <span>🎓</span>
-        <span>学习中心</span>
-      </button>
-
-      <!-- 示例库重置 -->
-      <button class="header-btn" id="btnResetDemos" title="打开示例宝库：145 个示例，含 12 个小游戏" data-page-node-id="98KQCKeXC37G73yST2L2YO">
-        <span data-page-node-id="lVHTuDGxYeBRsQwWM8oe5G">🎁</span>
-        <span data-page-node-id="2gVHTI6TQbOSrHzu2YnxIk">示例宝库</span>
-      </button>
-
-      <!-- 主题切换 -->
-      <button class="header-btn" id="btnToggleTheme" title="切换白天/星空夜景模式" data-page-node-id="iQBGfUGH19lan2SY2EgMTQ">
-        <span id="themeIcon" data-page-node-id="QsA4yp2TkYhFaIhcDS2hi8">🌙</span>
-      </button>
+      <!-- ---- 设置：不常用的都收进来 ---- -->
+      <div class="topbar-settings">
+        <button type="button" class="topbar-gear" id="pyGear"
+                aria-haspopup="true" aria-expanded="false" aria-label="设置" title="设置">
+          <span aria-hidden="true">⚙️</span>
+        </button>
+        <div class="settings-menu" id="pyMenu" role="menu" hidden>
+          <button type="button" class="settings-item" role="menuitem" id="btnUserChip" title="我的档案 / 云同步">
+            <span class="sm-ico" id="userAvatar">🐼</span>
+            <span class="sm-label" id="userName">小朋友</span>
+            <span class="sm-note" id="cloudDot">☁️</span>
+          </button>
+          <button type="button" class="settings-item" role="menuitem" id="btnResetDemos" title="打开示例宝库：145 个示例，含 12 个小游戏">
+            <span class="sm-ico" aria-hidden="true">🎁</span>
+            <span class="sm-label">示例宝库</span>
+          </button>
+          <div class="settings-sep" role="separator"></div>
+          <button type="button" class="settings-item" role="menuitem" id="btnToggleTheme" title="切换白天/星空夜景模式">
+            <span class="sm-ico" id="themeIcon" aria-hidden="true">🌙</span>
+            <span class="sm-label">夜间模式</span>
+          </button>
+        </div>
+      </div>
 
       <!-- 运行 / 停止 / 清空按钮已移到右侧「运行舞台」面板上方（见 .run-bar），贴近输出结果 -->
     </div>
   </header>
+
+  <script>
+    // Python 保留自有顶栏 DOM，只借用顶栏组件里的「⚙️ 设置菜单」这一段行为。
+    (function () {
+      if (!window.Topbar || !Topbar.bindMenu) return;
+      Topbar.bindMenu(document.getElementById("pyGear"), document.getElementById("pyMenu"));
+    })();
+  </script>
 
   <!-- ================= 学堂模式：顶部标签条（只在学堂模式显示，上面的顶栏保持原样） ================= -->
   <div class="learn-bar" id="learnBar">
@@ -469,7 +507,7 @@
   <script src="js/turtle-canvas.js?v=5836a39a"></script>
   <script src="js/zip-writer.js?v=71766d60"></script>
   <script src="js/poster.js?v=f2e8e885"></script>
-  <script src="js/python-runner.js?v=cc35b8c4"></script>
+  <script src="js/python-runner.js?v=c6c24649"></script>
   <script src="js/editor.js?v=93ad174c"></script>
   <script src="js/file-tree.js?v=2492263a"></script>
   <script src="js/progress.js?v=48bf25a3"></script>

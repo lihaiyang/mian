@@ -21,12 +21,6 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
 
-# 将来的 C++ 同样需要：Runno 的 WASI 运行时也是用
-# SharedArrayBuffer + Atomics.wait 实现交互式 std::cin 的。
-/cpp/*
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: require-corp
-
 # ---------------------------------------------------------------------------
 # 缓存
 # ---------------------------------------------------------------------------
