@@ -18,8 +18,9 @@
        topbar.js 在这里同步加载（不是 defer）：下面 header 之后的内联脚本
        要用 Topbar.bindMenu 接上「⚙️ 设置菜单」的开合。 -->
   <script src="/shared/core/topbar.js?v=e382f937"></script>
+  <script src="/shared/core/account-ui.js?v=74e0317f"></script>
   <link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
-  <link rel="stylesheet" href="/shared/styles/chrome.css?v=77cc90e4">
+  <link rel="stylesheet" href="/shared/styles/chrome.css?v=c0c00792">
 
   <!-- 全局自定义少儿样式。它开头的 :root 已经把变量接到平台令牌上了，
        所以下面 3000 行布局不用改就换了质感。 -->
@@ -91,7 +92,16 @@
           <span aria-hidden="true">⚙️</span>
         </button>
         <div class="settings-menu" id="pyMenu" role="menu" hidden>
-          <button type="button" class="settings-item" role="menuitem" id="btnUserChip" title="我的档案 / 云同步">
+          <!-- 全平台共用的账号面板：从这里登录，英语站和键盘岛的同步码
+               也会一起写好（一个码管所有学科）。 -->
+          <button type="button" class="settings-item" role="menuitem" id="btnAccount" title="一个同步码管所有学科">
+            <span class="sm-ico" aria-hidden="true">☁️</span>
+            <span class="sm-label">账号与云同步</span>
+            <span class="sm-note" id="accNote"></span>
+          </button>
+          <div class="settings-sep" role="separator"></div>
+          <!-- 档案是 Python 自己的概念（一个账号下可以给每个孩子建一个） -->
+          <button type="button" class="settings-item" role="menuitem" id="btnUserChip" title="我的档案：一个账号下可以给每个孩子建一个">
             <span class="sm-ico" id="userAvatar">🐼</span>
             <span class="sm-label" id="userName">小朋友</span>
             <span class="sm-note" id="cloudDot">☁️</span>
@@ -115,8 +125,17 @@
   <script>
     // Python 保留自有顶栏 DOM，只借用顶栏组件里的「⚙️ 设置菜单」这一段行为。
     (function () {
-      if (!window.Topbar || !Topbar.bindMenu) return;
-      Topbar.bindMenu(document.getElementById("pyGear"), document.getElementById("pyMenu"));
+      if (window.Topbar && Topbar.bindMenu) {
+        Topbar.bindMenu(document.getElementById("pyGear"), document.getElementById("pyMenu"));
+      }
+      // 账号与同步走**全平台共用**的那一份面板：从这里登录之后，
+      // 英语站和键盘岛的同步码也会一起写好（一个码管所有学科）。
+      var btn = document.getElementById("btnAccount");
+      if (btn && window.AccountUI) {
+        btn.addEventListener("click", function () { AccountUI.open(); });
+        var note = document.getElementById("accNote");
+        if (note) note.textContent = AccountUI.status().loggedIn ? "已登录" : "未开启";
+      }
     })();
   </script>
 

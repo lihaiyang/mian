@@ -19,7 +19,7 @@
                          两套东西同时定义同一批 class 只会让人分不清哪个生效
                          （Python 站就是被这个坑过）。实测引不引它，整页截图逐像素一致。 -->
 <link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
-<link rel="stylesheet" href="/shared/styles/chrome.css?v=77cc90e4">
+<link rel="stylesheet" href="/shared/styles/chrome.css?v=c0c00792">
 <link rel="stylesheet" href="css/style.css?v=c32d0f1a">
 <link rel="stylesheet" href="css/games.css?v=ff19c633">
 <link rel="stylesheet" href="css/print.css?v=c77d49bb" media="print">
@@ -34,16 +34,25 @@
   <a class="topbar-back" href="/">← 大厅</a>
 </header>
 <script src="/shared/core/topbar.js?v=e382f937"></script>
+<script src="/shared/core/account-ui.js?v=74e0317f"></script>
 <script>
   // 顶栏右侧那四块（星星 / 火焰 / 待复习卡片 / 小朋友）里的数字是动态的：
   // en/js/app.js 的 renderHud() 在每次路由切换时用 innerHTML 整块重绘 #hud，
   // 然后把点击事件绑在 #hudProfile 上。所以**不能**用 actions 把它们静态
   // 重建一遍 —— 重建出来的节点下一次 renderHud() 就被抹掉了，数字也不动了。
-  // 做法：顶栏只渲染「← 大厅 + 学科标识」，HUD 继续由 app.js 渲染，
-  // 页面末尾那段脚本再把原来的 #hud 节点整体搬进顶栏右侧（id 不变 = 绑定不变）。
+  // 做法：顶栏渲染「← 大厅 + 学科标识 + 一个 hud 插槽」，HUD 继续由 app.js 渲染，
+  // 页面末尾那段脚本再把原来的 #hud 节点整体搬进插槽（id 不变 = 绑定不变）。
   // 外面套一层判断：topbar.js 没到（CDN 抽风 / 离线首屏）时用 HTML 里那个静态
   // 兜底链接，而不是抛一个 "Topbar is not defined"。
-  if (window.Topbar) Topbar.mount({ mount: "#topbar", emoji: "🌴", name: "萌语岛" });
+  if (window.Topbar) {
+    Topbar.mount({
+      mount: "#topbar", emoji: "🌴", name: "萌语岛",
+      hudHost: true,
+      settings: [{ id: "btnAccount", emoji: "☁️", label: "账号与云同步" }]
+    });
+    var accBtn = document.getElementById("btnAccount");
+    if (accBtn && window.AccountUI) accBtn.addEventListener("click", function () { AccountUI.open(); });
+  }
 </script>
 
 <div class="app">
@@ -77,7 +86,9 @@
   var hud = document.getElementById("hud");
   var bar = document.getElementById("topbar");
   if (!hud || !bar || !window.Topbar) return;
-  bar.appendChild(hud);
+  // 搬进顶栏预留的插槽（在「主操作」和「状态/设置」之间）；
+  // 插槽不在（老版本顶栏）就退回直接挂在顶栏上。
+  (document.getElementById("topbarHud") || bar).appendChild(hud);
   var head = document.querySelector(".app-header");
   if (head && !head.children.length) head.remove();
 })();

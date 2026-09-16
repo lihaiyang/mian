@@ -246,3 +246,100 @@
   .topbar-back .tb-back-label { display: none; }
   .topbar-back { padding: 0 10px; }
 }
+
+/* ---------------------------------------------------------------- 账号与同步面板 */
+/* 面板样式放在 chrome.css 而不是 components.css：
+   Python 和英语站不加载组件层，但它们也要用这个面板。
+   类名统一 acc- 前缀，避开 Python 的 .modal-* 和英语站自己的命名。 */
+
+.acc-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  display: none; align-items: center; justify-content: center;
+  padding: var(--s4);
+  background: rgba(30, 22, 12, .45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.acc-overlay.open { display: flex; }
+
+.acc-card {
+  width: 100%; max-width: 460px; max-height: 86vh; overflow: auto;
+  padding: var(--s5);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-3);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.acc-title { font-size: var(--fs-h2); font-weight: 700; margin-bottom: var(--s2); }
+.acc-desc  { color: var(--ink-soft); font-size: var(--fs-sm); margin-bottom: var(--s4); }
+.acc-sec   { margin: var(--s5) 0 var(--s2); font-size: var(--fs-xs); font-weight: 700;
+             color: var(--muted); letter-spacing: .5px; }
+.acc-muted { color: var(--muted); font-size: var(--fs-sm); }
+.acc-hint  { margin-top: var(--s3); color: var(--muted); font-size: var(--fs-xs); line-height: 1.5; }
+
+.acc-codebox {
+  padding: var(--s4);
+  background: var(--accent-soft);
+  border-radius: var(--r-block);
+  text-align: center;
+}
+.acc-code {
+  font-family: var(--font-mono);
+  font-size: 26px; font-weight: 700; letter-spacing: 3px;
+  color: var(--accent);
+  word-break: break-all;
+  font-variant-numeric: tabular-nums;
+}
+
+.acc-subj { display: flex; justify-content: space-between; gap: var(--s3); padding: 6px 0;
+            font-size: var(--fs-sm); }
+.acc-subj-note { color: var(--muted); font-size: var(--fs-xs); }
+
+.acc-field { display: block; margin-bottom: var(--s3); }
+.acc-field > span { display: block; margin-bottom: 4px; color: var(--ink-soft); font-size: var(--fs-sm); }
+.acc-input {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0 var(--s3);
+  background: var(--paper-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-btn);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  /* 16px 是 iOS 的下限：小于它，聚焦时整页会被自动放大 */
+  font-size: 16px;
+}
+
+.acc-btn {
+  min-height: var(--tap-min);
+  padding: 0 var(--s5);
+  border: 1px solid transparent;
+  border-radius: var(--r-btn);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: inherit; font-size: var(--fs-body); font-weight: 600;
+  cursor: pointer;
+  transition: filter var(--dur-fast) var(--ease), scale var(--dur-fast) var(--ease);
+}
+.acc-btn:hover { filter: brightness(1.06); }
+.acc-btn:active { scale: var(--press); }
+.acc-btn[disabled] { opacity: .5; cursor: not-allowed; }
+.acc-btn.ghost { background: var(--paper-2); border-color: var(--line); color: var(--ink-soft); }
+.acc-btn.wide { width: 100%; margin-bottom: var(--s3); }
+
+.acc-row { display: flex; gap: var(--s3); margin-top: var(--s4); flex-wrap: wrap; }
+.acc-row-end { justify-content: flex-end; }
+.acc-row .acc-btn { flex: 1 1 auto; }
+
+.acc-msg { margin-top: var(--s3); color: var(--warn); font-size: var(--fs-sm); min-height: 1.2em; }
+.acc-msg:empty { display: none; }
+
+@media (max-width: 480px) {
+  .acc-card { padding: var(--s4); }
+  .acc-code { font-size: 22px; letter-spacing: 2px; }
+}

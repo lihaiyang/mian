@@ -468,7 +468,11 @@
             collect: function () {
               var row = Progress.exportRow();
               return [{
-                row_id: "progress",
+                // row_id 必须带上档案 id。sub_rows 的主键是
+                // (account_id, subject, entity, row_id)，**不含 profile_id** ——
+                // 写死 "progress" 的话，一个账号下两个孩子的进度会落到同一行，
+                // 后推的覆盖先推的。
+                row_id: "progress__" + Progress.profileId(),
                 profile_id: Progress.profileId(),
                 payload_json: row.stats_json,
                 updated_at: row.updated_at
@@ -476,8 +480,13 @@
             },
             apply: function (rows) {
               var n = 0;
+              var me = Progress.profileId();
               (rows || []).forEach(function (r) {
                 if (r.deleted) return;
+                // 只应用属于**当前档案**的行：一个账号下可能有多个孩子，
+                // 他们的进度是并列的行，不能互相导入。
+                // （profile_id 由 /api/v1/sync 的 GET 回传，见该文件里的注释）
+                if (r.profile_id && r.profile_id !== me) return;
                 if (Progress.importRow({ stats_json: r.payload_json, updated_at: r.updated_at })) n++;
               });
               return n;
@@ -529,7 +538,14 @@
       });
     }
     bindModal("btnProgress", "progressModal", refreshProgressPanel);
-    bindModal("btnSync", "syncModal", refreshSyncPanel);
+    // 「云同步」胶囊改成打开**全平台共用**的账号面板（AccountUI）——
+    // 一个同步码管所有学科，孩子只需要记住一个。
+    // 绑定在 index.html 的顶栏脚本里做；只有当那个脚本没跑起来时，
+    // 才退回打字自己的同步弹窗（保证功能不丢）。
+    if (!(window.AccountUI && document.getElementById("btnSync")
+          && document.getElementById("btnSync").dataset.accBound === "1")) {
+      bindModal("btnSync", "syncModal", refreshSyncPanel);
+    }
 
     // 同步操作
     $("btnCreateCode").addEventListener("click", function () {

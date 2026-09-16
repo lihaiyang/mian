@@ -60,15 +60,21 @@ export async function onRequestGet({ request, env }) {
   ).bind(acc.id, since).all()).results || [];
 
   const rows = (await db.prepare(
-    "SELECT entity, row_id, payload_json, updated_at, deleted, rev FROM sub_rows " +
+    "SELECT entity, row_id, profile_id, payload_json, updated_at, deleted, rev FROM sub_rows " +
     "WHERE account_id = ? AND subject = ? AND rev > ?"
   ).bind(acc.id, subject, since).all()).results || [];
 
   // 按实体分组，前端拿到就能直接用（和 /api/en/sync 的形状保持一致）
+  //
+  // ⚠️ profile_id 必须回传。sub_rows 的主键是
+  // (account_id, subject, entity, row_id) —— **不含 profile_id**，
+  // 所以一个账号下多个孩子的行是并列的。客户端不拿到 profile_id 就无法
+  // 分辨"这行是谁的"，会把别人的进度导进当前档案。
   const grouped = {};
   for (const r of rows) {
     (grouped[r.entity] = grouped[r.entity] || []).push({
       row_id: r.row_id,
+      profile_id: r.profile_id,
       payload_json: r.payload_json,
       updated_at: r.updated_at,
       deleted: r.deleted

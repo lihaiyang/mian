@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
 <link rel="stylesheet" href="/shared/styles/base.css?v=393d5261">
 <link rel="stylesheet" href="/shared/styles/components.css?v=2264217d">
-<link rel="stylesheet" href="/shared/styles/chrome.css?v=77cc90e4">
+<link rel="stylesheet" href="/shared/styles/chrome.css?v=c0c00792">
 </head>
 <body>
 
@@ -33,6 +33,20 @@
     <span class="topbar-actions">
       <!-- 家长中心是 M6 的内容，先把入口摆上，点了给一句说明而不是死链 -->
       <a class="btn ghost sm" href="/parent/" id="parentLink">👨‍👩‍👧 家长中心</a>
+    </span>
+    <!-- 设置：账号与同步是全域的东西，放在大厅最顺手 -->
+    <span class="topbar-settings">
+      <button type="button" class="topbar-gear" id="topbarGear"
+              aria-haspopup="true" aria-expanded="false" aria-label="设置" title="设置">
+        <span aria-hidden="true">⚙️</span>
+      </button>
+      <div class="settings-menu" id="topbarMenu" role="menu" hidden>
+        <button type="button" class="settings-item" role="menuitem" id="btnAccount">
+          <span class="sm-ico" aria-hidden="true">☁️</span>
+          <span class="sm-label">账号与云同步</span>
+          <span class="sm-note" id="accNote"></span>
+        </button>
+      </div>
     </span>
   </header>
 
@@ -70,11 +84,27 @@
      好在卡片上显示"经验 N"。（老站两个 manifest 读的是自己的历史键
      codepanda_* / en_*，不走 Store，那是历史包袱，见 docs 的多学科设计。） -->
 <script src="/shared/core/store.js?v=873bc876"></script>
+<script src="/shared/core/topbar.js?v=e382f937"></script>
+<script src="/shared/core/account-ui.js?v=74e0317f"></script>
 <script src="/shared/core/registry.js?v=0d6e477b"></script>
 <script src="/shared/subjects.js?v=23ec3921"></script>
 <script>
 (function () {
   "use strict";
+
+  // ---- 设置菜单 + 账号与云同步 ----
+  // 账号面板是全平台共用的一份（AccountUI）：一次登录，Python / 英语 / 打字
+  // 三个学科都会拿到同一个同步码。这里只需要接上入口。
+  if (window.Topbar && Topbar.bindMenu) {
+    Topbar.bindMenu(document.getElementById("topbarGear"), document.getElementById("topbarMenu"));
+  }
+  var btnAccount = document.getElementById("btnAccount");
+  if (btnAccount && window.AccountUI) {
+    btnAccount.addEventListener("click", function () { AccountUI.open(); });
+    var st = AccountUI.status();
+    var note = document.getElementById("accNote");
+    if (note) note.textContent = st.loggedIn ? "已登录" : "未开启";
+  }
 
   // 家长中心还没做（M6），先给一句明确的说明，不要给死链
   var pl = document.getElementById("parentLink");

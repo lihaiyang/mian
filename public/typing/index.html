@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
 <link rel="stylesheet" href="/shared/styles/base.css?v=393d5261">
 <link rel="stylesheet" href="/shared/styles/components.css?v=2264217d">
-<link rel="stylesheet" href="/shared/styles/chrome.css?v=77cc90e4">
+<link rel="stylesheet" href="/shared/styles/chrome.css?v=c0c00792">
 <!-- 本学科特有样式 -->
 <link rel="stylesheet" href="css/typing.css?v=3ac090f0">
 
@@ -33,19 +33,46 @@
     <a class="topbar-back" href="/">← 大厅</a>
   </header>
   <script src="/shared/core/topbar.js?v=e382f937"></script>
+  <script src="/shared/core/account-ui.js?v=74e0317f"></script>
   <script>
-    Topbar.mount({
+    var tbEl = Topbar.mount({
       mount: "#topbar", emoji: "⌨️", name: "键盘岛",
       // 「我的进度」是主操作，留在明面上
       actions: [
         { id: "btnProgress", label: "我的进度", emoji: "📊" }
       ],
-      // 云同步从「一个按钮」改成「状态胶囊」：它首先是状态，其次才是入口。
-      // id 保持 btnSync 不变，typing.js 的 bindModal 不用改。
+      // 云同步从「一个按钮」改成「状态胶囊」：它首先是状态，其次才是入口
       status: [
         { id: "btnSync", tone: "off", emoji: "☁️", label: "云同步", title: "云同步：还没开启" }
+      ],
+      settings: [
+        { id: "btnAccount", emoji: "☁️", label: "账号与云同步" }
       ]
     });
+
+    // 账号与同步走**全平台共用**的那一份面板（一次登录，四个学科都拿到同步码）。
+    // 打字自己的同步弹窗不再从顶栏进入；typing.js 里对应改成不绑（见那里的注释）。
+    if (window.AccountUI) {
+      var accBtn = document.getElementById("btnAccount");
+      if (accBtn) accBtn.addEventListener("click", function () { AccountUI.open(); });
+
+      var pill = document.getElementById("btnSync");
+      if (pill) {
+        pill.dataset.accBound = "1";   // 告诉 typing.js 别再绑它自己的同步弹窗了
+        pill.addEventListener("click", function () { AccountUI.open(); });
+        var st = AccountUI.status();
+        Topbar.setStatus("btnSync", st.loggedIn
+          ? { tone: "ok", label: "已登录", title: "已登录（" + st.code + "），点开看同步码" }
+          : { tone: "off", label: "云同步", title: "还没开启云同步，点我开启" });
+      }
+      // 面板里改了账号状态 → 顶栏胶囊跟着变
+      window.addEventListener("mian:account-changed", function (ev) {
+        var s = (ev.detail) || AccountUI.status();
+        Topbar.setStatus("btnSync", s.loggedIn
+          ? { tone: "ok", label: "已登录", title: "已登录（" + s.code + "）" }
+          : { tone: "off", label: "云同步", title: "还没开启云同步" });
+      });
+    }
   </script>
 
   <main class="page-body">
@@ -213,7 +240,7 @@
 <script src="/shared/core/registry.js?v=0d6e477b"></script>
 <script src="subject.js?v=4ddfca25"></script>
 <script src="data/lessons.js?v=9af62ac6"></script>
-<script src="js/typing.js?v=168f8a66"></script>
+<script src="js/typing.js?v=37108298"></script>
 
 </body>
 </html>
