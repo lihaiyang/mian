@@ -32,7 +32,7 @@ const pageErrors = [];
 page.on("pageerror", (e) => pageErrors.push(e.message));
 page.on("console", (m) => { if (m.type() === "error") pageErrors.push("console: " + m.text()); });
 
-await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
+await page.goto(BASE + "/python/", { waitUntil: "domcontentloaded" });
 await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 60000 });
 check("v2 页面加载 + Python 引擎就绪", true);
 

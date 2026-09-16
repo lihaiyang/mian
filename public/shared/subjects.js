@@ -1,0 +1,51 @@
+/* ============================================================================
+ * 萌学园 · 学科清单
+ *
+ * 这个文件是「加一个学科」唯一需要动的公共文件。
+ *
+ *   manifests —— 已经有独立目录的学科，写它的 manifest 路径。
+ *                每个 manifest 自己调用 Platform.register()。
+ *   planned   —— 还没开始做的学科，直接在这里写成占位（不需要目录），
+ *                大厅会把它渲染成「敬请期待」的卡片，让孩子知道还有的玩。
+ *
+ * 顺序 = 大厅里的展示顺序。
+ * ========================================================================== */
+window.MIAN_SUBJECTS = {
+  manifests: [
+    "/python/subject.js",
+    "/en/subject.js"
+  ],
+
+  planned: [
+    {
+      id: "math", name: "数学岛", emoji: "🔢",
+      tagline: "口算、竖式、应用题、图形 —— 把算术练成直觉",
+      accent: "#2E9E8F", accentSoft: "#DFF3EF",
+      grades: [1, 2, 3, 4, 5, 6]
+    },
+    {
+      id: "typing", name: "键盘岛", emoji: "⌨️",
+      tagline: "从盲打指法到编程符号，练出手感和速度",
+      accent: "#4A5568", accentSoft: "#E7EAF0",
+      grades: [2, 3, 4, 5, 6]
+    },
+    {
+      id: "pinyin", name: "拼音岛", emoji: "🅰️",
+      tagline: "声母韵母、四声、拼读 —— 听准了才读得对",
+      accent: "#E8735A", accentSoft: "#FCE8E3",
+      grades: [1, 2]
+    },
+    {
+      id: "chinese", name: "汉字岛", emoji: "📖",
+      tagline: "认字、笔顺、组词、古诗、阅读理解",
+      accent: "#C4562F", accentSoft: "#F9E7DE",
+      grades: [1, 2, 3, 4, 5, 6]
+    },
+    {
+      id: "cpp", name: "C++ 工坊", emoji: "⚙️",
+      tagline: "从 Python 再往前一步：类型、数组、算法",
+      accent: "#0F766E", accentSoft: "#DCF2EF",
+      grades: [5, 6]
+    }
+  ]
+};

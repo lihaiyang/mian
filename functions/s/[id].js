@@ -18,7 +18,7 @@ export async function onRequestGet({ params, env }) {
     '<pre id="code">' + code + '</pre>' +
     '<div class="row" style="margin-top:14px">' +
     '<button class="btn" onclick="navigator.clipboard.writeText(document.getElementById(\'code\').textContent).then(function(){this.textContent=\'✅ 已复制\'}.bind(this))">📋 复制代码</button>' +
-    '<a class="btn ghost" href="/?share=' + encodeURIComponent(id) + '">🚀 在萌码里打开</a>' +
+    '<a class="btn ghost" href="/python/?share=' + encodeURIComponent(id) + '">🚀 在萌码里打开</a>' +
     '</div></div>';
   return html(shell(row.title || "我的作品", body));
 }

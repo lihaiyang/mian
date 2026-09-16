@@ -1,0 +1,108 @@
+/* ============================================================================
+ * 萌学园 · 设计令牌（全平台唯一一份）
+ *
+ * 规则：学科页只能覆盖「--accent 系列」这三个变量，不要自己发明颜色。
+ *       其余令牌（间距 / 圆角 / 字体 / 阴影）一律用这里的，保证七个学科
+ *       看起来是同一个产品，而不是七个网站拼起来。
+ *
+ * 基准色取自「萌语岛」已经验证过的那套暖色纸感（对小学生更柔和、
+ * 也更适合打印单词卡与周报）。
+ * ========================================================================== */
+
+:root {
+  /* ---------- 纸与墨 ---------- */
+  --paper:      #F7EFE0;   /* 页面底色 */
+  --paper-2:    #FFFBF2;   /* 卡片底色（比页面更亮，形成层次） */
+  --paper-3:    #EFE4D2;   /* 次级块（输入框、代码块底） */
+  --ink:        #241E19;   /* 主文字 */
+  --ink-soft:   #5C5148;   /* 次级文字 */
+  --muted:      #8A7E72;   /* 弱化文字（说明、计数） */
+  --line:       #E4D8C4;   /* 描边 */
+  --line-strong:#CDBBA0;
+
+  /* ---------- 功能色 ---------- */
+  --ok:    #2E9E8F;
+  --warn:  #E8A33D;
+  --bad:   #D9534F;
+  --gold:  #E0A82E;
+  --silver:#A8A8A8;
+  --bronze: #C68642;
+
+  /* ---------- 学科主色（默认值；学科页覆盖这三个）---------- */
+  --accent:      #6A4C93;   /* 默认紫，来自萌语岛 */
+  --accent-soft: #EDE4F5;   /* 主色的浅底（卡片图标底、标签底） */
+  --accent-ink:  #FFFFFF;   /* 主色之上的文字色 */
+
+  /* 各学科建议主色（写在各自 manifest 里，这里只作参考，不直接使用）
+     python  #3B7DD8 蓝   en      #6A4C93 紫   math   #2E9E8F 青绿
+     pinyin  #E8735A 珊瑚 chinese #C4562F 赭   typing #4A5568 石墨
+     cpp     #0F766E 深青                                                */
+
+  /* ---------- 圆角 ---------- */
+  --r-card:  20px;
+  --r-block: 14px;
+  --r-chip:  999px;
+  --r-btn:   12px;
+
+  /* ---------- 间距（4 的倍数）---------- */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+
+  /* ---------- 字体 ----------
+     大厅不引入字体文件，用系统字体栈即可（中文优先，回退到各平台默认）。
+     学科页可以自带更讲究的字体（例如英语站的 Andika 识字字体），
+     但字号 / 行高请继续用下面的令牌。
+     共享字体的收敛是 M1 的事，见 docs/多学科平台架构设计.md。          */
+  --font-ui: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+             "Noto Sans SC", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas,
+               "Courier New", monospace;
+
+  --fs-hero: 34px;
+  --fs-h1:   26px;
+  --fs-h2:   20px;
+  --fs-body: 16px;
+  --fs-sm:   14px;
+  --fs-xs:   12px;
+  --lh-tight: 1.25;
+  --lh-body:  1.65;
+
+  /* ---------- 阴影（纸感：柔和、低饱和，不用纯黑）---------- */
+  --sh-1: 0 1px 2px rgba(90, 70, 40, .06);
+  --sh-2: 0 4px 14px rgba(90, 70, 40, .10);
+  --sh-3: 0 10px 30px rgba(90, 70, 40, .14);
+
+  /* ---------- 动效 ---------- */
+  --ease: cubic-bezier(.2, .8, .3, 1);
+  --dur:  .22s;
+
+  /* ---------- 布局 ---------- */
+  --page-max: 1080px;
+  --tap-min: 44px;          /* 小学低年级的触摸目标下限 */
+}
+
+/* 暗色模式：只改纸与墨，学科主色不动（保证学科识别度一致） */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper:      #1C1917;
+    --paper-2:    #262220;
+    --paper-3:    #322C29;
+    --ink:        #F2EBE3;
+    --ink-soft:   #C9BEB2;
+    --muted:      #9A8F84;
+    --line:       #3B3431;
+    --line-strong:#4E4541;
+    --sh-1: 0 1px 2px rgba(0, 0, 0, .30);
+    --sh-2: 0 4px 14px rgba(0, 0, 0, .40);
+    --sh-3: 0 10px 30px rgba(0, 0, 0, .50);
+  }
+}
+
+/* 尊重系统的减少动效设置 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}

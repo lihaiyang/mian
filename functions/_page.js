@@ -46,6 +46,6 @@ export function shell(title, bodyHtml) {
     "</style></head><body><div class=\"wrap\">" +
     '<div class="brand"><span>🐼</span><span>萌码 Python · 奇幻编程工坊</span></div>' +
     bodyHtml +
-    '<div class="foot">用「萌码 Python」创作 · <a href="/">打开工坊</a></div>' +
+    '<div class="foot">用「萌码 Python」创作 · <a href="/python/">打开工坊</a></div>' +
     "</div></body></html>";
 }

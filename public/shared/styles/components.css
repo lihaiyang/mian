@@ -1,0 +1,190 @@
+/* ============================================================================
+ * 萌学园 · 组件层
+ *
+ * 学科卡片靠「inline style 覆盖 --accent 三兄弟」来上色，
+ * 所以同一套卡片样式能长出七个不同颜色的学科，而不需要七份 CSS：
+ *   <a class="subject-card" style="--accent:#2E9E8F;--accent-soft:#DFF3EF">
+ * ========================================================================== */
+
+/* ---------------------------------------------------------------- 按钮 */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s2);
+  min-height: var(--tap-min);
+  padding: 0 var(--s5);
+  border: 1px solid transparent;
+  border-radius: var(--r-btn);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.btn:hover { transform: translateY(-1px); box-shadow: var(--sh-2); text-decoration: none; }
+.btn:active { transform: translateY(0); }
+
+.btn.ghost {
+  background: transparent;
+  color: var(--ink-soft);
+  border-color: var(--line-strong);
+}
+.btn.ghost:hover { background: var(--paper-3); }
+
+.btn.sm { min-height: 34px; padding: 0 var(--s3); font-size: var(--fs-sm); }
+
+/* ---------------------------------------------------------------- 标签 / 徽记 */
+
+.chip {
+  display: inline-flex; align-items: center; gap: var(--s1);
+  padding: 2px var(--s3);
+  border-radius: var(--r-chip);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.chip.plain {
+  background: var(--paper-3);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- 大厅头 */
+
+.lobby-hero {
+  text-align: center;
+  padding: var(--s6) 0 var(--s7);
+}
+.lobby-hero h1 {
+  font-size: var(--fs-hero);
+  line-height: var(--lh-tight);
+  letter-spacing: .5px;
+}
+.lobby-hero p {
+  margin-top: var(--s3);
+  color: var(--ink-soft);
+  font-size: var(--fs-body);
+}
+
+/* 「继续上次」——只在这个孩子确实来过时才出现 */
+.resume {
+  display: flex; align-items: center; gap: var(--s4);
+  padding: var(--s4) var(--s5);
+  margin-bottom: var(--s6);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--accent);
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-1);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.resume:hover { transform: translateY(-2px); box-shadow: var(--sh-2); text-decoration: none; }
+.resume .resume-emoji { font-size: 30px; line-height: 1; }
+.resume .resume-text { flex: 1; min-width: 0; }
+.resume .resume-label { color: var(--muted); font-size: var(--fs-xs); }
+.resume .resume-name { font-size: var(--fs-h2); font-weight: 700; }
+.resume .resume-go { color: var(--accent); font-weight: 700; font-size: var(--fs-sm); }
+
+/* ---------------------------------------------------------------- 学科网格 */
+
+.subject-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--s4);
+}
+
+.subject-card {
+  position: relative;
+  display: flex; flex-direction: column;
+  min-height: 190px;
+  padding: var(--s5);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-1);
+  color: var(--ink);
+  overflow: hidden;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
+              border-color var(--dur) var(--ease);
+}
+.subject-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--sh-3);
+  border-color: var(--accent);
+  text-decoration: none;
+}
+.subject-card:active { transform: translateY(-1px); }
+
+/* 卡片顶部的主色条：一眼区分学科 */
+.subject-card::before {
+  content: "";
+  position: absolute; inset: 0 0 auto 0;
+  height: 5px;
+  background: var(--accent);
+}
+
+.subject-card .sc-emoji {
+  display: grid; place-items: center;
+  width: 54px; height: 54px;
+  margin-bottom: var(--s3);
+  background: var(--accent-soft);
+  border-radius: var(--r-block);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.subject-card .sc-name {
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+}
+
+.subject-card .sc-tagline {
+  margin-top: var(--s2);
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  flex: 1;
+}
+
+.subject-card .sc-meta {
+  display: flex; align-items: center; gap: var(--s2);
+  margin-top: var(--s4);
+  flex-wrap: wrap;
+}
+
+/* 「已在用」角标 */
+.subject-card .sc-flag {
+  position: absolute; top: var(--s3); right: var(--s3);
+  padding: 2px var(--s2);
+  border-radius: var(--r-chip);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------- 空状态 / 说明 */
+
+.note {
+  padding: var(--s4) var(--s5);
+  background: var(--paper-2);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-card);
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+}
+
+.section-title {
+  display: flex; align-items: baseline; gap: var(--s3);
+  margin: var(--s7) 0 var(--s4);
+  font-size: var(--fs-h2);
+  font-weight: 700;
+}
+.section-title .st-sub {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  font-weight: 400;
+}

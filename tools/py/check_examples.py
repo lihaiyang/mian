@@ -15,9 +15,9 @@ import subprocess
 import sys
 import tempfile
 
-ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "public")
+ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "public", "python")
 # 默认检查示例库；也可以指定相对路径，例如
-#   python3 tools/py/check_examples.py public/js/examples-lib.js
+#   python3 tools/py/check_examples.py public/python/js/examples-lib.js
 JS = os.path.join(ROOT, sys.argv[1]) if len(sys.argv) > 1 else os.path.join(ROOT, "js", "examples-lib.js")
 
 TURTLE_STUB = '''

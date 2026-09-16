@@ -1,19 +1,60 @@
+# 全站通用头。
+# 注意这里**不再全站发 COOP/COEP** —— 见下面 /python/* 的说明。
 /*
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: require-corp
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
 
+# ---------------------------------------------------------------------------
+# COOP/COEP 只发给真正需要 SharedArrayBuffer 的学科
+#
+# 为什么收窄：这两个头的唯一目的是让 SharedArrayBuffer 可用（Pyodide 的
+# input() 靠它同步阻塞）。代价是 require-corp 会拦掉所有不带 CORP 头的
+# 跨源子资源——图片、字体、iframe、第三方课件全都得自己托管。
+# 全站发等于给以后"嵌个词典/地图/视频"埋雷，而且坏了是静默的、很难查。
+#
+# 实测确认：整个仓库只有 python-runner.js / python-worker.js 用到
+# SharedArrayBuffer，英语站完全没用到。所以按路径发就够了。
+#
+# 路径前缀规则不会互相覆盖，每条都要单独写。
+# ---------------------------------------------------------------------------
+/python/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
+# 将来的 C++ 同样需要：Runno 的 WASI 运行时也是用
+# SharedArrayBuffer + Atomics.wait 实现交互式 std::cin 的。
+/cpp/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
+# ---------------------------------------------------------------------------
+# 缓存
+# ---------------------------------------------------------------------------
+
+# 第三方资源带内容指纹式的版本号（lockFileURL?v=2），可以长期强缓存
 /vendor/*
   Cache-Control: public, max-age=31536000, immutable
 
-/js/*
+# 自己的代码靠 URL 上的 ?v= 换版本，所以这里必须 no-cache 式回源校验。
+# CDN 对 /js/* /css/* 还有一层 4 小时默认缓存会盖掉这里 —— 所以改完
+# css/js **一定要改 ?v=**，详见 README 的部署守则。
+/python/js/*
   Cache-Control: public, max-age=0, must-revalidate
 
-/css/*
+/python/css/*
   Cache-Control: public, max-age=0, must-revalidate
 
+# 平台层被所有学科共用：改了它等于改了所有学科，同样要回源校验
+/shared/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+# 大厅
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# ---------------------------------------------------------------------------
 # 英语站（/en/）—— 路径前缀规则不会互相覆盖，必须单独写
+# ---------------------------------------------------------------------------
 /en/js/*
   Cache-Control: public, max-age=0, must-revalidate
 
@@ -23,6 +64,7 @@
 /en/data/*
   Cache-Control: public, max-age=0, must-revalidate
 
+# Service Worker 必须每次回源，否则更新发不出去
 /en/sw.js
   Cache-Control: no-cache
 

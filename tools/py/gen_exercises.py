@@ -17,7 +17,7 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(os.path.dirname(os.path.dirname(HERE)), "public")
+ROOT = os.path.join(os.path.dirname(os.path.dirname(HERE)), "public", "python")
 sys.path.insert(0, HERE)
 
 from exlib import TOPICS, TOPIC_IDS, LEVELS, norm, run_answer  # noqa: E402

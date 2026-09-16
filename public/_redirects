@@ -1,1 +1,9 @@
-/v2/*  /  302
+# 老链接兜底（M0：萌码 Python 从 / 搬到了 /python/）
+#
+# 注意：不能把 "/" 也重定向到 /python/ —— "/" 现在是学科大厅，
+# 那一格是有意让出去的。老书签落到大厅只会多一次点击。
+# 但分享短链（/s/<id>、/p/<id>）和它们里面的 "在萌码里打开" 必须对着新地址，
+# 那部分改在 functions/ 里，见 functions/s/[id].js 与 functions/_page.js。
+
+/v2/*     /python/  302
+/py/*     /python/  302

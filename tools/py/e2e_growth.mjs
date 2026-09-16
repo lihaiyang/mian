@@ -50,7 +50,7 @@ page.on("console", (msg) => {
 });
 page.on("pageerror", (err) => consoleErrors.push("pageerror: " + err.message));
 
-await page.goto(BASE + "/index.html", { waitUntil: "domcontentloaded" });
+await page.goto(BASE + "/python/", { waitUntil: "domcontentloaded" });
 
 // 1. 引擎就绪
 await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 60000 });

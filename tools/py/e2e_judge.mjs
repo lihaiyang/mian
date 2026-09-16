@@ -27,7 +27,7 @@ const page = await browser.newPage();
 const pageErrors = [];
 page.on("pageerror", (e) => pageErrors.push(e.message));
 
-await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
+await page.goto(BASE + "/python/", { waitUntil: "domcontentloaded" });
 await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 60000 });
 
 // 打开「练习」把题库（懒加载）拉起来
