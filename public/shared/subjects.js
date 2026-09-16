@@ -14,16 +14,11 @@ window.MIAN_SUBJECTS = {
   manifests: [
     "/python/subject.js",
     "/en/subject.js",
-    "/typing/subject.js"
+    "/typing/subject.js",
+    "/math/subject.js"
   ],
 
   planned: [
-    {
-      id: "math", name: "数学岛", emoji: "🔢",
-      tagline: "口算、竖式、应用题、图形 —— 把算术练成直觉",
-      accent: "#2E9E8F", accentSoft: "#DFF3EF",
-      grades: [1, 2, 3, 4, 5, 6]
-    },
     {
       id: "pinyin", name: "拼音岛", emoji: "🅰️",
       tagline: "声母韵母、四声、拼读 —— 听准了才读得对",

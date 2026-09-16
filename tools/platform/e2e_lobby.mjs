@@ -86,8 +86,13 @@ const order = await page.evaluate(() =>
   Array.from(document.querySelectorAll("a.subject-card[data-subject]"))
        .map(el => el.getAttribute("data-subject"))
 );
+// 顺序 = subjects.js 里 manifests 的声明顺序。
+// **不要写死 id 列表** —— 数学岛上线时这条就是写死的 "python,en,typing" 而红的。
+// 现在改成和声明对账，加学科不用改测试。
+const declared = await page.evaluate(() =>
+  (window.MIAN_SUBJECTS.manifests || []).map(p => String(p).split("/")[1]));
 check("可进入学科的卡片顺序 = 声明顺序",
-  order.join(",") === "python,en,typing", `实际 ${order.join(",")}`);
+  order.join(",") === declared.join(","), `实际 ${order.join(",")} / 声明 ${declared.join(",")}`);
 
 // 所有学科都在本站：卡片里不能出现别的域名（曾短暂指向过老站，钉死防回归）
 const offsite = await page.evaluate(() =>
@@ -107,7 +112,10 @@ check("「敬请期待」排在可进入学科之后",
 // ---------------------------------------------------------------- 3. 敬请期待的学科
 const soon = page.locator('.subject-card[aria-disabled="true"]');
 const soonCount = await soon.count();
-check("「敬请期待」占位卡片在", soonCount >= 3, `${soonCount} 个`);
+// 同样和声明对账，不写死数字
+const plannedCount = await page.evaluate(() => (window.MIAN_SUBJECTS.planned || []).length);
+check("「敬请期待」占位卡片数 = 声明数", soonCount === plannedCount,
+      `渲染 ${soonCount} 个 / 声明 ${plannedCount} 个`);
 check("占位卡片不是链接（点了不会进空白页）",
   (await page.locator('a.subject-card[aria-disabled="true"]').count()) === 0);
 
@@ -116,11 +124,14 @@ const soonText = await page.evaluate(() =>
   Array.from(document.querySelectorAll('.subject-card[aria-disabled="true"]'))
        .map(el => el.textContent).join(" | ")
 );
-for (const name of ["数学岛", "拼音岛", "汉字岛"]) {
+for (const name of ["拼音岛", "汉字岛"]) {
   check(`占位里有「${name}」`, soonText.includes(name));
 }
-// 键盘岛已经上线了，不该再出现在占位里
-check("已上线的学科不在占位区", !soonText.includes("键盘岛"));
+// 已经上线的学科不该再出现在占位里。
+// 这条以前写死的是「键盘岛」，数学岛上线时它就成了漏网的 —— 改成列表。
+for (const live of ["键盘岛", "数学岛"]) {
+  check(`已上线的学科不在占位区（${live}）`, !soonText.includes(live));
+}
 // C++ 岛已经从产品里去掉了（2026-09 决定）。这条断言是**反向**的：
 // 防止以后有人照着旧文档/旧设计稿把它又抄回来。
 check("已去掉的学科不在占位区（C++）", !soonText.includes("C++"));

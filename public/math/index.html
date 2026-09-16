@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数学岛 · 口算与应用 · 萌学园</title>
+<meta name="description" content="给小学生 1-6 年级的数学练习：口算、竖式、单位换算、图形与应用题，答案全部由程序算过。">
+<meta name="theme-color" content="#F8F5F1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%A2%3C/text%3E%3C/svg%3E">
+
+<!-- 平台层样式（和键盘岛同一套） -->
+<link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
+<link rel="stylesheet" href="/shared/styles/base.css?v=393d5261">
+<link rel="stylesheet" href="/shared/styles/components.css?v=2264217d">
+<link rel="stylesheet" href="/shared/styles/chrome.css?v=c0c00792">
+<!-- 本学科特有样式 -->
+<link rel="stylesheet" href="css/math.css?v=9d1064d0">
+
+<style>
+  /* 学科主色：只覆盖这三个变量，其余全用平台令牌 */
+  :root { --accent: #2E9E8F; --accent-soft: #DFF3EF; --accent-ink: #FFFFFF; }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#question">跳到题目</a>
+
+<div class="page">
+
+  <header id="topbar">
+    <!-- 脚本没跑起来时的兜底：回大厅的链接必须一直在 -->
+    <a class="topbar-back" href="/">← 大厅</a>
+  </header>
+  <script src="/shared/core/topbar.js?v=e382f937"></script>
+  <script src="/shared/core/account-ui.js?v=74e0317f"></script>
+  <script>
+    Topbar.mount({
+      mount: "#topbar", emoji: "🔢", name: "数学岛",
+      actions: [{ id: "btnProgress", label: "我的进度", emoji: "📊" }],
+      status: [{ id: "btnSync", tone: "off", emoji: "☁️", label: "云同步", title: "云同步：还没开启" }],
+      settings: [{ id: "btnAccount", emoji: "☁️", label: "账号与云同步" }]
+    });
+    if (window.AccountUI) {
+      var ab = document.getElementById("btnAccount");
+      if (ab) ab.addEventListener("click", function () { AccountUI.open(); });
+      var pill = document.getElementById("btnSync");
+      if (pill) {
+        pill.dataset.accBound = "1";
+        pill.addEventListener("click", function () { AccountUI.open(); });
+        var st = AccountUI.status();
+        Topbar.setStatus("btnSync", st.loggedIn
+          ? { tone: "ok", label: "已登录", title: "已登录（" + st.code + "）" }
+          : { tone: "off", label: "云同步", title: "还没开启云同步，点我开启" });
+      }
+      window.addEventListener("mian:account-changed", function (ev) {
+        var s = (ev.detail) || AccountUI.status();
+        Topbar.setStatus("btnSync", s.loggedIn
+          ? { tone: "ok", label: "已登录", title: "已登录（" + s.code + "）" }
+          : { tone: "off", label: "云同步", title: "还没开启云同步" });
+      });
+    }
+  </script>
+
+  <main class="page-body">
+    <div class="ma-layout">
+
+      <!-- 左：年级 + 单元 -->
+      <aside class="ma-side">
+        <div class="ma-grades" id="gradeTabs" role="tablist" aria-label="选择年级"></div>
+        <div class="ma-side-head">
+          <span>练哪个单元</span><span class="ma-side-hint" id="sideHint"></span>
+        </div>
+        <div id="unitList"></div>
+      </aside>
+
+      <!-- 右：出题 -->
+      <section class="ma-main">
+
+        <div class="ma-card" id="introCard">
+          <h2>选一个单元开始</h2>
+          <p class="ma-sub">左边先选年级，再挑一个单元。一组 10 道题，做完会给小结。</p>
+          <p class="ma-sub ma-note">每题都有提示，答错不扣分 —— 看看提示再试一次就好。</p>
+        </div>
+
+        <div class="ma-card" id="playCard" style="display:none">
+          <div class="ma-progress">
+            <div class="ma-bar"><i id="barFill"></i></div>
+            <span class="ma-count" id="qCount"></span>
+          </div>
+
+          <div class="ma-q" id="question" tabindex="0" role="textbox"
+               aria-label="题目，用下面的数字键盘或电脑键盘输入答案"></div>
+          <div class="ma-unitname" id="unitName"></div>
+
+          <div class="ma-input-row">
+            <input class="ma-input" id="answer" inputmode="text" autocomplete="off"
+                   spellcheck="false" placeholder="在这里写答案" aria-label="你的答案">
+            <button class="ma-go" id="btnCheck" type="button">确定</button>
+          </div>
+
+          <div class="ma-keypad" id="keypad" aria-label="数字键盘"></div>
+
+          <div class="ma-feedback" id="feedback" aria-live="polite"></div>
+
+          <div class="ma-actions">
+            <button class="btn ghost sm" id="btnSkip" type="button">不会，看答案</button>
+            <button class="btn ghost sm" id="btnQuit" type="button">退出这一组</button>
+          </div>
+        </div>
+
+        <div class="ma-card" id="resultCard" style="display:none">
+          <div id="resultBody"></div>
+          <div class="ma-actions">
+            <button class="btn" id="btnAgain" type="button">🔁 再来一组</button>
+            <button class="btn ghost" id="btnNextUnit" type="button">➡️ 换个单元</button>
+          </div>
+        </div>
+
+      </section>
+    </div>
+  </main>
+
+  <footer class="page-foot">
+    <p>1025 道题的答案都由程序算过一遍，不是手写的。</p>
+  </footer>
+</div>
+
+<!-- ================= 进度弹窗（由平台层渲染） ================= -->
+<div class="modal-overlay" id="progressModal">
+  <div class="modal-card" style="max-width:560px;max-height:82vh;overflow:auto">
+    <div class="modal-title"><span>📊 我的进度</span></div>
+
+    <div class="ma-pf-level">
+      <div>
+        <b id="pfLevel">Lv.1</b>
+        <div class="muted" id="pfTitle">初来乍到</div>
+      </div>
+      <div class="ma-pf-bar"><i id="pfBar"></i></div>
+      <div class="muted" style="font-size:12px"><span id="pfXp"></span> XP</div>
+    </div>
+
+    <div class="muted" style="margin-top:10px;font-size:13px">
+      连续打卡 <b id="pfStreak">0</b> 天
+    </div>
+
+    <div class="ma-sec-title">📋 今日任务</div>
+    <div id="pfDaily"></div>
+
+    <div class="ma-sec-title">🎖️ 徽章 <span class="muted" id="pfBadgeCount"></span></div>
+    <div class="ma-badges" id="pfBadges"></div>
+
+    <div class="ma-sec-title">🏅 奖牌 <span class="muted" id="pfMedalCount"></span></div>
+    <div class="ma-medals" id="pfMedals"></div>
+
+    <div class="modal-footer">
+      <button class="btn ghost" data-close type="button">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 平台层 → 学科 =================
+     顺序：store → progress → sync → 注册表 → 学科声明 → 内容 → 学科逻辑 -->
+<script src="/shared/core/store.js?v=873bc876"></script>
+<script src="/shared/core/progress.js?v=acdd9b68"></script>
+<script src="/shared/core/sync.js?v=70663565"></script>
+<script src="/shared/core/registry.js?v=0d6e477b"></script>
+<script src="subject.js?v=2818c3f1"></script>
+<script src="data/problems.js?v=3d3c8d09"></script>
+<script src="js/math.js?v=ad3be725"></script>
+
+</body>
+</html>

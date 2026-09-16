@@ -1,0 +1,301 @@
+/* ============================================================================
+ * 数学岛 · 学科特有样式
+ *
+ * 只写"数学"这件事独有的部分：年级与单元列表、出题区、数字键盘、小结。
+ * 按钮、卡片、弹窗、令牌全部复用 shared/styles/*，不在这里重写。
+ * ========================================================================== */
+
+.ma-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: var(--s5);
+  align-items: start;
+}
+
+/* ---------------------------------------------------------------- 左栏 */
+
+.ma-side {
+  position: sticky; top: 78px;
+  max-height: calc(100vh - 100px);
+  overflow: auto;
+  padding: var(--s4);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+
+.ma-grades {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s1);
+  margin-bottom: var(--s4);
+}
+
+.ma-grade {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-btn);
+  background: var(--paper-2);
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease),
+              scale var(--dur-fast) var(--ease);
+}
+.ma-grade:hover { background: var(--paper-3); }
+.ma-grade:active { scale: var(--press); }
+.ma-grade.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+.ma-side-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 0 var(--s2) var(--s2);
+  color: var(--ink-soft);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: .5px;
+}
+.ma-side-hint { color: var(--muted); font-weight: 400; }
+
+.ma-unit-group {
+  margin-bottom: var(--s3);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: .5px;
+}
+
+.ma-unit {
+  display: flex; align-items: center; gap: var(--s2);
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--s2);
+  margin-bottom: 2px;
+  border: 0;
+  border-radius: var(--r-btn);
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+.ma-unit:hover { background: var(--paper-3); }
+.ma-unit.active { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.ma-unit-title { flex: 1; min-width: 0; }
+.ma-unit-best {
+  flex: none;
+  padding: 0 6px;
+  border-radius: var(--r-chip);
+  background: var(--paper-3);
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- 右栏 */
+
+.ma-main { min-width: 0; }
+
+.ma-card {
+  padding: var(--s5);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-1);
+}
+.ma-card + .ma-card { margin-top: var(--s4); }
+
+.ma-card h2 { font-size: var(--fs-h1); text-wrap: balance; }
+.ma-sub { margin-top: var(--s2); color: var(--ink-soft); font-size: var(--fs-sm); }
+.ma-note { color: var(--muted); }
+
+/* 进度条 */
+.ma-progress { display: flex; align-items: center; gap: var(--s3); }
+.ma-bar {
+  flex: 1; height: 8px;
+  background: var(--paper-3);
+  border-radius: var(--r-chip);
+  overflow: hidden;
+}
+.ma-bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: var(--r-chip); }
+.ma-count { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+
+/* 题目 */
+.ma-q {
+  margin-top: var(--s4);
+  padding: var(--s5) var(--s4);
+  background: var(--paper-3);
+  border-radius: var(--r-block);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  word-break: break-word;
+  outline: none;
+  text-wrap: balance;
+}
+.ma-unitname { margin-top: var(--s2); text-align: center; color: var(--muted); font-size: var(--fs-xs); }
+
+/* 输入 */
+.ma-input-row { display: flex; gap: var(--s2); margin-top: var(--s4); }
+.ma-input {
+  flex: 1; min-width: 0;
+  min-height: 52px;
+  padding: 0 var(--s4);
+  background: var(--paper-2);
+  border: 2px solid var(--line);
+  border-radius: var(--r-btn);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  /* 16px 是 iOS 的下限：小于它，聚焦时整页会被自动放大 */
+  font-size: 22px;
+  text-align: center;
+}
+.ma-input:focus { border-color: var(--accent); outline: none; }
+.ma-input.right { border-color: var(--ok); }
+.ma-input.wrong { border-color: var(--warn); }
+.ma-go {
+  flex: none;
+  min-height: 52px;
+  padding: 0 var(--s5);
+  border: 0;
+  border-radius: var(--r-btn);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: inherit; font-size: var(--fs-body); font-weight: 700;
+  cursor: pointer;
+  transition: filter var(--dur-fast) var(--ease), scale var(--dur-fast) var(--ease);
+}
+.ma-go:hover { filter: brightness(1.06); }
+.ma-go:active { scale: var(--press); }
+
+/* 数字键盘：低年级不要求打字速度，给大按钮 */
+.ma-keypad {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--s2);
+  margin-top: var(--s3);
+}
+.ma-key {
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-btn);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), scale var(--dur-fast) var(--ease);
+}
+.ma-key:hover { background: var(--paper-3); }
+.ma-key:active { scale: var(--press); }
+.ma-key.wide { grid-column: span 2; font-size: var(--fs-sm); }
+
+/* 反馈 */
+.ma-feedback {
+  margin-top: var(--s3);
+  min-height: 26px;
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+.ma-feedback.ok { color: var(--ok); font-weight: 700; }
+.ma-feedback.no { color: var(--warn); }
+
+.ma-actions { display: flex; gap: var(--s3); margin-top: var(--s4); flex-wrap: wrap; }
+
+/* 小结 */
+.ma-result-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: var(--s3); margin: var(--s5) 0; text-align: center;
+}
+.ma-result-grid b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; }
+.ma-result-grid span { color: var(--muted); font-size: var(--fs-xs); }
+.ma-stars { text-align: center; font-size: 40px; line-height: 1; letter-spacing: 8px; }
+.ma-star { color: var(--line-strong); }
+.ma-star.on { color: var(--gold); }
+.ma-wrongs { margin-top: var(--s4); }
+.ma-wrong {
+  padding: var(--s2) var(--s3);
+  margin-bottom: var(--s2);
+  background: var(--paper-3);
+  border-radius: var(--r-block);
+  font-size: var(--fs-sm);
+}
+.ma-wrong b { color: var(--warn); }
+
+/* 进度弹窗 */
+.ma-pf-level {
+  display: flex; align-items: center; gap: var(--s4);
+  padding: var(--s4);
+  background: var(--accent-soft);
+  border-radius: var(--r-block);
+}
+.ma-pf-level b { font-size: 26px; color: var(--accent); }
+.ma-pf-bar { flex: 1; height: 8px; background: var(--paper-2); border-radius: var(--r-chip); overflow: hidden; }
+.ma-pf-bar i { display: block; height: 100%; background: var(--accent); }
+
+.ma-sec-title { margin: var(--s5) 0 var(--s3); font-size: var(--fs-sm); font-weight: 700; color: var(--ink-soft); }
+
+.ma-daily { display: flex; align-items: center; gap: var(--s3); padding: 6px 0; font-size: var(--fs-sm); }
+.ma-daily-t { flex: 1; }
+.ma-daily-n { color: var(--muted); font-variant-numeric: tabular-nums; }
+.ma-daily.got .ma-daily-t { color: var(--ok); }
+
+.ma-badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--s2); }
+.ma-badge {
+  padding: var(--s2);
+  background: var(--paper-3);
+  border-radius: var(--r-block);
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  opacity: .55;
+}
+.ma-badge.got { opacity: 1; background: var(--paper-2); border: 1px solid var(--line); color: var(--ink); }
+.ma-badge-e { display: block; font-size: 20px; }
+.ma-badge-t { display: block; margin-top: 2px; }
+
+.ma-medals { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--s2); }
+.ma-medal {
+  padding: var(--s3);
+  background: var(--paper-3);
+  border-radius: var(--r-block);
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  opacity: .55;
+}
+.ma-medal.got { opacity: 1; background: var(--paper-2); border: 1px solid var(--line); color: var(--ink); }
+.ma-medal.got.gold { border-color: var(--gold); }
+.ma-medal.got.silver { border-color: var(--silver); }
+.ma-medal.got.bronze { border-color: var(--bronze); }
+.ma-medal-e { display: block; font-size: 24px; }
+.ma-medal-t { display: block; margin-top: 2px; }
+
+.muted { color: var(--muted); }
+
+/* ---------------------------------------------------------------- 窄屏 */
+
+@media (max-width: 900px) {
+  .ma-layout { grid-template-columns: 1fr; gap: var(--s4); }
+  /* 出题区排前面 —— 孩子进来是来算题的，不是来看单元列表的 */
+  .ma-main { order: 1; }
+  .ma-side { order: 2; position: static; max-height: 46vh; }
+  .ma-grades { grid-template-columns: repeat(6, 1fr); }
+}
+
+@media (max-width: 620px) {
+  .ma-card { padding: var(--s4); }
+  .ma-q { font-size: 24px; padding: var(--s4) var(--s3); }
+  .ma-keypad { grid-template-columns: repeat(3, 1fr); }
+  .ma-key { min-height: 52px; font-size: 22px; }
+  .ma-result-grid { grid-template-columns: repeat(3, 1fr); }
+  .ma-pf-level { flex-wrap: wrap; gap: var(--s3); }
+  .ma-pf-level .ma-pf-bar { flex: 1 1 100%; }
+  .ma-input { font-size: 20px; }
+}
