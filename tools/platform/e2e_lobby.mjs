@@ -65,11 +65,13 @@ check("有可进入的学科", readyCount >= 3, `${readyCount} 个`);
 
 const py = page.locator('a.subject-card[data-subject="python"]');
 check("萌码 Python 卡片在", (await py.count()) === 1);
-check("Python 卡片指向 /python/", (await py.getAttribute("href")) === "/python/");
+check("Python 卡片指向老站（数据在那边）",
+  (await py.getAttribute("href")) === "https://mian.lihaiyang.net/");
 
 const en = page.locator('a.subject-card[data-subject="en"]');
 check("萌语岛卡片在", (await en.count()) === 1);
-check("英语卡片指向 /en/（PWA 路径不能变）", (await en.getAttribute("href")) === "/en/");
+check("英语卡片指向老站的 /en/（PWA 装在这边）",
+  (await en.getAttribute("href")) === "https://mian.lihaiyang.net/en/");
 
 // 卡片顺序必须由 shared/subjects.js 的声明决定，不能由"哪个 manifest 先下载完"决定。
 // （之前用 Promise.all 时顺序会飘，这里钉住它，防止回归。）
@@ -94,29 +96,30 @@ check("「敬请期待」占位卡片在", soonCount >= 3, `${soonCount} 个`);
 check("占位卡片不是链接（点了不会进空白页）",
   (await page.locator('a.subject-card[aria-disabled="true"]').count()) === 0);
 
-const soonText = await page.textContent("#lobby");
-for (const name of ["数学岛", "键盘岛", "拼音岛", "汉字岛"]) {
+// 只取「敬请期待」那几张卡的文字（不能取整个 #lobby，否则会把已上线的学科也算进来）
+const soonText = await page.evaluate(() =>
+  Array.from(document.querySelectorAll('.subject-card[aria-disabled="true"]'))
+       .map(el => el.textContent).join(" | ")
+);
+for (const name of ["数学岛", "拼音岛", "汉字岛", "C++ 工坊"]) {
   check(`占位里有「${name}」`, soonText.includes(name));
 }
+// 键盘岛已经上线了，不该再出现在占位里
+check("已上线的学科不在占位区", !soonText.includes("键盘岛"));
 
 // ---------------------------------------------------------------- 4. 没访问过时不该有「继续上次」
 check("首次访问不显示「继续上次」", (await page.locator(".resume").count()) === 0);
 
 // ---------------------------------------------------------------- 5. 进入学科 + 继续上次
-await py.click();
+await page.locator('a.subject-card[data-subject="typing"]').click();
 await page.waitForLoadState("domcontentloaded");
 await sleep(1200);
-check("点卡片能进 Python", page.url().includes("/python/"), page.url());
+check("点卡片能进学科", page.url().includes("/typing/"), page.url());
 
-// 进 Python 后应该能起引擎（说明搬迁没把资源路径搞坏）
-await page.waitForFunction(
-  () => document.getElementById("statusText")?.textContent.includes("就绪"),
-  null, { timeout: 60000 }
-).catch(() => {});
-const engineOk = await page.evaluate(
-  () => (document.getElementById("statusText")?.textContent || "").includes("就绪")
-);
-check("Python 引擎仍能就绪（资源路径没搬坏）", engineOk);
+// 进打字学科后应该真的能用（说明平台层与学科资源都加载成功了）
+await page.waitForSelector(".ty-lesson", { timeout: 20000 }).catch(() => {});
+check("打字学科可用", (await page.locator(".ty-lesson").count()) >= 17,
+  `${await page.locator(".ty-lesson").count()} 关`);
 
 // 回大厅 → 应该出现「继续上次」
 await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
@@ -124,7 +127,7 @@ await page.waitForSelector(".subject-card", { timeout: 15000 });
 await sleep(400);
 check("回大厅出现「继续上次」", (await page.locator(".resume").count()) === 1);
 if (await page.locator(".resume").count()) {
-  check("「继续上次」指向 Python", (await page.locator(".resume").getAttribute("href")) === "/python/");
+  check("「继续上次」指向打字", (await page.locator(".resume").getAttribute("href")) === "/typing/");
 }
 
 // ---------------------------------------------------------------- 6. 无障碍与错误

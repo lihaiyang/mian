@@ -75,6 +75,10 @@
       ready: !isPlanned,                 // ready:false = 占位（"敬请期待"）
       order: 0,                          // 展示顺序，由 boot() 按声明顺序赋值
       capabilities: manifest.capabilities || [],
+      // external:true = 这个学科不在本站，指向另一个域名（老站）。
+      // 为什么需要：平台版和老站是两个数据库、两套账号。老站里是孩子**真实**的
+      // 作品和进度，所以大厅必须把他送到有数据的那一边，而不是本站这份空副本。
+      external: !!manifest.external,
       // 可选：学科自己的一句短标（例如"每天 15 分钟"），显示在卡片底部
       feedbackNote: manifest.feedbackNote || "",
       // 学科自己报"这个孩子学到哪了"；读不到就返回 null，不影响大厅渲染
@@ -131,6 +135,8 @@
     var flags = "";
     if (!m.ready) flags += '<span class="sc-flag">敬请期待</span>';
     else if (s && s.level != null) flags += '<span class="sc-flag">Lv.' + esc(s.level) + "</span>";
+    // 外站学科标一下，免得家长以为"怎么跳走了"
+    if (m.external) flags += '<span class="sc-flag sc-flag-alt">在老站</span>';
 
     var meta = "";
     var g = gradeText(m.grades);

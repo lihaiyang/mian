@@ -166,6 +166,15 @@
   font-weight: 700;
 }
 
+/* 指向另一个域名的学科（数据在那边）。放左上角，
+   和右上角的等级/敬请期待角标不会打架。用中性色，不抢学科主色。 */
+.subject-card .sc-flag-alt {
+  left: var(--s3); right: auto;
+  background: var(--paper-3);
+  color: var(--muted);
+  font-weight: 600;
+}
+
 /* ---------------------------------------------------------------- 弹窗 */
 
 .modal-overlay {
