@@ -5,15 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>键盘岛 · 打字练习 · 萌学园</title>
 <meta name="description" content="给小学生的打字练习：从基准键位到编程符号，练出盲打手感和速度。">
-<meta name="theme-color" content="#F7EFE0">
+<meta name="theme-color" content="#F8F5F1">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%8C%A8%EF%B8%8F%3C/text%3E%3C/svg%3E">
 
 <!-- 平台层样式（全站唯一一份） -->
-<link rel="stylesheet" href="/shared/styles/tokens.css?v=c1d611fa">
-<link rel="stylesheet" href="/shared/styles/base.css?v=d7cbbc1e">
-<link rel="stylesheet" href="/shared/styles/components.css?v=9fef5980">
+<link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
+<link rel="stylesheet" href="/shared/styles/base.css?v=393d5261">
+<link rel="stylesheet" href="/shared/styles/components.css?v=2264217d">
+<link rel="stylesheet" href="/shared/styles/chrome.css?v=b3dec025">
 <!-- 本学科特有样式 -->
-<link rel="stylesheet" href="css/typing.css?v=2beb1304">
+<link rel="stylesheet" href="css/typing.css?v=bf24ce57">
 
 <style>
   /* 学科主色：只覆盖这三个变量，其余全用平台令牌 */
@@ -26,16 +27,21 @@
 
 <div class="page">
 
-  <header class="page-head">
-    <a class="btn ghost sm" href="/" title="回到学科大厅">← 大厅</a>
-    <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:20px" aria-hidden="true">⌨️</span>
-      <strong>键盘岛</strong>
-    </div>
-    <div style="flex:1"></div>
-    <button class="btn ghost sm" id="btnProgress">📊 我的进度</button>
-    <button class="btn ghost sm" id="btnSync">☁️ 云同步</button>
+  <!-- 顶栏由 shared/core/topbar.js 渲染，全平台长得一样 -->
+  <header id="topbar">
+    <!-- 脚本没跑起来时的兜底：回大厅的链接必须一直在 -->
+    <a class="topbar-back" href="/">← 大厅</a>
   </header>
+  <script src="/shared/core/topbar.js?v=998a682b"></script>
+  <script>
+    Topbar.mount({
+      mount: "#topbar", emoji: "⌨️", name: "键盘岛",
+      actions: [
+        { id: "btnProgress", label: "我的进度", emoji: "📊" },
+        { id: "btnSync",     label: "云同步",   emoji: "☁️" }
+      ]
+    });
+  </script>
 
   <main class="page-body">
     <div class="ty-layout">

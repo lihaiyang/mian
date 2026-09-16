@@ -33,7 +33,9 @@ page.on("pageerror", (e) => pageErrors.push(e.message));
 page.on("console", (m) => { if (m.type() === "error") pageErrors.push("console: " + m.text()); });
 
 await page.goto(BASE + "/python/", { waitUntil: "domcontentloaded" });
-await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 60000 });
+// 150s 不是随便给的：Pyodide 首屏要拉约 13.6MB（wasm 10.1MB +
+// stdlib 2.3MB + 胶水 1.2MB），冷启动或慢网络下 60s 真的会超。
+await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 150000 });
 check("v2 页面加载 + Python 引擎就绪", true);
 
 await sleep(1500);
@@ -115,7 +117,9 @@ check("拖分隔条可以自己调比例", dragged.editor > lb.editor + 60, `${l
 await page.keyboard.press("Alt+3");
 await sleep(300);
 await page.reload({ waitUntil: "domcontentloaded" });
-await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 60000 });
+// 150s 不是随便给的：Pyodide 首屏要拉约 13.6MB（wasm 10.1MB +
+// stdlib 2.3MB + 胶水 1.2MB），冷启动或慢网络下 60s 真的会超。
+await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 150000 });
 await sleep(700);
 if (await page.isVisible("#confirmModal.active")) await page.click("#btnConfirmCancel");
 await page.click("#btnOpenLearnTop");
@@ -230,7 +234,9 @@ check("作品库文件数量没有变多",
 
 // 刷新页面：草稿仍然在
 await page.reload({ waitUntil: "domcontentloaded" });
-await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 60000 });
+// 150s 不是随便给的：Pyodide 首屏要拉约 13.6MB（wasm 10.1MB +
+// stdlib 2.3MB + 胶水 1.2MB），冷启动或慢网络下 60s 真的会超。
+await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 150000 });
 await sleep(800);
 if (await page.isVisible("#confirmModal.active")) await page.click("#btnConfirmCancel");
 await page.click("#btnOpenLearnTop");

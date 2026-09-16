@@ -1,12 +1,23 @@
-/* 🖨 打印样式：单词卡与家长周报（A4） */
+/* 🖨 打印样式：单词卡与家长周报（A4）
+   屏幕上靠「1px 细描边 + 柔和投影」分层，纸面上没有投影可言，
+   所以这里把分隔线统一成 1px 实黑：清楚，但不抢内容。 */
 @media print {
-  .app-header, .tabbar, .toast-wrap, .confetti-layer, .stamp-layer, .btn, .btn-row { display: none !important; }
+  #topbar, .app-header, .tabbar, .toast-wrap, .confetti-layer, .stamp-layer,
+  .btn, .btn-row { display: none !important; }
+
+  /* 夜间模式下打印：纸与墨强制回白底黑字，别打出一整页深色墨 */
+  [data-theme="night"] {
+    --paper: #fff; --paper-2: #fff; --paper-3: #fff;
+    --ink: #000; --ink-soft: #333; --muted: #555;
+    --line: #000; --line-strong: #000;
+  }
   body { background: #fff; }
+  body::before { display: none; }          /* 手账纸纹：屏幕上很淡，纸上全是灰点 */
   .app { max-width: none; padding: 0; }
-  .card { break-inside: avoid; box-shadow: none; border: 2px solid #000; }
+  .card { break-inside: avoid; box-shadow: none; border: 1px solid #000; }
   .word-grid { grid-template-columns: repeat(3, 1fr); }
-  .word-tile { border: 1.5px solid #000; min-height: 0; }
-  .kpi, .report-kpi { border: 1.5px solid #000; }
-  .spark .sbar { border: 1.5px solid #000; }
+  .word-tile { border: 1px solid #000; min-height: 0; }
+  .kpi, .report-kpi { border: 1px solid #000; }
+  .spark .sbar { border: 1px solid #000; }
   a[href]::after { content: ""; }
 }

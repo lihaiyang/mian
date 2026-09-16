@@ -53,7 +53,9 @@ page.on("pageerror", (err) => consoleErrors.push("pageerror: " + err.message));
 await page.goto(BASE + "/python/", { waitUntil: "domcontentloaded" });
 
 // 1. 引擎就绪
-await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 60000 });
+// 150s 不是随便给的：Pyodide 首屏要拉约 13.6MB（wasm 10.1MB +
+// stdlib 2.3MB + 胶水 1.2MB），冷启动或慢网络下 60s 真的会超。
+await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 150000 });
 check("Python 引擎就绪", true);
 
 // 2. 模块挂载

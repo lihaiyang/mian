@@ -26,3 +26,6 @@ __pycache__/
 
 # wrangler 本地构建缓存
 .wrangler/
+
+# 本地截图 / 一次性验证脚本（人看的，不进仓库）
+.shots/

@@ -33,7 +33,9 @@ async function newDevice(name) {
   const page = await ctx.newPage();
   page.on("pageerror", (e) => pageErrors.push(name + ": " + e.message));
   await page.goto(BASE + "/python/", { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 60000 });
+  // 150s 不是随便给的：Pyodide 首屏要拉约 13.6MB（wasm 10.1MB +
+  // stdlib 2.3MB + 胶水 1.2MB），冷启动或慢网络下 60s 真的会超。
+  await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 150000 });
   await sleep(1400);
   if (await page.isVisible("#confirmModal.active")) await page.click("#btnConfirmCancel");
   return { ctx, page, name };
@@ -321,7 +323,9 @@ check("A 改内容后确实推到了云端", pushedByA);
 
 // 现在没有后台自动同步了：B 重新打开页面时会同步一次（这是唯一的「自动」行为）
 await B.page.reload({ waitUntil: "domcontentloaded" });
-await B.page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 60000 });
+// 150s 不是随便给的：Pyodide 首屏要拉约 13.6MB（wasm 10.1MB +
+// stdlib 2.3MB + 胶水 1.2MB），冷启动或慢网络下 60s 真的会超。
+await B.page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 150000 });
 await sleep(3000);
 const got = await B.page.evaluate(() => FileManager.getFiles().some((f) => /闲置设备也要能收到这一行/.test(f.content || "")));
 check("另一台设备重新打开页面时会拉到改动", got);

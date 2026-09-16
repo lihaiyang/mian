@@ -7,8 +7,10 @@
 #   main 分支（线上老站，给孩子们在用）
 #     name = "mian"            D1 = mian-db            → https://mian.lihaiyang.net
 #
-#   platform 分支（平台版，还在建设中）
-#     name = "mian-platform"   D1 = mian-platform-db   → https://mian-platform.pages.dev
+#   platform 分支（平台版，主站）
+#     name = "mian-platform"   D1 = mian-platform-db
+#     → https://m.lihaiyang.net  （自定义域名，给孩子用的就是它）
+#     → https://mian-platform.pages.dev  （Cloudflare 默认域名，同一个项目）
 #
 # 为什么必须分成两个库：平台版要大改同步层（M1），而老站里有孩子们真实的
 # 作品和进度。共用一个库的话，平台版的一次错误写入就可能毁掉这些数据。

@@ -1,73 +1,96 @@
-/* 🎮 游戏厅样式（与主设计系统同一套令牌，粗描边 + 贴纸感） */
+/* 🎮 游戏厅样式
+   和主样式同一套令牌：纯白卡片 + 1px 细描边 + 柔和分层投影
+   （原来是「粗描边 + 贴纸感」，已随设计语言统一改掉） */
 
-.gm { display: flex; flex-direction: column; gap: 14px; }
-.gm-top { display: flex; align-items: center; gap: 10px; }
-.gm-title { font-family: var(--font-display); font-size: 20px; font-weight: 800; }
-.gm-score { margin-left: auto; font-weight: 800; font-size: 16px; background: var(--yellow);
-  border: 2.5px solid var(--ink); border-radius: 999px; padding: 4px 14px; }
-.gm-track { height: 12px; border-radius: 999px; border: 2.5px solid var(--ink); background: var(--paper-3); overflow: hidden; }
-.gm-track span { display: block; height: 100%; width: 0; background: var(--teal); transition: width .3s ease; }
-.gm-body { min-height: 320px; display: flex; flex-direction: column; gap: 14px; align-items: center; justify-content: center; }
-.gm-prompt { font-size: 19px; font-weight: 700; text-align: center; }
-.gm-prompt b { color: var(--violet); }
+.gm { display: flex; flex-direction: column; gap: var(--s4); }
+.gm-top { display: flex; align-items: center; gap: var(--s2); }
+.gm-title { font-family: var(--font-display); font-size: var(--fs-h2); font-weight: 800; line-height: var(--lh-tight); }
+.gm-score {
+  margin-left: auto; font-weight: 800; font-size: var(--fs-sm); background: var(--yellow-soft);
+  border: var(--bw) solid color-mix(in srgb, var(--yellow) 45%, var(--line));
+  border-radius: var(--r-chip); padding: 4px var(--s3);
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
+}
+.gm-track { height: 10px; border-radius: var(--r-chip); border: var(--bw) solid var(--line); background: var(--paper-3); overflow: hidden; }
+.gm-track span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s var(--ease); }
+.gm-body { min-height: 320px; display: flex; flex-direction: column; gap: var(--s4); align-items: center; justify-content: center; }
+.gm-prompt { font-size: var(--fs-h2); font-weight: 700; text-align: center; text-wrap: balance; }
+.gm-prompt b { color: var(--accent); }
 .gm-tip { min-height: 56px; }
 
 /* 打地鼠 */
-.gm-holes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; width: 100%; max-width: 660px; }
+.gm-holes { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4); width: 100%; max-width: 660px; }
 .gm-hole {
-  min-height: 108px; border: var(--line) solid var(--ink); border-radius: var(--radius);
-  background: var(--paper-3); box-shadow: var(--shadow-card); display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 4px; transition: transform .14s ease;
+  min-height: 108px; border: var(--bw) solid var(--line); border-radius: var(--r-card);
+  background: var(--paper-3); box-shadow: var(--sh-1); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--s1);
+  transition: translate var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
+              border-color var(--dur) var(--ease), scale var(--dur-fast) var(--ease);
 }
-.gm-hole:hover { transform: translateY(-3px); }
-.gm-hole .gm-mole { font-size: 40px; transition: transform .2s ease; }
-.gm-hole .gm-mole.pop { transform: translateY(-8px) scale(1.15); }
-.gm-hole .gm-word { font-family: var(--font-en); font-weight: 700; font-size: 17px; }
+.gm-hole:hover { translate: 0 -3px; box-shadow: var(--sh-2); border-color: var(--accent); }
+.gm-hole:active { translate: 0 -1px; scale: var(--press); }
+.gm-hole .gm-mole { font-size: 40px; transition: translate var(--dur) var(--ease), scale var(--dur) var(--ease); }
+.gm-hole .gm-mole.pop { translate: 0 -8px; scale: 1.15; }
+.gm-hole .gm-word { font-family: var(--font-en); font-weight: 700; font-size: var(--fs-base); }
 .gm-hole.ok { background: var(--teal-soft); border-color: var(--teal); }
-.gm-hole.miss { background: var(--yellow-soft); animation: gmshake .3s ease 1; }
+.gm-hole.miss { background: var(--yellow-soft); border-color: var(--yellow); animation: gmshake .3s ease 1; }
 @keyframes gmshake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
 
 /* 消消乐 / 翻牌 */
-.gm-grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; width: 100%; max-width: 700px; }
+.gm-grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s3); width: 100%; max-width: 700px; }
 .gm-card {
-  position: relative; min-height: 96px; border: var(--line) solid var(--ink); border-radius: var(--radius-sm);
-  background: var(--white); box-shadow: var(--shadow-card); font-weight: 700; display: grid; place-items: center;
-  padding: 8px; transition: transform .14s ease;
+  position: relative; min-height: 96px; border: var(--bw) solid var(--line); border-radius: var(--r-block);
+  background: var(--paper-2); box-shadow: var(--sh-1); font-weight: 700; display: grid; place-items: center;
+  padding: var(--s2);
+  transition: translate var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
+              border-color var(--dur) var(--ease), background var(--dur-fast) var(--ease),
+              scale var(--dur-fast) var(--ease);
 }
-.gm-card:hover { transform: translateY(-3px); }
-.gm-card .gm-face { font-family: var(--font-en); font-size: 17px; }
+.gm-card:hover { translate: 0 -3px; box-shadow: var(--sh-2); border-color: var(--accent); }
+.gm-card:active { translate: 0 -1px; scale: var(--press); }
+.gm-card .gm-face { font-family: var(--font-en); font-size: var(--fs-base); }
 .gm-card.open { background: var(--yellow-soft); }
-.gm-card.done { background: var(--teal-soft); border-color: var(--teal); opacity: .75; }
-.gm-card.gm-flip .gm-face2 { display: none; font-size: 15px; line-height: 1.4; text-align: center; }
+.gm-card.done { background: var(--teal-soft); border-color: var(--teal); opacity: .78; }
+.gm-card.gm-flip .gm-face2 { display: none; font-size: var(--fs-sm); line-height: 1.4; text-align: center; }
 .gm-card.gm-flip .gm-back { font-size: 32px; }
 .gm-card.gm-flip.open .gm-back { display: none; }
 .gm-card.gm-flip.open .gm-face2 { display: block; }
 
 /* 接龙 */
-.gm-chain { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; width: 100%; max-width: 700px; }
+.gm-chain { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s3); width: 100%; max-width: 700px; }
 .gm-pick {
-  min-height: 92px; border: var(--line) solid var(--ink); border-radius: var(--radius); background: var(--white);
-  box-shadow: var(--shadow-card); display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 4px; font-weight: 700;
+  min-height: 92px; border: var(--bw) solid var(--line); border-radius: var(--r-card); background: var(--paper-2);
+  box-shadow: var(--sh-1); display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--s1); font-weight: 700;
+  transition: translate var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
+              border-color var(--dur) var(--ease), background var(--dur-fast) var(--ease),
+              scale var(--dur-fast) var(--ease);
 }
+.gm-pick:hover { translate: 0 -3px; box-shadow: var(--sh-2); border-color: var(--accent); }
+.gm-pick:active { translate: 0 -1px; scale: var(--press); }
 .gm-pick .gm-mole { font-size: 30px; }
-.gm-pick.ok { background: var(--teal-soft); }
-.gm-pick.miss { background: var(--yellow-soft); }
+.gm-pick.ok { background: var(--teal-soft); border-color: var(--teal); }
+.gm-pick.miss { background: var(--yellow-soft); border-color: var(--yellow); }
 
 /* Bingo */
-.gm-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 560px; }
+.gm-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s3); width: 100%; max-width: 560px; }
 .gm-cell {
-  min-height: 96px; border: var(--line) solid var(--ink); border-radius: var(--radius-sm); background: var(--white);
-  box-shadow: var(--shadow-card); display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 96px; border: var(--bw) solid var(--line); border-radius: var(--r-block); background: var(--paper-2);
+  box-shadow: var(--sh-1); display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2px; font-weight: 700;
+  transition: translate var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
+              border-color var(--dur) var(--ease), background var(--dur-fast) var(--ease),
+              scale var(--dur-fast) var(--ease);
 }
+.gm-cell:hover { translate: 0 -3px; box-shadow: var(--sh-2); border-color: var(--accent); }
+.gm-cell:active { translate: 0 -1px; scale: var(--press); }
 .gm-cell .gm-mole { font-size: 30px; }
-.gm-cell .en { font-family: var(--font-en); font-size: 15px; }
+.gm-cell .en { font-family: var(--font-en); font-size: var(--fs-sm); }
 .gm-cell.mark { background: var(--teal-soft); border-color: var(--teal); }
 .gm-cell.miss { animation: gmshake .3s ease 1; }
 
 /* 结算 */
-.gm-result { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.gm-result { text-align: center; display: flex; flex-direction: column; align-items: center; gap: var(--s2); }
 
 @media (max-width: 760px) {
   .gm-holes { grid-template-columns: repeat(2, 1fr); }

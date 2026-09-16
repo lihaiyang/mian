@@ -10,14 +10,26 @@
   <link rel="stylesheet" href="/vendor/codemirror/codemirror.min.css" data-page-node-id="F6m5S0eWVsUeraOTNQriYe">
   <link rel="stylesheet" href="/vendor/codemirror/show-hint.min.css">
   
-  <!-- 全局自定义少儿样式 -->
-  <link rel="stylesheet" href="css/style.css?v=292e147c" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
+  <!-- 平台层：设计令牌 + 顶栏样式。
+       只引这两个，**不引** base.css / components.css ——
+       Python 有自己的组件系统（3000 行），组件层的 .chip / .section-title
+       会误伤它（它用了这些 class 名但没自己定义）。见 shared/styles/chrome.css -->
+  <link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
+  <link rel="stylesheet" href="/shared/styles/chrome.css?v=b3dec025">
+
+  <!-- 全局自定义少儿样式。它开头的 :root 已经把变量接到平台令牌上了，
+       所以下面 3000 行布局不用改就换了质感。 -->
+  <link rel="stylesheet" href="css/style.css?v=7c85552d" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
 </head>
 <body data-page-node-id="MABBDhhrP5uEOfEzmMJlsw">
 
   <!-- ================= 顶部导航与控制栏 ================= -->
   <header class="app-header" data-page-node-id="QBborKtDQEFyecJYM4Kvfl">
     <div class="brand-section" data-page-node-id="07ly9LXeqeI2svdJJKlCAZ">
+      <!-- 回大厅。以前这一页一个链接都没有，孩子进来就出不去了 -->
+      <a class="topbar-back" id="btnBackLobby" href="/" title="回到大厅，换一个学科">
+        <span class="tb-arrow" aria-hidden="true">←</span><span>大厅</span>
+      </a>
       <div class="brand-logo-wrap" title="点击探索更多" data-page-node-id="6JMoVfCLjCEiocGolK3pAc">
         <span data-page-node-id="aWoi3eL2wjScEBbekdGp76">🐼</span>
       </div>

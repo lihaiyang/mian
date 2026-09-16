@@ -3,28 +3,53 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
-<meta name="theme-color" content="#F7EFE0">
+<meta name="theme-color" content="#F8F5F1">
 <meta name="description" content="萌语岛 English Island —— 给 6-10 岁孩子的英语学习岛：每天 15 分钟，听、说、读、写一关一关往前走。">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="萌语岛">
 <title>萌语岛 English Island · 每天 15 分钟学英语</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%BC%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="css/style.css?v=b5de2283">
-<link rel="stylesheet" href="css/games.css?v=e14eb0f5">
-<link rel="stylesheet" href="css/print.css?v=5b5cefd4" media="print">
+<!-- 平台层样式：顺序不能变 —— 先令牌，再平台骨架，最后才是学科自己的。
+     chrome.css 是顶栏（.topbar）唯一的一份样式，少了它「← 大厅」会掉样式。
+
+     这里**故意不引**另两个平台表：
+       base.css       —— 它会给 body 设系统字体栈，会把英语识字要用的 Andika 盖掉
+       components.css —— 英语站有自己的组件系统（.btn/.chip/.modal-* 全都自己定义），
+                         两套东西同时定义同一批 class 只会让人分不清哪个生效
+                         （Python 站就是被这个坑过）。实测引不引它，整页截图逐像素一致。 -->
+<link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
+<link rel="stylesheet" href="/shared/styles/chrome.css?v=b3dec025">
+<link rel="stylesheet" href="css/style.css?v=c32d0f1a">
+<link rel="stylesheet" href="css/games.css?v=ff19c633">
+<link rel="stylesheet" href="css/print.css?v=c77d49bb" media="print">
 </head>
 <body class="en-body">
 
+<!-- 顶栏：全平台统一，左边永远是「← 大厅」。
+     英语站自己的底部标签栏是 地图/复习/绘本/游戏/我的，回不去大厅，
+     所以这一条是必要的。 -->
+<header id="topbar">
+  <!-- topbar.js 没跑起来时的兜底：回大厅的链接必须一直在 -->
+  <a class="topbar-back" href="/">← 大厅</a>
+</header>
+<script src="/shared/core/topbar.js?v=998a682b"></script>
+<script>
+  // 顶栏右侧那四块（星星 / 火焰 / 待复习卡片 / 小朋友）里的数字是动态的：
+  // en/js/app.js 的 renderHud() 在每次路由切换时用 innerHTML 整块重绘 #hud，
+  // 然后把点击事件绑在 #hudProfile 上。所以**不能**用 actions 把它们静态
+  // 重建一遍 —— 重建出来的节点下一次 renderHud() 就被抹掉了，数字也不动了。
+  // 做法：顶栏只渲染「← 大厅 + 学科标识」，HUD 继续由 app.js 渲染，
+  // 页面末尾那段脚本再把原来的 #hud 节点整体搬进顶栏右侧（id 不变 = 绑定不变）。
+  // 外面套一层判断：topbar.js 没到（CDN 抽风 / 离线首屏）时用 HTML 里那个静态
+  // 兜底链接，而不是抛一个 "Topbar is not defined"。
+  if (window.Topbar) Topbar.mount({ mount: "#topbar", emoji: "🌴", name: "萌语岛" });
+</script>
+
 <div class="app">
+  <!-- HUD 的兜底位置：末尾的脚本会把它搬进顶栏；万一 topbar.js 加载失败，
+       它就留在这一行里，页面照样有星星和连续天数。 -->
   <header class="app-header">
-    <div class="brand" role="button" tabindex="0" id="brandHome" aria-label="回到地图首页">
-      <div class="brand-logo" aria-hidden="true">🐼</div>
-      <div>
-        <div class="brand-name">萌语岛</div>
-        <div class="brand-sub">English Island</div>
-      </div>
-    </div>
     <div class="hud" id="hud"></div>
   </header>
 
@@ -43,6 +68,20 @@
 <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
 <div class="confetti-layer" id="confettiLayer" aria-hidden="true"></div>
 <div class="stamp-layer" id="stampLayer" aria-hidden="true"></div>
+
+<script>
+/* HUD 搬进顶栏：必须等 #hud 出现在 DOM 里，所以放在 body 末尾。
+   只做「搬家」，不重建任何节点 —— renderHud() 和 #hudProfile 的点击绑定
+   都不受影响。品牌那一行（.brand）已经并进顶栏，空掉的那层就删掉。 */
+(function () {
+  var hud = document.getElementById("hud");
+  var bar = document.getElementById("topbar");
+  if (!hud || !bar || !window.Topbar) return;
+  bar.appendChild(hud);
+  var head = document.querySelector(".app-header");
+  if (head && !head.children.length) head.remove();
+})();
+</script>
 
 <script>
 /* 资源版本号：改了 en/js 或 en/css 之后必须改这里（CDN 有 4 小时默认缓存） */

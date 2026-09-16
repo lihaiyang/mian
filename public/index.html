@@ -6,13 +6,14 @@
 <!-- 母品牌名是临时占位，最终叫什么见 docs/多学科平台架构设计.md 第 10 节（待决策） -->
 <title>萌学园 · 一站式小学学习乐园</title>
 <meta name="description" content="给小学生的一站式学习乐园：编程、英语、数学、拼音、语文、打字。每天一点，看得见进步。">
-<meta name="theme-color" content="#F7EFE0">
+<meta name="theme-color" content="#F8F5F1">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%92%3C/text%3E%3C/svg%3E">
 
 <!-- 平台层样式：全站唯一一份，学科只覆盖 --accent 三个变量 -->
-<link rel="stylesheet" href="/shared/styles/tokens.css?v=c1d611fa">
-<link rel="stylesheet" href="/shared/styles/base.css?v=d7cbbc1e">
-<link rel="stylesheet" href="/shared/styles/components.css?v=9fef5980">
+<link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
+<link rel="stylesheet" href="/shared/styles/base.css?v=393d5261">
+<link rel="stylesheet" href="/shared/styles/components.css?v=2264217d">
+<link rel="stylesheet" href="/shared/styles/chrome.css?v=b3dec025">
 </head>
 <body>
 
@@ -20,14 +21,19 @@
 
 <div class="page">
 
-  <header class="page-head">
-    <div class="brand" style="display:flex;align-items:center;gap:10px;">
-      <span style="font-size:24px" aria-hidden="true">🎒</span>
-      <strong style="font-size:17px">萌学园</strong>
-    </div>
-    <div style="flex:1"></div>
-    <!-- 家长中心是 M6 的内容，先把入口摆上，点了给一句说明而不是死链 -->
-    <a class="btn ghost sm" href="/parent/" id="parentLink">👨‍👩‍👧 家长中心</a>
+  <!-- 大厅自己就是「家」，所以没有「← 大厅」；其余长得和学科页顶栏一样。
+       topbar--keep-name：大厅窄屏也保留「萌学园」这个名字（学科页会省略，
+       因为它们右侧还有按钮，名字会让顶栏换行挤烂）。 -->
+  <header class="topbar topbar--keep-name">
+    <span class="topbar-brand">
+      <span class="tb-emoji" aria-hidden="true">🎒</span>
+      <span class="tb-name">萌学园</span>
+    </span>
+    <span class="topbar-spacer"></span>
+    <span class="topbar-actions">
+      <!-- 家长中心是 M6 的内容，先把入口摆上，点了给一句说明而不是死链 -->
+      <a class="btn ghost sm" href="/parent/" id="parentLink">👨‍👩‍👧 家长中心</a>
+    </span>
   </header>
 
   <main class="page-body">

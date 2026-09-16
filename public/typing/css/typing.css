@@ -13,7 +13,16 @@
 }
 
 @media (max-width: 900px) {
-  .ty-layout { grid-template-columns: 1fr; }
+  .ty-layout { grid-template-columns: 1fr; gap: var(--s4); }
+  /* 打字区排到前面。以前只是把两栏上下叠起来，结果 17 关的列表占满整屏，
+     孩子进来看到的是一堆关卡名，要滚很久才够到打字区。 */
+  .ty-main { order: 1; }
+  .ty-side {
+    order: 2;
+    position: static;
+    max-height: 46vh;      /* 关卡列表自己滚，不把整页撑长 */
+    overflow: auto;
+  }
 }
 
 /* ---------------------------------------------------------------- 关卡列表 */
@@ -304,3 +313,47 @@
   font-size: var(--fs-sm);
 }
 .muted { color: var(--muted); }
+
+/* ---------------------------------------------------------------- 窄屏收敛
+   打字练习在平板上要能真的用起来（外接蓝牙键盘），手机上也别崩。 */
+
+@media (max-width: 720px) {
+  .ty-card { padding: var(--s4); }
+
+  /* 键盘图 13 列放不进 390px：让整块横向滚动，
+     不要让它把页面撑出横向滚动条。 */
+  .ty-kbd { overflow-x: auto; padding-bottom: var(--s1); }
+  .kbd-row {
+    justify-content: flex-start;
+    width: max-content;
+    gap: 3px;
+    margin-bottom: 3px;
+  }
+  .kbd-key {
+    min-width: 26px; height: 30px;
+    padding: 0 4px;
+    font-size: 10px;
+    border-radius: 6px;
+    border-bottom-width: 2px;
+  }
+  .kbd-key.next { border-bottom-width: 1px; }
+  .kbd-space { min-width: 120px; }
+
+  .ty-text {
+    font-size: 18px;
+    line-height: 1.8;
+    letter-spacing: 0;
+    padding: var(--s3);
+  }
+
+  .ty-hud { gap: var(--s4); }
+  .ty-hud-item b { font-size: 19px; }
+  .ty-progress { flex-basis: 100%; }
+
+  .ty-result-grid { grid-template-columns: repeat(2, 1fr); }
+  .ty-actions { flex-wrap: wrap; }
+  .ty-pf-level { flex-wrap: wrap; gap: var(--s3); }
+  .ty-pf-level .ty-pf-bar { flex: 1 1 100%; }
+  .ty-badges { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+  .ty-medals { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+}

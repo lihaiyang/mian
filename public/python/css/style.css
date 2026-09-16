@@ -1,82 +1,104 @@
 /* ============================================================
    🌈 萌码 Python (CodePanda IDE) - 少儿儿童专属 Python 在线工坊
-   设计风格：柔和梦幻渐变、Q弹圆角卡片、生动交互反馈、视力友好
+   布局：桌面 IDE 三栏（代码宝箱 / 编辑器 / 运行舞台）
+   质感：与全平台统一 —— 暖白底 + 纯白面板 + 1px 细描边 + 柔和分层投影
+
+   这个文件下面有 3000 行布局规则，它们全都通过变量取色。
+   所以「统一风格」不需要重写布局，只要把变量接到平台令牌上就行 ——
+   这是本文件开头这段 :root 存在的唯一意义。
    ============================================================ */
 
 :root {
-  /* 品牌色盘 - 充满好奇心与童趣的魔法科技感 */
-  --primary: #5B5FED;
-  --primary-hover: #474BD8;
-  --primary-light: #EEF0FF;
-  --primary-glow: rgba(91, 95, 237, 0.25);
-  
-  --success: #10B981;
-  --success-hover: #059669;
-  --success-light: #ECFDF5;
-  --success-glow: rgba(16, 185, 129, 0.3);
-  
-  --warning: #F59E0B;
-  --warning-light: #FFFBEB;
-  
-  --danger: #EF4444;
-  --danger-light: #FEF2F2;
+  /* ---------- 学科主色 ----------
+     必须和 public/python/subject.js 里 manifest 声明的 accent 一致，
+     否则大厅卡片是蓝的、进来却变成紫的。 */
+  --accent: #3B7DD8;
+  --accent-soft: #E3EEFB;
+  --accent-ink: #FFFFFF;
 
+  /* ---------- Python 原有变量名 → 平台令牌 ---------- */
+  --primary: var(--accent);
+  --primary-hover: #2F6BC0;
+  --primary-light: var(--accent-soft);
+  --primary-glow: rgba(59, 125, 216, 0.25);
+
+  --success: var(--ok);
+  --success-hover: #0B7F58;
+  --success-light: var(--ok-soft);
+  --success-glow: rgba(14, 159, 110, 0.3);
+
+  --warning: var(--warn);
+  --warning-light: var(--warn-soft);
+
+  --danger: var(--bad);
+  --danger-light: var(--bad-soft);
+
+  /* 童趣点缀色：只用在插画/图标/彩带，不参与信息层级 */
   --accent-pink: #F472B6;
   --accent-purple: #A855F7;
   --accent-cyan: #06B6D4;
   --accent-yellow: #FBBF24;
 
-  /* 背景与面板 */
-  --bg-app: #F0F4FD;
-  --bg-gradient: linear-gradient(135deg, #F0F4FD 0%, #E8EEFB 50%, #F5F3FF 100%);
-  --panel-bg: #FFFFFF;
-  --panel-bg-glass: rgba(255, 255, 255, 0.88);
-  --border-color: #E2E8F0;
-  --border-soft: #EEF2F6;
+  /* 背景与面板：这里是「统一」发生的地方 */
+  --bg-app: var(--paper);
+  --bg-gradient: linear-gradient(160deg, #FBF9F6 0%, var(--paper) 45%, #F3EEE6 100%);
+  --panel-bg: var(--paper-2);
+  --panel-bg-glass: rgba(255, 255, 255, 0.86);
+  --border-color: var(--line);
+  --border-soft: var(--line);
 
   /* 文字 */
-  --text-main: #1E293B;
-  --text-muted: #64748B;
-  --text-light: #94A3B8;
+  --text-main: var(--ink);
+  --text-muted: var(--ink-soft);
+  --text-light: var(--muted);
 
-  /* 控制台与暗色区 */
+  /* 控制台：唯一保留的深色区（终端就该是深色的，孩子也认这个） */
   --term-bg: #1E1E2E;
   --term-header: #181825;
   --term-text: #CDD6F4;
   --term-prompt: #A6E3A1;
   --term-err: #F38BA8;
 
-  /* 阴影与圆角 */
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --radius-pill: 9999px;
-  
-  --shadow-sm: 0 2px 6px rgba(100, 116, 139, 0.06);
-  --shadow-md: 0 8px 20px rgba(100, 116, 139, 0.08);
-  --shadow-lg: 0 16px 36px rgba(91, 95, 237, 0.12);
-  --shadow-popup: 0 20px 40px rgba(15, 23, 42, 0.15);
+  /* 阴影与圆角 → 平台令牌 */
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-block);
+  --radius-lg: var(--r-card);
+  --radius-pill: var(--r-chip);
+
+  --shadow-sm: var(--sh-1);
+  --shadow-md: var(--sh-2);
+  --shadow-lg: var(--sh-3);
+  --shadow-popup: var(--sh-3);
 
   --font-ui: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-code: "JetBrains Mono", "Fira Code", Consolas, Menlo, monospace;
 }
 
-/* 深色模式适配（可选夜间太空模式） */
+/* 深色模式适配（可选夜间太空模式）
+   平台用的是 prefers-color-scheme，Python 用的是手动开关，两者取不到
+   对方的值，所以这里把 tokens.css 暗色模式那组数字抄一份过来。
+   **改 tokens.css 的暗色时，记得同步这里。** */
 body.dark-mode {
-  --bg-app: #0F111A;
-  --bg-gradient: linear-gradient(135deg, #0B0D14 0%, #111422 50%, #15162B 100%);
-  --panel-bg: #1A1D2B;
-  --panel-bg-glass: rgba(26, 29, 43, 0.92);
-  --border-color: #2E344A;
-  --border-soft: #24293C;
-  --text-main: #F1F5F9;
-  --text-muted: #94A3B8;
-  --text-light: #64748B;
+  --bg-app: #191817;
+  --bg-gradient: linear-gradient(160deg, #1E1C1B 0%, #191817 45%, #151413 100%);
+  --panel-bg: #232120;
+  --panel-bg-glass: rgba(35, 33, 32, 0.90);
+  --border-color: #35312F;
+  --border-soft: #2C2927;
+  --text-main: #F1F4F8;
+  --text-muted: #C3C9D2;
+  --text-light: #98A1AD;
   --term-bg: #12141F;
   --term-header: #0D0F17;
-  --primary-light: rgba(91, 95, 237, 0.18);
-  --success-light: rgba(16, 185, 129, 0.18);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --accent-soft: rgba(59, 125, 216, 0.18);
+  --primary-light: rgba(59, 125, 216, 0.18);
+  --success-light: rgba(14, 159, 110, 0.18);
+  --warning-light: rgba(217, 119, 6, 0.18);
+  --danger-light: rgba(220, 38, 38, 0.18);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .35), 0 1px 3px rgba(0, 0, 0, .30);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, .35), 0 6px 16px rgba(0, 0, 0, .40);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, .40), 0 16px 40px rgba(0, 0, 0, .55);
+  --shadow-popup: 0 4px 8px rgba(0, 0, 0, .40), 0 16px 40px rgba(0, 0, 0, .55);
 }
 
 /* ================= 基础重置 ================= */
@@ -121,7 +143,7 @@ body {
 .brand-logo-wrap {
   width: 36px;
   height: 36px;
-  background: linear-gradient(135deg, #FF6B8B 0%, #FFA07A 50%, #5B5FED 100%);
+  background: linear-gradient(135deg, #FF6B8B 0%, #FFA07A 50%, var(--accent) 100%);
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
@@ -440,7 +462,7 @@ body.dark-mode .file-item:hover {
 .file-item.active {
   background: var(--primary-light);
   color: var(--primary);
-  border-color: rgba(91, 95, 237, 0.25);
+  border-color: var(--primary-glow);
   font-weight: 700;
 }
 
@@ -799,8 +821,8 @@ body.dark-mode .CodeMirror-selected { background: rgba(137, 180, 250, 0.25); }
 body.dark-mode .CodeMirror-matchingbracket { background: rgba(166, 227, 161, 0.3); color: #A6E3A1 !important; }
 
 /* 亮色模式选中色微调，与品牌色呼应 */
-::selection { background: rgba(91, 95, 237, 0.22); }
-.CodeMirror-selected { background: rgba(91, 95, 237, 0.16); }
+::selection { background: var(--primary-glow); }
+.CodeMirror-selected { background: var(--primary-glow); }
 
 #codeEditorArea {
   width: 100%;
@@ -1291,8 +1313,8 @@ body.dark-mode .magic-fix-btn.has-warn {
 /* ===== 🔭 变量望远镜卡片 ===== */
 .vars-card {
   margin-top: 10px;
-  background: linear-gradient(135deg, #EEF2FF 0%, #F5F3FF 100%);
-  border: 1px solid #DDD6FE;
+  background: linear-gradient(135deg, var(--accent-soft) 0%, #F5F3FF 100%);
+  border: 1px solid var(--accent-soft);
   border-radius: var(--radius-md);
   padding: 10px 12px;
   font-size: 12px;
@@ -1321,7 +1343,7 @@ body.dark-mode .magic-fix-btn.has-warn {
 .vars-type { color: #94A3B8; font-size: 10px; white-space: nowrap; }
 
 body.dark-mode .vars-card {
-  background: linear-gradient(135deg, rgba(91,95,237,0.16) 0%, rgba(168,85,247,0.12) 100%);
+  background: linear-gradient(135deg, var(--primary-glow) 0%, rgba(168,85,247,0.12) 100%);
   border-color: rgba(167, 139, 250, 0.35);
 }
 body.dark-mode .vars-header { color: #C4B5FD; }
@@ -1473,11 +1495,11 @@ body.dark-mode .gallery-item-desc { color: #94A3B8; }
   font-size: 12px;
   font-weight: 800;
   color: var(--text-main);
-  background: linear-gradient(90deg, rgba(91, 95, 237, .10), rgba(91, 95, 237, .02));
+  background: linear-gradient(90deg, var(--primary-glow), var(--primary-glow));
   transition: background .18s ease;
 }
 .folder-head:first-child { margin-top: 0; }
-.folder-head:hover { background: rgba(91, 95, 237, .16); }
+.folder-head:hover { background: var(--primary-glow); }
 .folder-head .folder-arrow {
   font-size: 10px;
   color: var(--text-light);
@@ -1646,7 +1668,7 @@ body.dark-mode .tab-action-btn { background: #1E293B; border-color: #334155; }
 }
 .file-tool-btn .tool-ico { font-size: 12px; line-height: 1; }
 .file-tool-btn .tool-label { font-size: 11px; line-height: 1; }
-.file-tool-btn:hover { background: var(--primary-light); border-color: rgba(91, 95, 237, .35); }
+.file-tool-btn:hover { background: var(--primary-light); border-color: var(--primary-glow); }
 body.dark-mode .file-tool-btn { background: #1E293B; border-color: #334155; }
 
 
@@ -1682,7 +1704,7 @@ body.dark-mode .file-tool-btn { background: #1E293B; border-color: #334155; }
 }
 .cloud-code-box .cloud-row { justify-content: center; }
 .cloud-status { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
-body.dark-mode .cloud-code-box { background: rgba(91, 95, 237, .16); }
+body.dark-mode .cloud-code-box { background: var(--primary-glow); }
 
 
 /* ================= 我的档案（成长 + 云同步 + 分享） ================= */
@@ -1701,7 +1723,7 @@ body.dark-mode .cloud-code-box { background: rgba(91, 95, 237, .16); }
 .my-panel-body { min-height: 200px; max-height: 62vh; overflow-y: auto; }
 .my-pane { display: none; }
 .my-pane.active { display: block; }
-body.dark-mode .my-tab.active { background: rgba(91, 95, 237, .18); }
+body.dark-mode .my-tab.active { background: var(--primary-glow); }
 
 /* 分享标签页 */
 .share-block { border: 1px dashed var(--border-color); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
@@ -1953,7 +1975,11 @@ body.dark-mode .snippets-bar .snippet-chip-list::-webkit-scrollbar-thumb { backg
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-@media (max-width: 1024px) {
+/* 注意 min-width：这条规则原来只写 max-width: 1024px，
+   而它排在文件后半部分，比前面的 max-width:768px 单栏规则更晚，
+   于是在手机上它也命中、把单栏又改回 190px 1fr 280px —— 三栏挤爆屏幕。
+   加 min-width: 769px 让两者互斥。 */
+@media (min-width: 769px) and (max-width: 1024px) {
   .app-workspace {
     grid-template-columns: 190px 1fr 280px;
   }
@@ -2020,8 +2046,8 @@ body.dark-mode .need-sync-notice { background: #2A2416; border-color: #8A6D1F; c
   padding: 12px 14px;
   margin-bottom: 10px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #EEF0FF 0%, #FDF2F8 100%);
-  border: 2px solid #DDD6FE;
+  background: linear-gradient(135deg, var(--accent-soft) 0%, #FDF2F8 100%);
+  border: 2px solid var(--accent-soft);
   box-shadow: var(--shadow-sm);
 }
 .level-emoji { font-size: 34px; line-height: 1; }
@@ -2047,14 +2073,14 @@ body.dark-mode .level-bar { background: #334155; }
   margin-bottom: 12px;
   border: none;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #5B5FED 0%, #A855F7 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, #A855F7 100%);
   color: #FFFFFF;
   cursor: pointer;
   text-align: left;
-  box-shadow: 0 8px 18px rgba(91, 95, 237, .28);
+  box-shadow: 0 8px 18px var(--primary-glow);
   transition: transform .15s ease, box-shadow .15s ease;
 }
-.learn-entry-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(91, 95, 237, .34); }
+.learn-entry-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 24px var(--primary-glow); }
 .learn-entry-emoji { font-size: 26px; }
 .learn-entry-text { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .learn-entry-title { font-size: 15px; font-weight: 900; }
@@ -2189,7 +2215,7 @@ body.dark-mode .learn-head-title { color: #F1F5F9; }
 }
 .learn-btn:hover { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
 .learn-btn:disabled { opacity: .6; cursor: default; }
-.learn-btn.primary { background: linear-gradient(135deg, #5B5FED, #7C3AED); color: #FFF; border-color: transparent; }
+.learn-btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-purple)); color: #FFF; border-color: transparent; }
 .learn-btn.primary:hover { color: #FFF; transform: translateY(-1px); }
 .learn-btn.success { background: linear-gradient(135deg, #10B981, #059669); color: #FFF; border-color: transparent; }
 .learn-btn.success:hover { color: #FFF; transform: translateY(-1px); }
@@ -2214,7 +2240,7 @@ body.dark-mode .learn-chip { background: #1E293B; color: #E2E8F0; border-color: 
 }
 .learn-search:focus { border-color: var(--primary); }
 .inline-code {
-  background: #EEF2FF; color: #4338CA; padding: 0 5px; border-radius: 5px;
+  background: var(--accent-soft); color: #4338CA; padding: 0 5px; border-radius: 5px;
   font-family: var(--font-code); font-size: .93em;
 }
 body.dark-mode .inline-code { background: #312E81; color: #C7D2FE; }
@@ -2223,8 +2249,8 @@ body.dark-mode .inline-code { background: #312E81; color: #C7D2FE; }
 .path-hero {
   display: flex; align-items: center; gap: 14px;
   padding: 16px; border-radius: var(--radius-lg); margin-bottom: 14px;
-  background: linear-gradient(135deg, #EEF0FF 0%, #FCE7F3 100%);
-  border: 2px solid #DDD6FE;
+  background: linear-gradient(135deg, var(--accent-soft) 0%, #FCE7F3 100%);
+  border: 2px solid var(--accent-soft);
 }
 .path-hero-emoji { font-size: 42px; }
 .path-hero-main { flex: 1; min-width: 0; }
@@ -2249,7 +2275,7 @@ body.dark-mode .path-hero-title { color: #F1F5F9; }
 .today-item b { margin-left: auto; color: var(--primary); font-size: 12px; }
 .today-item i { font-style: normal; color: var(--warning); font-size: 11px; }
 .today-item.done { background: #F0FDF4; }
-.today-item.link { cursor: pointer; background: #EEF2FF; }
+.today-item.link { cursor: pointer; background: var(--accent-soft); }
 .today-item.link:hover { background: #E0E7FF; }
 body.dark-mode .path-today { background: #1E293B; border-color: #334155; }
 body.dark-mode .today-item { background: #0F172A; color: #E2E8F0; }
@@ -2489,7 +2515,7 @@ body.dark-mode .exam-intro-title, body.dark-mode .exam-level-name { color: #F1F5
 .exam-bar {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 10px 13px; border-radius: 12px; margin-bottom: 10px;
-  background: linear-gradient(135deg, #EEF0FF, #FCE7F3); border: 2px solid #DDD6FE;
+  background: linear-gradient(135deg, var(--accent-soft), #FCE7F3); border: 2px solid var(--accent-soft);
 }
 .exam-bar-title { font-size: 13.5px; font-weight: 900; color: var(--text-main); }
 .exam-bar-info { font-size: 12px; color: var(--text-muted); font-weight: 700; }
@@ -2566,11 +2592,11 @@ body.dark-mode .award-stat { background: #1E293B; border-color: #334155; }
 
 /* 顶栏「学习中心」按钮：比其它按钮更醒目一点 */
 .learn-top-btn {
-  background: linear-gradient(135deg, #5B5FED 0%, #A855F7 100%) !important;
+  background: linear-gradient(135deg, var(--accent) 0%, #A855F7 100%) !important;
   color: #FFFFFF !important;
   border-color: transparent !important;
   font-weight: 800;
-  box-shadow: 0 4px 12px rgba(91, 95, 237, .26);
+  box-shadow: 0 4px 12px var(--primary-glow);
 }
 .learn-top-btn:hover { transform: translateY(-1px); }
 
@@ -2610,8 +2636,8 @@ body.mode-learn.learn-wide .learn-panel { border-right: none; }
   align-items: center;
   gap: 10px;
   padding: 6px 14px;
-  background: linear-gradient(90deg, #EEF0FF 0%, #FDF2F8 100%);
-  border-bottom: 2px solid #DDD6FE;
+  background: linear-gradient(90deg, var(--accent-soft) 0%, #FDF2F8 100%);
+  border-bottom: 2px solid var(--accent-soft);
   flex-wrap: wrap;
 }
 .learn-bar-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
@@ -2622,15 +2648,15 @@ body.mode-learn.learn-wide .learn-panel { border-right: none; }
   font-family: var(--font-ui);
   transition: background .15s ease;
 }
-.learn-tab:hover { background: rgba(91, 95, 237, .14); }
-.learn-tab.active { background: #5B5FED; color: #FFF; box-shadow: 0 4px 12px rgba(91, 95, 237, .3); }
+.learn-tab:hover { background: var(--primary-glow); }
+.learn-tab.active { background: var(--accent); color: #FFF; box-shadow: 0 4px 12px var(--primary-glow); }
 .learn-bar-hud { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
 .learn-exit-btn {
   border: 2px solid #C4B5FD; background: #FFF; color: #5B21B6;
   padding: 6px 14px; border-radius: 999px; cursor: pointer;
   font-size: 12.5px; font-weight: 800; font-family: var(--font-ui);
 }
-.learn-exit-btn:hover { background: #5B5FED; border-color: #5B5FED; color: #FFF; }
+.learn-exit-btn:hover { background: var(--accent); border-color: var(--accent); color: #FFF; }
 body.dark-mode .learn-bar { background: linear-gradient(90deg, #232838 0%, #2A2438 100%); border-color: #4338CA; }
 body.dark-mode .learn-tab { color: #C7D2FE; }
 body.dark-mode .learn-exit-btn { background: #1E293B; border-color: #4338CA; color: #C7D2FE; }
@@ -2638,7 +2664,7 @@ body.dark-mode .learn-exit-btn { background: #1E293B; border-color: #4338CA; col
 /* HUD 元素（等级 / 经验条 / 战果） */
 .hud-level { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; color: #5B21B6; white-space: nowrap; }
 .hud-emoji { font-size: 15px; }
-.hud-bar { width: 80px; height: 8px; border-radius: 999px; background: #DDD6FE; overflow: hidden; }
+.hud-bar { width: 80px; height: 8px; border-radius: 999px; background: var(--accent-soft); overflow: hidden; }
 .hud-bar > span { display: block; height: 100%; background: linear-gradient(90deg, #6366F1, #EC4899); }
 .hud-num { font-size: 11.5px; font-weight: 700; color: #6D28D9; white-space: nowrap; }
 body.dark-mode .hud-level, body.dark-mode .hud-num { color: #C7D2FE; }
@@ -2743,11 +2769,11 @@ body.dark-mode .task-title, body.dark-mode .task-body { color: #E2E8F0; }
   align-items: center; gap: 8px;
   padding: 6px 10px;
   background: #F5F3FF;
-  border-bottom: 2px solid #DDD6FE;
+  border-bottom: 2px solid var(--accent-soft);
   font-size: 12px;
 }
 .learn-task-crumb { font-weight: 800; color: #5B21B6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.learn-task-progress { margin-left: auto; font-size: 11px; color: #7C3AED; font-weight: 700; white-space: nowrap; }
+.learn-task-progress { margin-left: auto; font-size: 11px; color: var(--accent-purple); font-weight: 700; white-space: nowrap; }
 body.dark-mode .learn-task-bar { background: #241F3A; border-color: #4338CA; }
 body.dark-mode .learn-task-crumb { color: #C7D2FE; }
 
@@ -2765,7 +2791,7 @@ body.dark-mode .learn-action-bar { background: #1E293B; border-color: #334155; }
 }
 .learn-act i { font-style: normal; font-size: 10px; opacity: .6; font-weight: 700; }
 .learn-act:hover { border-color: var(--primary); color: var(--primary); }
-.learn-act.primary { background: linear-gradient(135deg, #5B5FED, #7C3AED); color: #FFF; border-color: transparent; }
+.learn-act.primary { background: linear-gradient(135deg, var(--accent), var(--accent-purple)); color: #FFF; border-color: transparent; }
 .learn-act.success { background: linear-gradient(135deg, #10B981, #059669); color: #FFF; border-color: transparent; }
 .learn-act.primary:hover, .learn-act.success:hover { color: #FFF; transform: translateY(-1px); }
 .learn-act-status { margin-left: auto; font-size: 11.5px; font-weight: 700; color: var(--text-muted); }
@@ -2881,15 +2907,15 @@ body.learn-wide .learn-panel-body { padding: 16px 22px 28px; }
   justify-content: center;
   height: 12px;
   cursor: ns-resize;
-  background: #EEF2FF;
-  border-top: 1px solid #DDD6FE;
-  border-bottom: 1px solid #DDD6FE;
+  background: var(--accent-soft);
+  border-top: 1px solid var(--accent-soft);
+  border-bottom: 1px solid var(--accent-soft);
   touch-action: none;
   user-select: none;
 }
 body.mode-learn .learn-splitter.show { display: flex; }
-.learn-splitter:hover, .learn-splitter.dragging { background: #DDD6FE; }
-.learn-splitter-grip { width: 54px; height: 4px; border-radius: 999px; background: #A5B4FC; }
+.learn-splitter:hover, .learn-splitter.dragging { background: var(--accent-soft); }
+.learn-splitter-grip { width: 54px; height: 4px; border-radius: 999px; background: var(--accent); }
 .learn-splitter-badge { position: absolute; right: 10px; font-size: 10.5px; font-weight: 800; color: #5B21B6; }
 body.dark-mode .learn-splitter { background: #241F3A; border-color: #4338CA; }
 body.dark-mode .learn-splitter-grip { background: #6366F1; }
@@ -2927,8 +2953,8 @@ body.mode-learn .learn-layout-group.show { display: inline-flex; }
   width: 28px; height: 22px; border-radius: 7px; font-size: 13px; line-height: 1;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.learn-layout-btn:hover { background: #DDD6FE; }
-.learn-layout-btn.active { background: #5B5FED; box-shadow: 0 2px 6px rgba(91, 95, 237, .35); }
+.learn-layout-btn:hover { background: var(--accent-soft); }
+.learn-layout-btn.active { background: var(--accent); box-shadow: 0 2px 6px var(--primary-glow); }
 body.dark-mode .learn-layout-group { background: #312E81; }
 body.dark-mode .learn-layout-btn.active { background: #6366F1; }
 
@@ -2941,8 +2967,8 @@ body.learn-focus .learn-bar { display: none; }
 body.learn-focus .learn-panel { display: none; }
 body.learn-focus .output-panel { display: none; }
 body.learn-focus .app-workspace { grid-template-columns: minmax(0, 1fr); }
-body.learn-focus .learn-task-bar { background: #EEF2FF; border-bottom-color: #A5B4FC; }
-body.learn-focus .learn-lesson-host { border-bottom-color: #A5B4FC; }
+body.learn-focus .learn-task-bar { background: var(--accent-soft); border-bottom-color: var(--accent); }
+body.learn-focus .learn-lesson-host { border-bottom-color: var(--accent); }
 body.dark-mode.learn-focus .learn-task-bar { background: #241F3A; }
 
 /* 「讲解优先」：代码区收成一条可点的提示栏 */
@@ -2971,18 +2997,18 @@ body.dark-mode .learn-code-row.collapsed { background: #1E293B; border-color: #3
   width: calc(100% - 12px);
   margin: 6px;
   padding: 9px 10px;
-  border: 2px solid #DDD6FE;
+  border: 2px solid var(--accent-soft);
   border-radius: 12px;
-  background: linear-gradient(135deg, #EEF0FF 0%, #FDF2F8 100%);
+  background: linear-gradient(135deg, var(--accent-soft) 0%, #FDF2F8 100%);
   cursor: pointer;
   font-family: var(--font-ui);
   text-align: left;
   transition: transform .14s ease, box-shadow .14s ease;
 }
-.folder-entry:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(91, 95, 237, .18); }
+.folder-entry:hover { transform: translateY(-1px); box-shadow: 0 6px 16px var(--primary-glow); }
 .folder-entry .folder-emoji { font-size: 15px; }
 .folder-entry .folder-name { font-size: 12.5px; font-weight: 800; color: #4C1D95; }
-.folder-entry-go { margin-left: auto; font-size: 10.5px; font-weight: 800; color: #7C3AED; }
+.folder-entry-go { margin-left: auto; font-size: 10.5px; font-weight: 800; color: var(--accent-purple); }
 body.dark-mode .folder-entry { background: linear-gradient(135deg, #232838, #2A2438); border-color: #4338CA; }
 body.dark-mode .folder-entry .folder-name { color: #C7D2FE; }
 
@@ -3006,4 +3032,71 @@ body.dark-mode .sync-btn.is-error { background: #3B1D1D; }
   content: "🟡";
   margin-left: 5px;
   font-size: 10px;
+}
+
+/* ============================================================================
+   窄屏（手机 / 竖屏平板）—— 让 Python 在手机上真的能用
+   
+   桌面是三栏「代码宝箱 / 编辑器 / 运行舞台」。手机没有横向空间，硬塞三栏
+   只会互相压扁（曾经就是这样：被 body{overflow:hidden} 藏住了溢出，
+   肉眼看才发现右边两栏被切掉了）。这里改成单栏纵向，并重排顺序：
+   
+     编辑器（写字）→ 运行舞台（看结果）→ 代码宝箱（选文件，用得最少）
+   
+   ⚠️ 这一块必须留在文件**最后**。上面有 10 多处 @media 覆盖同一个选择器，
+   CSS 同权重看先后，放前面就会被后面盖掉。
+   ========================================================================== */
+@media (max-width: 768px) {
+  /* ---- 顶栏：只留「← 大厅」、品牌、学习中心、引擎状态点 ---- */
+  .app-header {
+    height: auto;
+    min-height: 50px;
+    padding: 0 var(--s2);
+    gap: var(--s1);
+    flex-wrap: nowrap;
+  }
+  /* 这几个手机上都从别处能进，不占顶栏 */
+  .sync-btn,
+  #btnResetDemos,
+  #btnExportAll,
+  #btnShareCode,
+  .user-chip .user-name { display: none !important; }
+
+  .brand-title { font-size: 14px; }
+  .engine-status-pill { min-width: 0; max-width: 34vw; }
+  .engine-status-pill #statusText {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* ---- 单栏纵向 ---- */
+  .app-workspace {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: none;
+    grid-auto-rows: min-content;
+    height: auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: var(--s2);
+    gap: var(--s2);
+  }
+  .workspace-panel { min-width: 0; }
+
+  .editor-panel   { order: 1; min-height: 62vh; }
+  .output-panel   { order: 2; min-height: 46vh; }
+  .filetree-panel { order: 3; max-height: 46vh; }
+
+  /* 学堂模式也走单栏：课程内容排在编辑器前面 */
+  body.mode-learn .app-workspace { grid-template-columns: minmax(0, 1fr) !important; }
+  body.mode-learn .learn-panel { order: 0; max-height: 46vh; }
+
+  /* 代码宝箱的工具按钮在窄屏挤不下就换行，不要撑出横向滚动 */
+  .filetree-panel .panel-tools { flex-wrap: wrap; }
+}
+
+/* 更窄（常见手机竖屏 390px）：顶栏再让一步 */
+@media (max-width: 480px) {
+  .user-chip { display: none !important; }
+  .engine-status-pill #statusText { display: none; }
+  .editor-panel { min-height: 58vh; }
 }

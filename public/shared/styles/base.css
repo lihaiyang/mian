@@ -66,6 +66,9 @@ button, input, select, textarea {
   flex-direction: column;
 }
 
+/* ⚠️ 已废弃：页面头部请用 chrome.css 的 .topbar。
+   这个类是全平台统一顶栏之前的旧写法，留着只会让人再多写一种头部，
+   所以它不再被任何页面引用。下一个要删的就是它。 */
 .page-head {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; gap: var(--s3);

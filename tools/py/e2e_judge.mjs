@@ -28,7 +28,9 @@ const pageErrors = [];
 page.on("pageerror", (e) => pageErrors.push(e.message));
 
 await page.goto(BASE + "/python/", { waitUntil: "domcontentloaded" });
-await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 60000 });
+// 150s 不是随便给的：Pyodide 首屏要拉约 13.6MB（wasm 10.1MB +
+// stdlib 2.3MB + 胶水 1.2MB），冷启动或慢网络下 60s 真的会超。
+await page.waitForFunction(() => document.getElementById("statusText")?.textContent.includes("就绪"), null, { timeout: 150000 });
 
 // 打开「练习」把题库（懒加载）拉起来
 await page.evaluate(() => Learn.open("exercise"));

@@ -1,0 +1,103 @@
+/* ============================================================================
+ * 萌学园 · 页面骨架层（顶栏 / 页脚等「每一页都有」的东西）
+ *
+ * 为什么单独一个文件，而不是并进 components.css：
+ * Python 和英语站各自有 3000 行 / 900 行的自有组件样式，它们的 class 名
+ * （chip、section-title、modal-*）和自己那套系统绑死了。把整个组件层塞给
+ * 它们会误伤（例如 Python 用了 .chip 但没定义，组件层会突然给它上色）。
+ *
+ * 所以拆开：
+ *   大厅 / 键盘岛  →  tokens + base + components + chrome
+ *   Python / 英语  →  tokens + chrome + 自己的
+ *
+ * 判据不是「谁新谁旧」，而是**这个学科的组件是不是自给自足**：
+ *   · Python 的 HTML 用了 .chip / .section-title 但自己没定义
+ *     → 引入组件层会突然给它上色，所以不能引
+ *   · 英语站的 .btn / .chip / .section-title / .modal-* 全部自己定义
+ *     → 引不引实测逐像素一致；既然没作用就不引：
+ *       两套东西同时定义同一批 class，只会让人分不清哪个生效。
+ *
+ * 顶栏样式只有这一份，改这里所有页面一起变。
+ *
+ * 依赖：只依赖 tokens.css 的变量，不依赖任何组件。
+ * ========================================================================== */
+
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: var(--s3);
+  min-height: 58px;
+  padding: var(--s2) var(--s5);
+  /* 先用纯色垫底，再用 color-mix 做半透明；老 WebView 不支持时自动降级 */
+  background: rgba(255, 255, 255, .88);
+  background: color-mix(in srgb, var(--paper-2) 86%, transparent);
+  backdrop-filter: blur(12px) saturate(1.3);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
+  border-bottom: 1px solid var(--line);
+}
+
+/* 「← 大厅」——回大厅的唯一入口，每个学科页都有 */
+.topbar-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  flex: 0 0 auto;
+  /* 触摸目标不小于 40×40，视觉上仍是小胶囊 */
+  min-height: 40px;
+  padding: 0 var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-chip);
+  background: var(--paper-2);
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease),
+              scale var(--dur-fast) var(--ease);
+}
+.topbar-back:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+}
+.topbar-back:active { scale: var(--press); }
+.topbar-back .tb-arrow { font-size: 15px; line-height: 1; }
+
+.topbar-brand {
+  display: inline-flex; align-items: center; gap: var(--s2);
+  min-width: 0;
+  font-size: 17px; font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.topbar-brand .tb-emoji {
+  display: grid; place-items: center;
+  width: 30px; height: 30px;
+  flex: 0 0 auto;
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+  font-size: 17px; line-height: 1;
+}
+/* 窄屏上学科名可以省略，但「← 大厅」永远保留 */
+.topbar-brand .tb-name { overflow: hidden; text-overflow: ellipsis; }
+
+.topbar-spacer { flex: 1 1 auto; min-width: var(--s2); }
+
+/* 右侧操作区：学科自己往里塞按钮，换行时也不挤坏顶栏 */
+.topbar-actions {
+  display: flex; align-items: center; gap: var(--s2);
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .topbar { padding: var(--s2) var(--s3); gap: var(--s2); }
+  .topbar-back { padding: 0 var(--s3); }
+  .topbar-actions { gap: 6px; }
+}
+/* 很窄时把学科名藏起来，只留图标 + 返回（宁可少显示，也不要换行挤烂）。
+   大厅（.topbar--keep-name）只有品牌 + 一个按钮，放得下，所以保留名字。 */
+@media (max-width: 420px) {
+  .topbar-brand .tb-name { display: none; }
+  .topbar--keep-name .topbar-brand .tb-name { display: inline; }
+}
