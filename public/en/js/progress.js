@@ -66,8 +66,18 @@ const Progress = (() => {
     Store.del("stats__" + id);
     Store.del("srs__" + id);
     if (Store.get("profile") === id) Store.set("profile", list[0].id);
+    // 记一笔"墓碑"。不记的话服务端只知道"这个档案还没同步过"，
+    // 于是下一次整拉（换设备登录）会把删掉的档案又带回来 —— 复活 bug。
+    const tomb = Store.get("profile_tomb", []);
+    if (tomb.indexOf(id) === -1) tomb.push(id);
+    Store.set("profile_tomb", tomb);
     _cache = null; emit();
   }
+
+  /** 待上报的墓碑（cloud.js 会以 deleted:1 推上去） */
+  function deletedProfiles() { return Store.get("profile_tomb", []); }
+  /** 推送成功后清掉——已经告诉服务端了，不用反复发 */
+  function clearDeletedProfiles() { Store.set("profile_tomb", []); }
 
   /* ---------------- 统计 ---------------- */
   function blank() {
@@ -577,6 +587,7 @@ const Progress = (() => {
 
   return {
     profiles, profileId, currentProfile, switchProfile, addProfile, updateProfile, removeProfile,
+    deletedProfiles, clearDeletedProfiles,
     get: load, addXp, level: () => levelInfo(load().xp), levelInfo,
     streak, touchToday, daily, claimDaily, missions, badges, medals, DOMAINS, TIERS, BADGES, MEDALS,
     markLevel, isLevelDone, levelStars, markReader, isReaderDone, markPhonics, isPhonicsDone,

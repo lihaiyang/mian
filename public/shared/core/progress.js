@@ -118,7 +118,10 @@
     var p = {
       id: "p_" + Math.random().toString(36).slice(2, 9),
       name: String(name || "小朋友").slice(0, 12),
-      emoji: emoji || "🐼"
+      emoji: emoji || "🐼",
+      // 档案也参与 LWW。没有这个时间戳的话 collectProfiles 只能发 Date.now()，
+      // 于是任何一台设备一推就会覆盖别处的改名（见 sync.js 的 collectProfiles）
+      updatedAt: now()
     };
     list.push(p);
     ns.set("profiles", list);
@@ -126,11 +129,15 @@
     return p;
   }
 
-  function updateProfile(id, patch) {
+  /** 改档案。opts.keepUpdated —— 应用远端数据时用：
+   *  解码/合并不是「本地编辑」，不能把 updatedAt 刷成 now()，
+   *  否则下一次远端更新又会被判成旧的（和 save() 同一类坑）。 */
+  function updateProfile(id, patch, opts) {
     var list = profiles();
     var p = list.filter(function (x) { return x.id === id; })[0];
     if (!p) return false;
     Object.assign(p, patch);
+    if (!(opts && opts.keepUpdated)) p.updatedAt = now();
     ns.set("profiles", list);
     emitChange();
     return true;

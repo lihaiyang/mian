@@ -122,7 +122,10 @@
   function collectProfiles() {
     if (typeof Progress === "undefined") return [];
     return Progress.profiles().map(function (p) {
-      return { id: p.id, name: p.name, emoji: p.emoji, updated_at: Date.now() };
+      // 用档案自己的 updatedAt，**不要**用 Date.now()。
+      // 用 now() 的话每台设备每次推送都"最新"，服务端 LWW 一律照收 ——
+      // A 设备改的名字会被 B 设备下一次推送回退掉。
+      return { id: p.id, name: p.name, emoji: p.emoji, updated_at: Number(p.updatedAt) || 0 };
     });
   }
 
@@ -135,13 +138,25 @@
     rows.forEach(function (r) {
       if (!r || r.deleted) return;
       if (byId[r.id]) {
-        // 远端更新就更新名字/头像；不切当前档案（那是本机的事）
-        if (r.name && r.name !== byId[r.id].name) Progress.updateProfile(r.id, { name: r.name });
+        // 只有远端**确实更新**才覆盖本地；不切当前档案（那是本机的事）。
+        // 时间戳还是 0 的老数据当"最旧"处理，不许盖掉本地改过的。
+        var mine = Number(byId[r.id].updatedAt) || 0;
+        var theirs = Number(r.updated_at) || 0;
+        if (theirs > mine) {
+          var patch = { updatedAt: theirs };
+          if (r.name && r.name !== byId[r.id].name) patch.name = r.name;
+          // 头像原来漏了，跟着一起补齐
+          if (r.emoji && r.emoji !== byId[r.id].emoji) patch.emoji = r.emoji;
+          Progress.updateProfile(r.id, patch, { keepUpdated: true });
+        }
       } else {
         // 远端有、本地没有：加进来（换设备时靠这个把档案带过来）
         var list = Progress.profiles();
         if (list.length < 8) {
-          list.push({ id: r.id, name: r.name || "小朋友", emoji: r.emoji || "🐼" });
+          list.push({
+            id: r.id, name: r.name || "小朋友", emoji: r.emoji || "🐼",
+            updatedAt: Number(r.updated_at) || 0
+          });
           Store.ns(cfg.subject).set("profiles", list);
           added++;
         }
@@ -215,6 +230,13 @@
       ns.set(KEYS.rev, Number(d.rev) || 0);
       ns.set(KEYS.lastAt, Date.now());
       emit();
+      // 服务端因为超限丢掉了行 → 明确说出来，不要静默。
+      // 常见原因：单行 payload 超过 120000 字符（作品代码可能很大）、
+      // 一个实体超过 2000 行、一次推的实体超过 12 个、profile_id 不属于本账号。
+      if (d.dropped) {
+        console.warn("[Sync] 有内容没能上传（服务端超限丢弃）：", d.dropped);
+        return { ok: true, dropped: d.dropped };
+      }
       return { ok: true };
     });
   }

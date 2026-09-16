@@ -121,9 +121,14 @@ export async function onRequestPost({ request, env }) {
   const now = Date.now();
   const stmts = [];
   const applied = { profiles: 0, rows: 0 };
+  // 被丢弃的行要**记账并回报**。原来是静默丢弃 —— 客户端只拿到一个计数，
+  // 根本发现不了自己少传了东西（Python 那个端点专门做了 dropped 记账，
+  // 注释写着"绝不静默丢数据"，平台端点当时漏了）。
+  const dropped = { entities: 0, profiles: 0, rows: 0, badRows: 0, noProfile: 0, oversized: 0 };
 
   // ---------- 档案（跨学科共用表）----------
   // 先写档案，这样下面 sub_rows 的 profile_id 才有归属可查
+  dropped.profiles = Math.max(0, profiles.length - 8);
   profiles.slice(0, 8).forEach(p => {
     const id = str(p.id, 60);
     if (!id) return;
@@ -144,20 +149,23 @@ export async function onRequestPost({ request, env }) {
     "SELECT id FROM profiles WHERE account_id = ?").bind(acc.id).all()).results || []).map(r => r.id));
   profiles.forEach(p => { if (p && p.id) owned.add(str(p.id, 60)); });
 
-  const entityNames = Object.keys(rows).filter(e => ENTITY_RE.test(e)).slice(0, MAX_ENTITIES);
+  const validEntities = Object.keys(rows).filter(e => ENTITY_RE.test(e));
+  const entityNames = validEntities.slice(0, MAX_ENTITIES);
+  dropped.entities = Math.max(0, validEntities.length - MAX_ENTITIES);
 
   entityNames.forEach(entity => {
     const list = Array.isArray(rows[entity]) ? rows[entity] : [];
+    dropped.rows += Math.max(0, list.length - MAX_ROWS_PER_ENTITY);
     list.slice(0, MAX_ROWS_PER_ENTITY).forEach(r => {
       const rowId = str(r && (r.row_id || r.id), 80);
-      if (!rowId) return;
+      if (!rowId) { dropped.badRows++; return; }
       const pid = str(r.profile_id, 60);
-      if (!pid || !owned.has(pid)) return;              // 不属于本账号的档案，丢弃
+      if (!pid || !owned.has(pid)) { dropped.noProfile++; return; }   // 不属于本账号的档案
 
       let payload = r.payload_json;
       if (payload === undefined || payload === null) payload = "";
       payload = String(payload);
-      if (payload.length > MAX_PAYLOAD) return;
+      if (payload.length > MAX_PAYLOAD) { dropped.oversized++; return; }
 
       // 关键：sub_rows 的主键是 (account_id, subject, entity, row_id)，
       // **不含 profile_id** —— profile_id 只是 payload 的一部分。
@@ -183,5 +191,8 @@ export async function onRequestPost({ request, env }) {
     return bad("保存失败：" + String(e && e.message || e).slice(0, 120), 500);
   }
 
-  return json({ ok: true, rev, serverTime: Date.now(), subject, applied });
+  // dropped 全为 0 时不占地方；有值就带上，客户端可以据此提示"这次没传完"
+  const anyDropped = Object.keys(dropped).some(k => dropped[k] > 0);
+  return json({ ok: true, rev, serverTime: Date.now(), subject, applied,
+                dropped: anyDropped ? dropped : undefined });
 }

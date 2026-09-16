@@ -115,7 +115,90 @@ const r4 = await feed(Object.assign({}, cloudStats, { xp: 123 }), newerStamp - 5
 check("本地改过之后，更旧的云端行被拒绝（LWW 方向正确）", r4.accepted === false);
 check("被拒绝时本地 xp 没被改掉", r4.xp !== 123, `xp=${r4.xp}`);
 
-// ---------------------------------------------------------------- 8. 没有 JS 报错
+// ---------------------------------------------------------------- 8. 多档案不撞行 + 档案改名 LWW
+// 用拦截网络的方式测：把 /api/v1/sync 的请求体截下来看，再伪造响应喂回去。
+let pushBodies = [];
+let fakeProfiles = [];
+await page.route("**/api/v1/sync**", async (route) => {
+  const req = route.request();
+  const ok = { status: 200, contentType: "application/json" };
+  if (req.method() === "POST") {
+    try { pushBodies.push(JSON.parse(req.postData() || "{}")); } catch (e) { pushBodies.push({}); }
+    return route.fulfill(Object.assign({}, ok, {
+      body: JSON.stringify({ ok: true, rev: 9, serverTime: Date.now() }) }));
+  }
+  return route.fulfill(Object.assign({}, ok, {
+    body: JSON.stringify({ ok: true, rev: 9, serverTime: Date.now(), subject: "typing",
+                           profiles: fakeProfiles, rows: {} }) }));
+});
+
+// 设一个登录态（不联网，只写本地），再加一个档案
+await page.evaluate(() => {
+  AccountUI.applyCode("TESTCODE", {});
+  if (Progress.profiles().length < 2) Progress.addProfile("老二", "🐼");
+});
+await sleep(200);
+
+async function pushCurrent() {
+  pushBodies = [];
+  await page.evaluate(() => Sync.push().catch(() => null));
+  await sleep(500);
+  return pushBodies[0] || null;
+}
+
+const first = await page.evaluate(() => Progress.profileId());
+const b1 = await pushCurrent();
+const row1 = b1 && b1.rows && b1.rows.progress && b1.rows.progress[0] && b1.rows.progress[0].row_id;
+
+await page.evaluate(() => {
+  const other = Progress.profiles().find(p => p.id !== Progress.profileId());
+  Progress.switchProfile(other.id);
+});
+await sleep(200);
+const second = await page.evaluate(() => Progress.profileId());
+const b2 = await pushCurrent();
+const row2 = b2 && b2.rows && b2.rows.progress && b2.rows.progress[0] && b2.rows.progress[0].row_id;
+
+check("两个档案推的 row_id 不同（sub_rows 主键不含 profile_id，写死就会互相覆盖）",
+      !!row1 && !!row2 && row1 !== row2, `${row1} vs ${row2}`);
+check("row_id 里带了档案 id", /^progress__/.test(row1 || "") && row1.indexOf(first) > 0,
+      `${row1} / 档案=${first}`);
+check("第二个档案的 row_id 也带了它自己的 id", (row2 || "").indexOf(second) > 0, `${row2} / 档案=${second}`);
+
+// 档案时间戳：必须是档案自己的，不能是 now()（否则 A 设备改名会被 B 设备推回）
+const profPayload = b1 && b1.profiles && b1.profiles[0];
+check("推送的档案带着自己的 updated_at（不是 Date.now()）",
+      !!profPayload && typeof profPayload.updated_at === "number",
+      JSON.stringify(profPayload));
+
+// 远端档案行的时间戳更旧 → 不许覆盖本地改过的名字
+const renamed = await page.evaluate(() => {
+  const id = Progress.profileId();
+  Progress.updateProfile(id, { name: "本地改的名字" });
+  const p = Progress.profiles().find(x => x.id === id);
+  return { id, name: p.name, updatedAt: p.updatedAt };
+});
+check("本地改档案会推进 updatedAt", renamed.updatedAt > 0, `updatedAt=${renamed.updatedAt}`);
+
+fakeProfiles = [{ id: renamed.id, name: "别的设备改的", emoji: "🐼",
+                  updated_at: Math.max(0, renamed.updatedAt - 60000), deleted: 0 }];
+await page.evaluate(() => Sync.pull().catch(() => null));
+await sleep(500);
+const afterOld = await page.evaluate((id) =>
+  (Progress.profiles().find(x => x.id === id) || {}).name, renamed.id);
+check("更旧的远端档案行不会覆盖本地改名（LWW 方向正确）",
+      afterOld === "本地改的名字", `现在是「${afterOld}」`);
+
+// 远端档案行更新 → 要能覆盖
+fakeProfiles = [{ id: renamed.id, name: "别的设备改的", emoji: "🐼",
+                  updated_at: renamed.updatedAt + 60000, deleted: 0 }];
+await page.evaluate(() => Sync.pull().catch(() => null));
+await sleep(500);
+const afterNew = await page.evaluate((id) =>
+  (Progress.profiles().find(x => x.id === id) || {}).name, renamed.id);
+check("更新的远端档案行能覆盖本地", afterNew === "别的设备改的", `现在是「${afterNew}」`);
+
+// ---------------------------------------------------------------- 9. 没有 JS 报错
 check("没有 JS 报错", pageErrors.length === 0, pageErrors.slice(0, 2).join(" | "));
 
 console.log(out.join("\n"));

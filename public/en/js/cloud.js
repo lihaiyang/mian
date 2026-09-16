@@ -15,7 +15,7 @@
 const Cloud = (() => {
   const BASE = "/api/en";
   const state = {
-    code: "", rev: 0, lastSyncAt: 0, lastPushAt: 0,
+    code: "", pin: "", rev: 0, lastSyncAt: 0, lastPushAt: 0,
     error: "", syncing: false, offline: false, pending: 0, nick: ""
   };
   let listeners = [];
@@ -30,12 +30,14 @@ const Cloud = (() => {
       state.lastSyncAt = Number(s.lastSyncAt) || 0;
       state.lastPushAt = Number(s.lastPushAt) || 0;
       state.nick = s.nick || "";
+      state.pin = String(s.pin || "");
     }
   }
   function save() {
     Store.set("cloud", {
       code: state.code, rev: state.rev,
-      lastSyncAt: state.lastSyncAt, lastPushAt: state.lastPushAt, nick: state.nick
+      lastSyncAt: state.lastSyncAt, lastPushAt: state.lastPushAt, nick: state.nick,
+      pin: state.pin
     });
   }
   function emit() { listeners.forEach(cb => { try { cb(status()); } catch (e) {} }); }
@@ -80,6 +82,15 @@ const Cloud = (() => {
           deleted: 0
         });
       });
+      // 删掉的档案要以 deleted:1 推上去，否则服务端永远不知道它们被删了
+      if (typeof Progress.deletedProfiles === "function") {
+        Progress.deletedProfiles().forEach(id => {
+          rows.profiles.push({
+            id: id, name: "", emoji: "", grade: 2, goal: 15,
+            created_at: 0, updated_at: Date.now(), deleted: 1
+          });
+        });
+      }
       if (cur && typeof Progress.exportRow === "function") {
         const row = Progress.exportRow();
         rows.progress.push({ profile_id: cur.id, stats_json: row.stats_json, updated_at: row.updated_at });
@@ -104,6 +115,12 @@ const Cloud = (() => {
         if (!rp || !rp.id) return;
         const list = Progress.profiles();
         const hit = list.find(x => x.id === rp.id);
+        // 远端说这个档案删了 → 本地也删掉。
+        // 不看 deleted 的话，删掉的档案在下次整拉时会被重新加回来（复活 bug）。
+        if (rp.deleted) {
+          if (hit) { Progress.removeProfile(rp.id); n++; }
+          return;
+        }
         if (!hit) {
           list.push({ id: rp.id, name: rp.name || "小朋友", emoji: rp.emoji || "🐼", grade: rp.grade || 2, createdAt: rp.created_at || Date.now() });
           Store.set("profiles", list);
@@ -131,7 +148,11 @@ const Cloud = (() => {
 
   /* ---------------- 同步 ---------------- */
   async function pull() {
-    const data = await api("/sync?code=" + encodeURIComponent(state.code) + "&since=" + state.rev);
+    // PIN 必须带上：服务端一旦发现账号设过 PIN 就校验，不带就 401「PIN 不对哦」。
+    // 以前这里只带 code —— 结果是**设过 PIN 的账号在英语站永久拉不动数据**，
+    // 而英语站的界面里连 PIN 输入框都没有，孩子完全无从下手。
+    const pinQ = state.pin ? "&pin=" + encodeURIComponent(state.pin) : "";
+    const data = await api("/sync?code=" + encodeURIComponent(state.code) + pinQ + "&since=" + state.rev);
     if (data.serverTime) state.serverTime = data.serverTime;
     if (typeof data.rev === "number") state.rev = data.rev;
     if (data.nickname) state.nick = data.nickname;
@@ -141,7 +162,7 @@ const Cloud = (() => {
   }
 
   async function push(rows) {
-    const data = await api("/sync", { method: "POST", body: JSON.stringify({ code: state.code, rows: rows }) });
+    const data = await api("/sync", { method: "POST", body: JSON.stringify({ code: state.code, pin: state.pin, rows: rows }) });
     if (typeof data.rev === "number" && data.rev > state.rev) state.rev = data.rev;
     state.lastPushAt = Date.now();
     save();
@@ -159,6 +180,8 @@ const Cloud = (() => {
       const pulled = await pull();
       const rows = collect();
       await push(rows);
+      // 墓碑已经送达，清掉，免得每次同步都重发
+      if (typeof Progress.clearDeletedProfiles === "function") Progress.clearDeletedProfiles();
       state.lastSyncAt = Date.now();
       state.offline = false;
       retry = 0;
@@ -214,6 +237,7 @@ const Cloud = (() => {
       // 新设备本地 rev 是 0，必须从头把账号里的东西全拉一遍；
       // 只有同步响应（pull/push）才能推进 state.rev。
       state.nick = data.nickname || "";
+      state.pin = pin || "";      // 记下来，后面每次拉/推都要用
       save();
       const r = await sync(true);
       return { ok: r.ok !== false, error: r.error };
@@ -222,15 +246,26 @@ const Cloud = (() => {
     }
   }
 
-  async function setPin(pin) {
+  /** 设置 / 取消 PIN。
+   *  ⚠️ 服务端读的字段是 **newPin**，而 `pin` 是用来验证**当前**身份的。
+   *  原来这里发的是 {action:"setpin", code, pin}：newPin 为 undefined →
+   *  服务端把 pin_hash 置成 null → **不但没设上，还会把已有的 PIN 取消掉**。 */
+  async function setPin(newPin) {
     try {
-      await api("/account", { method: "POST", body: JSON.stringify({ action: "setpin", code: state.code, pin: pin }) });
-      return { ok: true };
+      const clean = String(newPin || "").replace(/[^0-9]/g, "").slice(0, 6);
+      const data = await api("/account", {
+        method: "POST",
+        body: JSON.stringify({ action: "setpin", code: state.code, pin: state.pin, newPin: clean })
+      });
+      state.pin = clean;
+      save();
+      return { ok: true, hasPin: !!data.hasPin };
     } catch (e) { return { ok: false, error: (e && e.message) || "设置失败" }; }
   }
 
   function signOut() {
     state.code = "";
+    state.pin = "";
     state.rev = 0;
     state.lastSyncAt = 0;
     Store.del("cloud");
