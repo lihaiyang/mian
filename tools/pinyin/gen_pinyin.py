@@ -145,14 +145,19 @@ def split_tone(p):
 def load_chars():
     """读汉字岛的 3500 字表（JS 对象字面量，用正则抠字段）。
     同时记下每个字的**序号** —— 字表是按使用频率分级的，
-    序号越小越常用，用来给音节挑"更像小学例字"的那个字。"""
+    序号越小越常用，用来给音节挑"更像小学例字"的那个字。
+
+    ⚠️ 字表里的 g 有 **720 个字**写的是 U+0261「ɡ」（LATIN SMALL LETTER
+    SCRIPT G），不是键盘上的 ASCII g —— 那是 chinese-xinhua 原始数据带进来的。
+    它一路流进 py 字段（bānɡ）和"听音写拼音"的答案，而孩子只能打出 ASCII g，
+    于是永远判错。所以在这里归一化，全站显示与判分才一致。"""
     out = {}
     global chars_rank
     rank = 0
     pat = re.compile(r'\{\s*c:\s*"([^"]+)",\s*p:\s*"([^"]*)"')
     for f in sorted(glob.glob(os.path.join(REPO, "public", "cn", "data", "chars-g*.js"))):
         for m in pat.finditer(open(f, encoding="utf-8").read()):
-            out[m.group(1)] = m.group(2)
+            out[m.group(1)] = m.group(2).replace("\u0261", "g")
             chars_rank.setdefault(m.group(1), rank)
             rank += 1
     return out

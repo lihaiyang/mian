@@ -36,11 +36,71 @@ UNITS = []
 
 
 def unit(uid, grade, name, title, desc, fn, n=None):
-    """登记一个单元。fn(rng, k) 返回第 k 道题 (q, a, tip)。"""
+    """登记一个单元。fn(rng, k) 返回第 k 道题 (q, a, tip)，
+    竖式题再带第 4 个元素 v（见 vspec）。"""
     UNITS.append({
         "id": uid, "grade": grade, "unit": name, "title": title,
         "desc": desc, "fn": fn, "n": n or PER_UNIT,
     })
+
+
+def vspec(op, x, y):
+    """把一道横式算式变成**竖式布局**。
+
+    为什么这件事必须在生成端做、而不能让前端自己算：
+    竖式的每一位、每一次进位/借位都是"答案"的一部分，前端重算一遍就等于
+    把判分逻辑建立在第二份实现上 —— 两份算不一致时，孩子会被判错而没人发现。
+    所以这里算好，客户端只负责画和比对（和"答案由 Python 真算"是同一条纪律）。
+
+    返回的数组都是**从左到右**（和页面上看到的一致，客户端不用再反转）：
+      xs / ys —— 两个加数（乘数）的每一位，"" = 这一列没有，左边空出来
+      res     —— 结果每一位，"" = 这一位不用填（最高位的 0）
+      carry   —— 写在这一列上方的进位（减法时是借位记号），"" = 这一列没有
+      w       —— 一共几列
+
+    减法的 w 不加额外一列（差不可能是位数更多）；加法/乘法加一列放最高位进位。
+    """
+    rs, ys = str(x), str(y)
+    w = max(len(rs), len(ys)) + (1 if op in ("+", "×") else 0)
+
+    def place(s):
+        return [""] * (w - len(s)) + list(s)
+
+    xs, yds = place(rs), place(ys)
+    res = [""] * w
+    carry = [""] * w
+    c = 0                                   # 从右边进来的进位 / 借位
+    for i in range(w - 1, -1, -1):
+        xd = int(xs[i]) if xs[i] else 0
+        yd = int(yds[i]) if yds[i] else 0
+        if op == "+":
+            t = xd + yd + c
+            d, nc = t % 10, t // 10
+        elif op == "−":
+            t = xd - yd - c
+            if t < 0:
+                t += 10
+                nc = 1                      # 向前一位借 1
+            else:
+                nc = 0
+            d = t
+        else:                               # ×（乘数是一位数，由调用方保证）
+            t = xd * int(ys) + c
+            d, nc = t % 10, t // 10
+        res[i] = str(d)
+        # 这一列产生的进位写进**左边那一列**的上方（教材的写法）
+        if i - 1 >= 0 and nc:
+            carry[i - 1] = str(nc)
+        c = nc
+
+    # 最高位的 0 不能当成"要填的位"：把第一个非 0 之前的都清成空
+    first = next((i for i, d in enumerate(res) if d not in ("", "0")), None)
+    if first is None:
+        res = [""] * (w - 1) + ["0"]        # 结果是 0（正常不会生成，别崩）
+    else:
+        for i in range(first):
+            res[i] = ""
+    return {"op": op, "x": rs, "y": ys, "w": w, "xs": xs, "ys": yds, "res": res, "carry": carry}
 
 
 def fmt_num(x):
@@ -167,6 +227,40 @@ def g2_sub100(rng, k):
     return "%d − %d" % (a, b), a - b, "个位不够减就从前一位借 1。"
 
 
+# ---- 竖式（二年级）：题目就是上面那两种，只是**换一种排版来练** ----
+#
+# 为什么单独开两个单元，而不是往"两位数加法"里掺几道竖式：
+#   ① 竖式的重点不是"会不会算"，而是**从个位起、满十进一 / 不够减就借**这套手续，
+#      所以要能专门刷；
+#   ② 混合在一起时，一个单元里两种排版会让"这批题的难度"说不清。
+# 这里刻意**只出需要进位/退位的题** —— 不进位的那种，做竖式的意义不大。
+
+def g2_vadd(rng, k):
+    """两位数 + 两位数（竖式）——**必定有进位**，和不超过 100。"""
+    ta = rng.randint(1, 6)              # 十位
+    oa = rng.randint(1, 9)              # 个位
+    tb = rng.randint(1, max(1, 8 - ta))
+    ob = rng.randint(10 - oa, 9)        # 保证 oa + ob ≥ 10（有进位）
+    a, b = ta * 10 + oa, tb * 10 + ob
+    if oa + ob < 10 or a + b > 99:
+        return None, None, None
+    return ("%d + %d" % (a, b), a + b,
+            "从个位加起，满十向前一位进 1。", vspec("+", a, b))
+
+
+def g2_vsub(rng, k):
+    """两位数 − 两位数（竖式）——**必定要退位**。"""
+    ta = rng.randint(2, 9)
+    oa = rng.randint(1, 8)
+    tb = rng.randint(1, ta - 1)
+    ob = rng.randint(oa + 1, 9)         # 保证个位不够减（要借位）
+    a, b = ta * 10 + oa, tb * 10 + ob
+    if oa >= ob or a - b < 1:
+        return None, None, None
+    return ("%d − %d" % (a, b), a - b,
+            "个位不够减，从前一位借 1 再减。", vspec("−", a, b))
+
+
 def g2_length(rng, k):
     kind = k % 3
     if kind == 0:
@@ -194,6 +288,18 @@ def g3_mul_1digit(rng, k):
     a = rng.randint(12, 99)
     b = rng.randint(2, 9)
     return "%d × %d" % (a, b), a * b, "先用个位乘，再用十位乘，最后相加。"
+
+
+def g3_vmul(rng, k):
+    """两位数 × 一位数（竖式）——个位乘出来**必定满十**（要进位）。"""
+    b = rng.randint(2, 9)
+    ta = rng.randint(1, 9)
+    oa = rng.choice([d for d in range(2, 10) if d * b >= 10])
+    a = ta * 10 + oa
+    if oa * b < 10 or a * b > 999:
+        return None, None, None
+    return ("%d × %d" % (a, b), a * b,
+            "从个位乘起，满十向前一位进 1。", vspec("×", a, b))
 
 
 def g3_mul_2digit(rng, k):
@@ -511,10 +617,14 @@ unit("g2_mul", 2, "表内乘法", "乘法口诀", "九九表", g2_mul_table)
 unit("g2_div", 2, "表内除法", "用口诀求商", "除法是乘法的逆运算", g2_div_table)
 unit("g2_add100", 2, "100 以内加减法", "两位数加两位数", "进位加法", g2_add100)
 unit("g2_sub100", 2, "100 以内加减法", "两位数减两位数", "退位减法", g2_sub100)
+# 竖式：练的是"从个位起、满十进一 / 不够减就借"这套手续，所以单独成单元
+unit("g2_vadd", 2, "100 以内加减法", "两位数加法（竖式）", "从个位加起，满十进一", g2_vadd)
+unit("g2_vsub", 2, "100 以内加减法", "两位数减法（竖式）", "个位不够减就借 1", g2_vsub)
 unit("g2_len", 2, "长度单位", "米 / 厘米 / 毫米", "量一量有多长", g2_length)
 unit("g2_time", 2, "认识时间", "几时几分", "分针走一大格是 5 分", g2_time)
 
 unit("g3_mul1", 3, "多位数乘一位数", "两位数乘一位数", "乘法竖式", g3_mul_1digit)
+unit("g3_vmul", 3, "多位数乘一位数", "乘法竖式（× 一位数）", "从个位乘起，满十进一", g3_vmul)
 unit("g3_mul2", 3, "两位数乘两位数", "两位数乘两位数", "拆开分步算", g3_mul_2digit)
 unit("g3_div1", 3, "除数是一位数的除法", "三位数除以一位数", "从高位除起", g3_div_1digit)
 unit("g3_frac", 3, "分数的初步认识", "认识几分之几", "平均分", g3_fraction_intro)
@@ -560,16 +670,20 @@ def build(seed=20260907):
         guard = 0
         while len(items) < u["n"] and guard < u["n"] * 60:
             guard += 1
-            q, a, tip = u["fn"](rng, k)
+            got = u["fn"](rng, k)
             k += 1
+            # 题目家族要么返回 (q, a, tip)，要么 (q, a, tip, 竖式布局)
+            q, a, tip = got[0], got[1], got[2]
+            v = got[3] if len(got) > 3 else None
             # 同一单元内去重，且答案必须能算出来
             if a is None or q in seen:
                 continue
             seen.add(q)
-            items.append({
-                "id": "%s_%03d" % (u["id"], len(items) + 1),
-                "q": q, "a": fmt_num(a), "tip": tip,
-            })
+            it = {"id": "%s_%03d" % (u["id"], len(items) + 1),
+                  "q": q, "a": fmt_num(a), "tip": tip}
+            if v:
+                it["v"] = v
+            items.append(it)
         if len(items) < u["n"]:
             print("  ⚠ %s 只生成 %d 题（目标 %d）" % (u["id"], len(items), u["n"]), file=sys.stderr)
         out.append({
@@ -596,9 +710,13 @@ def render(units):
         lines.append("    desc: %s," % json.dumps(u["desc"], ensure_ascii=False))
         lines.append("    items: [")
         for it in u["items"]:
-            lines.append("      { id: %s, q: %s, a: %s, tip: %s }," % (
+            tail = ""
+            if it.get("v"):
+                tail = ", v: " + json.dumps(it["v"], ensure_ascii=False, separators=(",", ":"))
+            lines.append("      { id: %s, q: %s, a: %s, tip: %s%s }," % (
                 json.dumps(it["id"]), json.dumps(it["q"], ensure_ascii=False),
-                json.dumps(it["a"], ensure_ascii=False), json.dumps(it["tip"], ensure_ascii=False)))
+                json.dumps(it["a"], ensure_ascii=False), json.dumps(it["tip"], ensure_ascii=False),
+                tail))
         lines.append("    ]")
         lines.append("  },")
     lines.append("];")
@@ -606,8 +724,46 @@ def render(units):
     return "\n".join(lines).replace("每题的量：%d 道", "共 %d 道" % sum(len(u["items"]) for u in units))
 
 
+def check_v(it):
+    """竖式自检：**照着位图自己重算一遍**，确认位图 / 进位 / 结果三样自洽。
+
+    这不是形式主义：客户端只画不算（"答案由 Python 真算"是同一条纪律），
+    所以"哪一位是几、哪里进位"全都来自生成端。这一层算错了，页面照样能点、
+    也能判分，只是教的是错的 —— 和拼音岛那条"教材规矩"是同一类风险。
+    返回 None = 没问题，否则返回一句人话。"""
+    v = it["v"]
+    w = v["w"]
+    keys = ("xs", "ys", "res", "carry")
+    if any(len(v[k]) != w for k in keys):
+        return "位图长度不等于列数 %d" % w
+    op = v["op"]
+    c = 0
+    for i in range(w - 1, -1, -1):
+        xd = int(v["xs"][i]) if v["xs"][i] else 0
+        yd = int(v["ys"][i]) if v["ys"][i] else 0
+        if op == "+":
+            t = xd + yd + c
+        elif op == "−":
+            t = xd - yd - c
+        else:
+            t = xd * int(v["y"]) + c
+        expect = t % 10
+        nc = t // 10 if op != "−" else (1 if t < 0 else 0)
+        # res 里 "" 表示"这一列不用填"，等价于 0（只有最高位会这样）
+        if (v["res"][i] or "0") != str(expect):
+            return "右起第 %d 列的结果位是 %r，按位图算出来应该是 %d" % (
+                w - i, v["res"][i] or "空", expect)
+        if i - 1 >= 0 and (v["carry"][i - 1] or "0") != str(nc):
+            return "右起第 %d 列的进位是 %r，应该是 %d" % (w - i, v["carry"][i - 1] or "空", nc)
+        c = nc
+    got = "".join(v["res"]) or "0"
+    if got != it["a"]:
+        return "位图拼出来是 %s，答案却是 %s" % (got, it["a"])
+    return None
+
+
 def check(units):
-    """自检：id 唯一、答案非空、题面非空、每单元题量够"""
+    """自检：id 唯一、答案非空、题面非空、每单元题量够、竖式位图自洽"""
     bad = 0
     ids = set()
     for u in units:
@@ -617,6 +773,10 @@ def check(units):
             ids.add(it["id"])
             if not it["q"].strip() or not it["a"].strip():
                 print("  ✗ 题面或答案为空:", it["id"]); bad += 1
+            if it.get("v"):
+                why = check_v(it)
+                if why:
+                    print("  ✗ 竖式不对（%s）：%s" % (it["id"], why)); bad += 1
         if len(u["items"]) < u["n"]:
             print("  ✗ %s 题量不足：%d/%d" % (u["id"], len(u["items"]), u["n"])); bad += 1
     return bad

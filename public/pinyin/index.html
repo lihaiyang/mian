@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="/shared/styles/components.css?v=15b61969">
 <link rel="stylesheet" href="/shared/styles/chrome.css?v=a70f5710">
 <!-- 本学科特有样式 -->
-<link rel="stylesheet" href="css/pinyin.css?v=75520adc">
+<link rel="stylesheet" href="css/pinyin.css?v=786a4ce8">
 
 <style>
   /* 学科主色：只覆盖这三个变量，其余全用平台令牌 */
@@ -68,16 +68,17 @@
 
     <section class="py-hero">
       <h1>拼音：先听准，再读对</h1>
-      <p>点任意一张卡片就会发音。声母、韵母、四个声调都能单独听，也可以一步一步练拼读。</p>
+      <p>点任意一张卡片就会发音。声母、韵母、四个声调都能单独听；练完拼读，还可以听音写拼音。</p>
     </section>
 
-    <!-- 五个页签：前四个是"表"（点读），最后一个是"练"（做题） -->
+    <!-- 六个页签：前四个是"表"（点读），后两个是"练"（做题） -->
     <div class="py-tabs" role="tablist" aria-label="拼音分区">
       <button type="button" class="py-tab active" data-tab="sm" role="tab" aria-selected="true">声母 <b>23</b></button>
       <button type="button" class="py-tab" data-tab="ym" role="tab" aria-selected="false">韵母 <b>24</b></button>
       <button type="button" class="py-tab" data-tab="sd" role="tab" aria-selected="false">四个声调</button>
       <button type="button" class="py-tab" data-tab="zt" role="tab" aria-selected="false">整体认读 <b>16</b></button>
       <button type="button" class="py-tab" data-tab="pd" role="tab" aria-selected="false">拼读练习</button>
+      <button type="button" class="py-tab" data-tab="xz" role="tab" aria-selected="false">听音写拼音</button>
     </div>
 
     <!-- 声母 / 韵母 / 整体认读：同一块网格，按页签重绘 -->
@@ -95,6 +96,11 @@
     <!-- 拼读练习 -->
     <section class="py-pane" id="pane-pd" hidden>
       <div id="pdBox"><div class="py-note">正在准备…</div></div>
+    </section>
+
+    <!-- 听音写拼音 -->
+    <section class="py-pane" id="pane-xz" hidden>
+      <div id="xzBox"><div class="py-note">正在准备…</div></div>
     </section>
 
     <p class="py-foot-note">
@@ -131,17 +137,17 @@
 <!-- ================= 平台层 → 学科 =================
      顺序：store → progress → sync → 注册表 → 学科声明 → 数据 → 发音 → 学科逻辑 -->
 <script src="/shared/core/store.js?v=873bc876"></script>
-<script src="/shared/core/progress.js?v=e6e6e1c0"></script>
+<script src="/shared/core/progress.js?v=9269c173"></script>
 <script src="/shared/core/sync.js?v=70663565"></script>
 <script src="/shared/core/registry.js?v=5065a79c"></script>
-<script src="subject.js?v=7c080c11"></script>
-<script src="data/initials.js?v=bf93156e"></script>
-<script src="data/finals.js?v=d3f32d51"></script>
+<script src="subject.js?v=9cd9afae"></script>
+<script src="data/initials.js?v=13098fe7"></script>
+<script src="data/finals.js?v=f28c84cd"></script>
 <script src="data/tones.js?v=7bae9e84"></script>
-<script src="data/whole.js?v=de088895"></script>
-<script src="data/syllables.js?v=52479e62"></script>
+<script src="data/whole.js?v=4908d004"></script>
+<script src="data/syllables.js?v=baf32f69"></script>
 <script src="js/voice.js?v=164f4baa"></script>
-<script src="js/pinyin.js?v=4ae9c687"></script>
+<script src="js/pinyin.js?v=8fe043d5"></script>
 <script src="/shared/core/pwa.js?v=3a9ce5f9"></script>
 </body>
 </html>

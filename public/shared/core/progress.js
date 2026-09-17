@@ -603,18 +603,53 @@
     };
   }
 
-  /** 只读地看**别的体系**（Python / 英语各有自己的 progress.js）今天来过没有。
-   *  它们的每日任务池在自己的模块里，大厅拿不到也不该抄一份（会各自漂移），
-   *  所以这里只回答一个确定的事实：今天有没有练过。
+  /** 只读地看**别的体系**（Python / 英语各有自己的 progress.js）今天做过什么。
+   *
+   *  英语的每日任务池**已经并进平台契约**了：`/en/subject.js` 把任务池和
+   *  "今天挑哪三条"的规则挂在 `window.EN_DAILY` 上，而大厅本来就会加载
+   *  各学科的 manifest —— 所以这里能算出"今天具体是哪三条、做到哪了"，
+   *  而不是只知道"今天来过没有"。**规则只有那一份实现**，大厅不抄。
+   *
+   *  Python 的任务池还在自己的 js/learn.js 里（大厅不加载那个文件），
+   *  所以对它只报事实：今天完成了几条。
    *
    *  ⚠️ 这两个学科**不用 Store.ns()**，键是历史遗留的（老站还在用同一份数据）：
-   *     Python  codepanda_stats_v1_p_default
-   *     英语    en_stats__p_default
+   *     Python  codepanda_stats_v1_p_default / codepanda_current_profile_v1
+   *     英语    en_stats__p_default         / en_profile
    *  和 tools/parent 的读取器是同一套键，改这里要一起改。 */
   var LEGACY_KEY = {
     python: function (pid) { return "codepanda_stats_v1_" + pid; },
     en: function (pid) { return "en_stats__" + pid; }
   };
+
+  /** 老站的"当前档案"键。**不能走 profileOf()** —— 那个读的是
+   *  Store.ns(subject).get("profile")，也就是 mian_en__profile，
+   *  而老站写的是 en_profile，这个键**永远不存在**，
+   *  于是永远退回 p_default：第二个孩子打开大厅，看到的是第一个孩子的数据。
+   *  （Python 的键存的是 JSON 字符串，英语存的是裸字符串，两种都要认。） */
+  var LEGACY_PROFILE_KEY = {
+    python: "codepanda_current_profile_v1",
+    en: "en_profile"
+  };
+
+  function legacyProfileOf(subjectId) {
+    var k = LEGACY_PROFILE_KEY[subjectId];
+    if (!k) return profileOf(subjectId);
+    // ⚠️ 这里不能借 readRaw：它只认**对象**，而档案键存的是裸字符串
+    //    （en_profile 存 "p_default"，Python 的存 "\"p_default\""），
+    //    用 readRaw 会一律拿到 null，于是又退回 p_default —— 白改。
+    var v = readAny(k);
+    if (typeof v === "string" && v) return v;
+    if (v && typeof v === "object" && v.id) return v.id;
+    return "p_default";
+  }
+
+  /** 某个老站学科"今天哪三条任务"——只有它自己声明了才拿得到（现在只有英语）。 */
+  function legacyDailyApi(subjectId) {
+    if (subjectId !== "en") return null;
+    var api = (typeof window !== "undefined") ? window.EN_DAILY : null;
+    return (api && typeof api.items === "function") ? api : null;
+  }
 
   function readRaw(key) {
     try {
@@ -625,13 +660,27 @@
     } catch (e) { return null; }
   }
 
+  /** 读任意 JSON 值（字符串 / 数字也认）。readRaw 只给"必须是对象"的地方用。 */
+  function readAny(key) {
+    try {
+      var raw = localStorage.getItem(key);
+      return raw === null ? null : JSON.parse(raw);
+    } catch (e) { return null; }
+  }
+
   function peekLegacy(subjectId) {
     var out = { subject: subjectId, hasDaily: false, visitedToday: false,
                 xp: 0, level: 1, streak: 0, daily: [], dailyDone: 0, dailyTotal: 0 };
     var mk = LEGACY_KEY[subjectId];
     if (!mk) return out;
-    var s = readRaw(mk(profileOf(subjectId)));
-    if (!s) return out;
+    var pid = legacyProfileOf(subjectId);
+    var s = readRaw(mk(pid));
+    if (!s) {
+      // 这个档案还没有任何数据（新档案 / 刚换过档案）也要报"今天该做什么"：
+      // 大厅是给孩子看的 to-do 清单，空着没有意义。
+      fillLegacyDaily(out, subjectId, pid, {});
+      return out;
+    }
     var t = today();
     out.xp = Math.max(0, Number(s.xp) || 0);
     // Python / 英语的等级曲线和平台不一样（80 + 20/级），这里只报个大概，
@@ -648,6 +697,33 @@
       out.dailyTotal = DAILY_COUNT;
       out.dailyDone = s.daily.done.length;
     }
+    fillLegacyDaily(out, subjectId, pid,
+      (s.today && s.today.date === t && s.today.c) ? s.today.c : {});
+    return out;
+  }
+
+  /**
+   * 学科把任务池声明给平台之后（现在只有英语，见 /en/subject.js 的 window.EN_DAILY），
+   * 大厅就能算出它**今天具体是哪三条、各自做到哪了**。
+   *
+   * 计数读的是学科自己的按天计数器（英语是 today.c，今天没打开过就对不上日期 →
+   * 计数全 0，大厅显示 "0/5"，这正是"今天该做什么"该有的样子）。
+   */
+  function fillLegacyDaily(out, subjectId, pid, counters) {
+    var api = legacyDailyApi(subjectId);
+    if (!api) return out;
+    var picked = api.items(today(), pid);
+    if (!picked || !picked.length) return out;
+    out.daily = picked.map(function (d) {
+      var cur = Math.min(d.need, Number(counters[d.key]) || 0);
+      return {
+        id: d.id, emoji: d.emoji, title: d.title,
+        cur: cur, need: d.need, xp: d.xp, done: cur >= d.need
+      };
+    });
+    out.dailyDone = out.daily.filter(function (x) { return x.done; }).length;
+    out.dailyTotal = out.daily.length;
+    out.hasDaily = true;
     return out;
   }
 

@@ -17,5 +17,5 @@ window.PY_WHOLE = [
   {"p": "yuan", "c": "冤", "py": "yuān", "exists": true},
   {"p": "yin", "c": "因", "py": "yīn", "exists": true},
   {"p": "yun", "c": "晕", "py": "yūn", "exists": true},
-  {"p": "ying", "c": "英", "py": "yīnɡ", "exists": true}
+  {"p": "ying", "c": "英", "py": "yīng", "exists": true}
 ];

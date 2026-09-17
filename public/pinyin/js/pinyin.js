@@ -6,7 +6,7 @@
  *   四声            → 妈麻马骂，同一个音节四个调对比着听
  *   整体认读         → 16 个要整体记的音节
  *   拼读练习         → b + ā = bā，一步一步拼给孩子听
- *   看拼音选字       → 反过来练：给了音节，挑出对的字
+ *   听音写拼音       → 听一个音，自己写出字母 + 标出声调（比"选"难一档）
  *
  * 和其它学科一样：等级 / 打卡 / 徽章 / 云同步 / 家长报告一行都不写，全交给平台层。
  * 发音走 PinyinVoice（音频精灵 → 系统 TTS 两级降级）。
@@ -22,7 +22,7 @@
   var SYLLABLES = window.PY_SYLLABLES || [];
 
   var S = {
-    tab: "sm",          // sm / ym / sd / zt / pd
+    tab: "sm",          // sm / ym / sd / zt / pd / xz
     // 拼读练习
     pd: null,           // 当前题
     pdRight: 0,
@@ -31,10 +31,24 @@
     pdRound: 0,         // 这一组做了几题
     pdOrder: [],
     // 看拼音选字
-    cx: null
+    cx: null,
+    // 听音写拼音
+    xzRow: null,        // 当前题（音节行）
+    xzLetters: "",      // 孩子写的字母
+    xzTone: 0,          // 孩子选的声调（1–4，0 = 还没选）
+    xzRight: 0,
+    xzWrong: 0,
+    xzDone: 0,
+    xzRound: 0,
+    xzOrder: [],
+    xzSettled: false    // 本题已经判过（锁定输入，等自动下一题）
   };
 
   var PD_ROUND = 8;     // 拼读一组 8 题
+  var XZ_ROUND = 8;     // 写拼音一组 8 题
+
+  var TONE_NAME = { 1: "第一声", 2: "第二声", 3: "第三声", 4: "第四声" };
+  var TONE_SIGN = { 1: "ˉ", 2: "ˊ", 3: "ˇ", 4: "ˋ" };
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -276,6 +290,225 @@
     S.pdRight = 0; S.pdWrong = 0; S.pdOrder = [];
   }
 
+  // ---------------------------------------------------------------- 听音写拼音
+  //
+  // 比"听音选字"难一档：选字是**认**，写是**产出**，是真正掌握的门槛。
+  // 判分把答案拆成两半分别判：字母（b + a）和声调（第几声）。
+  // 这样才能给出"字母对了、声调再听听"这种有用的反馈 —— 只报对错的话，
+  // 孩子不知道自己错在哪一半。
+
+  /** 调号 → 不带调的字母表；ɡ(U+0261) 是数据源里的手写体 g，孩子打不出来；
+   *  v 是键盘上代替 ü 的写法（lü 打成 lv 算对）。 */
+  var TONE_MAP = {
+    "ā": "a", "á": "a", "ǎ": "a", "à": "a",
+    "ē": "e", "é": "e", "ě": "e", "è": "e",
+    "ī": "i", "í": "i", "ǐ": "i", "ì": "i",
+    "ō": "o", "ó": "o", "ǒ": "o", "ò": "o",
+    "ū": "u", "ú": "u", "ǔ": "u", "ù": "u",
+    "ǖ": "ü", "ǘ": "ü", "ǚ": "ü", "ǜ": "ü", "ü": "ü"
+  };
+
+  function lettersOf(s) {
+    var str = String(s == null ? "" : s).toLowerCase()
+      .replace(/\u0261/g, "g").replace(/v/g, "ü");
+    var out = "";
+    for (var i = 0; i < str.length; i++) {
+      var c = str.charAt(i);
+      if (TONE_MAP[c]) out += TONE_MAP[c];
+      else if (/[a-z]/.test(c)) out += c;
+    }
+    return out;
+  }
+
+  /** 能听写的音节：要有声调可写。轻声/无调的那几个（的/了/么/呢）
+   *  没有调号可标，判分只会变成猜谜，直接排除。 */
+  function xzPool() {
+    return pdPool().filter(function (r) { return r.t >= 1 && r.t <= 4; });
+  }
+
+  function newXz(reshuffle) {
+    if (reshuffle || !S.xzOrder.length) {
+      S.xzOrder = shuffled(xzPool(), "xz:" + Date.now() + ":" + Math.random());
+      S.xzRound = 0;
+    }
+    var row = S.xzOrder.pop();
+    if (!row) { S.xzOrder = []; return newXz(false); }
+    S.xzRow = row;
+    S.xzLetters = "";
+    S.xzTone = 0;
+    S.xzSettled = false;
+    renderXz();
+    speak("p:" + row.s, row.c);          // 进来先听一遍
+  }
+
+  function renderXz(result) {
+    var host = $("xzBox");
+    if (!host) return;
+    var r = S.xzRow;
+    if (!r) { host.innerHTML = '<p class="py-note">数据没加载出来。</p>'; return; }
+
+    var tones = [1, 2, 3, 4].map(function (n) {
+      return '<button type="button" class="py-tbtn' + (S.xzTone === n ? " active" : "") + '"' +
+        ' data-tone="' + n + '"' + (S.xzSettled ? " disabled" : "") +
+        ' aria-pressed="' + (S.xzTone === n ? "true" : "false") + '">' +
+        "<b>" + TONE_SIGN[n] + "</b><span>" + TONE_NAME[n] + "</span></button>";
+    }).join("");
+
+    var head = '<div class="py-pd-head">' +
+      '<span class="py-pd-progress">第 ' + (S.xzRound + 1) + " / " + XZ_ROUND + " 题</span>" +
+      '<span class="py-pd-score">✅ ' + S.xzRight + "　❌ " + S.xzWrong + "</span>" +
+      "</div>";
+
+    var play = '<div class="py-xz-play">' +
+      '<button type="button" class="btn py-play" data-key="p:' + esc(r.s) + '" data-say="' + esc(r.c) + '">' +
+      "🔊 再听一遍</button></div>";
+
+    var ask = '<p class="py-ask">听一听，把这个音节写下来</p>';
+
+    var input = '<div class="py-xz-input-row">' +
+      '<label class="sr-only" for="xzInput">写下你听到的拼音字母</label>' +
+      '<input id="xzInput" class="py-xz-input" type="text" value="' + esc(S.xzLetters) + '"' +
+      ' inputmode="latin" autocomplete="off" autocorrect="off" autocapitalize="off"' +
+      ' spellcheck="false" enterkeyhint="done" placeholder="写拼音字母"' +
+      (S.xzSettled ? " disabled" : "") + ">" +
+      '<button type="button" class="py-xz-hk" data-k="ü"' + (S.xzSettled ? " disabled" : "") + ">ü</button>" +
+      '<button type="button" class="py-xz-hk" data-k="⌫"' + (S.xzSettled ? " disabled" : "") +
+      ' aria-label="删掉一个字母">⌫</button>' +
+      "</div>" +
+      '<div class="py-tone-pick">' + tones + "</div>";
+
+    var ans = "";
+    if (S.xzSettled && result) {
+      var parts = [];
+      if (r.i) parts.push("声母 " + r.i);
+      if (r.f) parts.push("韵母 " + r.f);
+      ans = '<div class="py-xz-ans' + (result.ok ? " ok" : " no") + '">' +
+        '<div class="py-xz-ans-main">' +
+          '<span class="py-xz-ans-py">' + esc(r.py) + "</span>" +
+          '<span class="py-xz-ans-c">' + esc(r.c) + "</span>" +
+          '<span class="py-xz-ans-t">' + esc(TONE_NAME[r.t] || "") + "</span>" +
+        "</div>" +
+        '<div class="py-xz-ans-say">' + esc(result.msg) + "</div>" +
+        (parts.length ? '<div class="py-note">' + esc(parts.join("　＋　")) + "</div>" : "") +
+        "</div>";
+    }
+
+    var actions = S.xzSettled ? "" :
+      '<div class="py-pd-actions">' +
+        '<button type="button" class="btn" id="btnXzCheck">检查</button>' +
+        '<button type="button" class="btn ghost sm" id="btnXzSkip">不会，看答案</button>' +
+      "</div>";
+
+    host.innerHTML = head + play + ask + input + ans + actions;
+  }
+
+  function setTone(n) {
+    if (S.xzSettled || !n) return;
+    S.xzTone = n;
+    // 只改按键的高亮状态，**不重画** —— 重画会把输入框里的光标和键盘焦点丢掉
+    var host = $("xzBox");
+    if (host) {
+      var btns = host.querySelectorAll("[data-tone]");
+      for (var i = 0; i < btns.length; i++) {
+        var on = Number(btns[i].getAttribute("data-tone")) === n;
+        btns[i].classList.toggle("active", on);
+        btns[i].setAttribute("aria-pressed", on ? "true" : "false");
+      }
+      var warn = $("xzToneWarn");
+      if (warn && warn.parentNode) warn.parentNode.removeChild(warn);
+    }
+  }
+
+  function xzKey(k) {
+    if (S.xzSettled) return;
+    if (k === "⌫") S.xzLetters = S.xzLetters.slice(0, -1);
+    else S.xzLetters = (S.xzLetters + k).slice(0, 12);
+    var inp = $("xzInput");
+    if (inp) inp.value = S.xzLetters;      // 直接改值，同样是为了不丢光标
+    else renderXz();
+  }
+
+  function checkXz() {
+    var r = S.xzRow;
+    if (!r || S.xzSettled) return;
+    var give = lettersOf(S.xzLetters);
+    if (!give) { var i = $("xzInput"); if (i) i.focus(); return; }
+    if (!S.xzTone) {
+      var host = $("xzBox");
+      if (host && !$("xzToneWarn")) {
+        var w = document.createElement("p");
+        w.id = "xzToneWarn";
+        w.className = "py-xz-warn";
+        w.textContent = "别忘了标声调：先选一个声调再检查。";
+        host.insertBefore(w, host.firstChild);
+      }
+      return;
+    }
+
+    var want = lettersOf(r.py);
+    var okLetters = give === want;
+    var okTone = S.xzTone === r.t;
+    var ok = okLetters && okTone;
+    var msg;
+    if (ok) msg = "全对！";
+    else if (okLetters) msg = "字母写对了，声调再听一遍 —— 你标的是" + TONE_NAME[S.xzTone] + "，应该是" + TONE_NAME[r.t] + "。";
+    else msg = "字母差一点，你写的是 " + esc(S.xzLetters.trim() || "（空）") + "。";
+
+    S.xzSettled = true;
+    S.xzDone++;
+    if (ok) S.xzRight++; else S.xzWrong++;
+
+    if (typeof Progress !== "undefined") {
+      Progress.emit("pinyin_write", {});
+      if (ok) Progress.emit("pinyin_write_ok", {});
+    }
+    renderXz({ ok: ok, msg: msg });
+    // 对了要把正确读音再放一遍，让"写的"和"听的"重新对上
+    speak("p:" + r.s, r.c);
+    var delay = ok ? 1500 : 3000;
+    setTimeout(function () {
+      S.xzRound++;
+      if (S.xzRound >= XZ_ROUND) return finishXz();
+      newXz(false);
+    }, delay);
+  }
+
+  function skipXz() {
+    var r = S.xzRow;
+    if (!r || S.xzSettled) return;
+    S.xzSettled = true;
+    S.xzDone++;
+    S.xzWrong++;
+    if (typeof Progress !== "undefined") Progress.emit("pinyin_write", {});
+    renderXz({ ok: false, msg: "没写出来没关系，先记住它怎么读。" });
+    speak("p:" + r.s, r.c);
+    setTimeout(function () {
+      S.xzRound++;
+      if (S.xzRound >= XZ_ROUND) return finishXz();
+      newXz(false);
+    }, 3000);
+  }
+
+  function finishXz() {
+    var total = S.xzRight + S.xzWrong || 1;
+    var pct = Math.round(S.xzRight / total * 100);
+    $("xzBox").innerHTML =
+      '<div class="py-finish">' +
+        "<h2>" + (pct >= 100 ? "全对！会写拼音啦 🎉" : pct >= 60 ? "写得不错" : "再来一组会更好") + "</h2>" +
+        '<div class="py-finish-grid">' +
+          "<div><b>" + S.xzRight + "</b><span>写对</span></div>" +
+          "<div><b>" + S.xzWrong + "</b><span>没写对</span></div>" +
+          "<div><b>" + pct + "%</b><span>正确率</span></div>" +
+        "</div>" +
+        '<button type="button" class="btn" id="btnXzAgain">🔁 再来一组</button>' +
+      "</div>";
+    if (typeof Progress !== "undefined") {
+      Progress.emit("pinyin_write_round", {});
+      if (pct === 100) Progress.emit("pinyin_write_perfect", { perfect: true });
+    }
+    S.xzRight = 0; S.xzWrong = 0; S.xzOrder = []; S.xzRow = null; S.xzSettled = false;
+  }
+
   // ---------------------------------------------------------------- 切换
 
   function switchTab(tab) {
@@ -286,7 +519,7 @@
       tabs[i].classList.toggle("active", on);
       tabs[i].setAttribute("aria-selected", on ? "true" : "false");
     }
-    ["sm", "ym", "zt", "sd", "pd"].forEach(function (t) {
+    ["sm", "ym", "zt", "sd", "pd", "xz"].forEach(function (t) {
       var el = $("pane-" + t);
       if (el) el.hidden = t !== tab;
     });
@@ -300,10 +533,15 @@
       renderTones(); $("sdBox").setAttribute("data-ready", "1");
     }
     if (tab === "pd") { if (!S.pd) newPd(true); else renderPd(); }
+    if (tab === "xz") { if (!S.xzRow) newXz(true); else renderXz(); }
     // 预热：切过去之前就把音频拉下来
     if (window.PinyinVoice) {
-      PinyinVoice.warm(tab === "sm" ? ["sm"] : tab === "ym" ? ["ym"] :
-                       tab === "zt" ? ["zt"] : tab === "sd" ? ["sd"] : ["bd1"]);
+      // 写拼音的题是随机抽的，可能是 bd1…bd4 任意一组，四组都要备好
+      if (tab === "xz") PinyinVoice.warm(["bd1", "bd2", "bd3", "bd4"]);
+      else {
+        PinyinVoice.warm(tab === "sm" ? ["sm"] : tab === "ym" ? ["ym"] :
+                         tab === "zt" ? ["zt"] : tab === "sd" ? ["sd"] : ["bd1"]);
+      }
     }
   }
 
@@ -335,6 +573,14 @@
       }
       var ch = el.closest ? el.closest(".py-choice") : null;
       if (ch) { answerPd(ch, ch.getAttribute("data-syl")); return; }
+      // 听音写拼音：声调键 / ü / ⌫ / 检查 / 跳过 / 再来一组
+      var toneBtn = el.closest ? el.closest("[data-tone]") : null;
+      if (toneBtn) { setTone(Number(toneBtn.getAttribute("data-tone"))); return; }
+      var hk = el.closest ? el.closest("[data-k]") : null;
+      if (hk) { xzKey(hk.getAttribute("data-k")); return; }
+      if (el.id === "btnXzCheck") { checkXz(); return; }
+      if (el.id === "btnXzSkip") { skipXz(); return; }
+      if (el.id === "btnXzAgain") { S.xzOrder = []; newXz(true); return; }
       if (el.id === "btnToneAll") { playAllTones(); return; }
       if (el.id === "btnPdSkip") {
         var r = S.pd;
@@ -346,6 +592,19 @@
       if (el.id === "btnPdAgain") { S.pdOrder = []; newPd(true); return; }
       var tab = el.closest ? el.closest(".py-tab") : null;
       if (tab) { switchTab(tab.getAttribute("data-tab")); }
+    });
+
+    // 写拼音的输入框是每题重画的，所以输入事件也要委托
+    document.addEventListener("input", function (ev) {
+      if (ev.target && ev.target.id === "xzInput") {
+        S.xzLetters = String(ev.target.value || "").slice(0, 12);
+      }
+    });
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" && ev.target && ev.target.id === "xzInput") {
+        ev.preventDefault();
+        checkXz();
+      }
     });
 
     switchTab("sm");
@@ -427,6 +686,15 @@
      ⚠️ 测试必须调这里的真函数，不能抄一份实现 —— 抄了迟早跟实现漂移。 */
   window.PinyinDebug = {
     pickDistractors: typeof pickDistractors === "function" ? pickDistractors : null,
-    pdPool: pdPool
+    pdPool: pdPool,
+    xzPool: xzPool,
+    lettersOf: lettersOf,
+    TONE_MAP: TONE_MAP,
+    // 当前这道听写题 —— e2e 要能"按正确答案作答"，否则只能瞎点
+    xzRow: function () { return S.xzRow; },
+    xzState: function () {
+      return { right: S.xzRight, wrong: S.xzWrong, round: S.xzRound,
+               settled: S.xzSettled, tone: S.xzTone, letters: S.xzLetters };
+    }
   };
 })();

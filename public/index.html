@@ -104,7 +104,7 @@
      codepanda_* / en_*，不走 Store，那是历史包袱，见 docs 的多学科设计。） -->
 <script src="/shared/core/store.js?v=873bc876"></script>
 <script src="/shared/core/srs.js?v=d4b0684f"></script>
-<script src="/shared/core/progress.js?v=e6e6e1c0"></script>
+<script src="/shared/core/progress.js?v=9269c173"></script>
 <script src="/shared/core/topbar.js?v=e382f937"></script>
 <script src="/shared/core/account-ui.js?v=74e0317f"></script>
 <script src="/shared/core/registry.js?v=5065a79c"></script>
@@ -157,10 +157,14 @@
   // 这里不再拦点击 —— 之前那个「还在建设中」的 alert 已经过时了。
 
   // ---- 今天各学科做什么（F5）----
-  // 五个学科的每日任务由各自声明，这里只把它们**并排放到一屏**。
-  //   · 打字 / 数学 / 汉字：走平台内核，能读到今天具体是哪三条
-  //   · Python / 英语：各有自己的 progress.js，任务池在自己的文件里，
-  //     大厅再抄一份迟早会漂移 —— 所以只报"今天来过没有"，不编任务。
+  // 各学科的每日任务由各自声明，这里只把它们**并排放到一屏**。
+  //   · 打字 / 数学 / 汉字 / 拼音：走平台内核，能读到今天具体是哪三条
+  //   · 英语：任务池**已经并进平台契约** —— 它把池子和"今天挑哪三条"的规则
+  //     挂在 /en/subject.js 的 window.EN_DAILY 上（大厅本来就会加载各学科
+  //     manifest），所以也能读到具体三条和各自的进度。规则只有那一份实现。
+  //   · Python：任务池还在自己的 js/learn.js 里（大厅不加载那个文件），
+  //     也没有声明给平台，所以只报事实：今天完成了几条。
+  //     **不要在大厅里抄一份 Python 的任务池** —— 抄了迟早漂移。
   function renderToday() {
     var host = document.getElementById("today");
     if (!host || typeof Progress === "undefined" || !Progress.peek) return;

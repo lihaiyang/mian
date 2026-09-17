@@ -182,21 +182,21 @@ const Progress = (() => {
   }
 
   /* ---------------- 每日任务 ---------------- */
-  const DAILY_POOL = [
-    { id: "d_words", emoji: "🆕", title: "学 5 个新词", key: "newWords", need: 5, xp: 20 },
-    { id: "d_review", emoji: "🔁", title: "复习 10 张卡片", key: "reviews", need: 10, xp: 20 },
-    { id: "d_listen", emoji: "👂", title: "听 10 个词", key: "listens", need: 10, xp: 15 },
-    { id: "d_speak", emoji: "🎤", title: "跟读 5 次", key: "speaks", need: 5, xp: 25 },
-    { id: "d_right", emoji: "✅", title: "答对 12 题", key: "right", need: 12, xp: 20 },
-    { id: "d_game", emoji: "🎮", title: "玩 1 局小游戏", key: "games", need: 1, xp: 15 },
-    { id: "d_phonics", emoji: "🧩", title: "学 1 关拼读", key: "phonics", need: 1, xp: 20 },
-    { id: "d_page", emoji: "📖", title: "读 4 页绘本", key: "pages", need: 4, xp: 20 },
-    { id: "d_star", emoji: "⭐", title: "拿 3 颗星", key: "stars", need: 3, xp: 20 },
-    { id: "d_say", emoji: "⏱", title: "开口说满 60 秒", key: "speakSeconds", need: 60, xp: 25 }
-  ];
+
+  /* ⚠️ 任务池和"今天挑哪三条"的规则**都在 /en/subject.js 的 window.EN_DAILY 里**，
+     不在这个文件。为什么：大厅只能加载各学科的 manifest，读不到 js/progress.js；
+     池子留在这里的话，大厅的「今天各学科做什么」就只能显示"今天来过没有"。
+     一份实现在 subject.js，两个消费者（英语站自己 + 大厅）—— 不会漂移。
+     subject.js 在 index.html 里排在 progress.js 之前加载。 */
+  function dailyApi() {
+    if (typeof window !== "undefined" && window.EN_DAILY) return window.EN_DAILY;
+    console.error("[en] EN_DAILY 没加载（subject.js 应该在 progress.js 之前）—— 今天的每日任务会空着");
+    return null;
+  }
 
   function dailyFor(dateStr) {
-    return UI.pick(DAILY_POOL, 3, "daily:" + dateStr + ":" + profileId());
+    const d = dailyApi();
+    return d ? d.items(dateStr, profileId()) : [];
   }
   function daily() {
     const s = load();

@@ -100,10 +100,15 @@ const ls = await page.evaluate(() => Object.keys(localStorage).filter(k => k.sta
 check("本地存储已写入进度", ls.some(k => k.includes("stats")));
 
 // 8. 无 JS 报错
+// 这里原来只把 404 **打印**出来、从不判定，于是"打开绘本必发一个 404"这种真 bug
+// 在套件里一直显示全绿（2026-09-17 抓到：app.js 进绘本页把精灵键当分组名传给
+// Player.ready()，拼出 assets/audio/r_mycat#p1.json，"#" 之后被当锚点丢掉 →
+// 每次都请求 assets/audio/r_mycat → 404）。音频/数据的存在性由 check_audio.py
+// 与 check_content.py 保证，所以跑到这里还缺资源就是真问题，不能容忍。
 const missing = errors.filter(e => /404|Failed to load resource/i.test(e));
 const realErrors = errors.filter(e => !/404|Failed to load resource|favicon|manifest|ServiceWorker/i.test(e));
 check("没有 JS 运行时报错", realErrors.length === 0, realErrors.slice(0, 3).join(" | "));
-console.log("（提示）加载失败的资源 " + missing.length + " 个" + (missing.length ? "：多半是内容/音频还没生成" : ""));
+check("没有加载失败的资源（404）", missing.length === 0, missing.slice(0, 3).join(" | "));
 
 console.log(results.join("\n"));
 console.log("\n" + (failed ? "❌ 失败 " + failed + " 项" : "✅ 全部通过") + "（共 " + results.length + " 项）");

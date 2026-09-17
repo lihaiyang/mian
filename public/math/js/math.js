@@ -23,6 +23,11 @@
     streak: 0,
     bestStreak: 0,
     answered: 0,
+    // 竖式（横式题用不到这几个）
+    vItem: null,        // 当前竖式题
+    vVals: [],          // 孩子填的每一位（按列存，"" = 还没填）
+    vCursor: 0,         // 现在光标在哪一列
+    vLocked: false      // 判完了就不给改了
   };
 
   function $(id) { return document.getElementById(id); }
@@ -52,6 +57,9 @@
     }
     return false;
   }
+
+  /** 这道题是不是竖式（布局在题库里，见 tools/math/gen_problems.py） */
+  function isV(it) { return !!(it && it.v && it.v.w); }
 
   function esc(s) {
     return String(s == null ? "" : s)
@@ -175,33 +183,59 @@
     $("question").textContent = it.q;
     $("qCount").textContent = (S.idx + 1) + " / " + S.queue.length;
     $("barFill").style.width = Math.round((S.idx / S.queue.length) * 100) + "%";
-    var inp = $("answer");
-    inp.value = "";
-    inp.className = "ma-input";
-    inp.disabled = false;
     $("feedback").textContent = "";
     $("feedback").className = "ma-feedback";
     $("btnCheck").disabled = false;
     $("btnSkip").disabled = false;
-    inp.focus();
+
+    var vertical = isV(it);
+    $("vform").hidden = !vertical;
+    // 竖式时只藏**横式输入框**，"确定"按钮要留在原地（它和输入框在同一行里，
+    // 整行藏掉的话就没法提交了）
+    $("answer").hidden = vertical;
+    if ($("inputRow")) $("inputRow").classList.toggle("ma-solo", vertical);
+    if (vertical) vStart(it);
+    else {
+      S.vItem = null;
+      var inp = $("answer");
+      inp.value = "";
+      inp.className = "ma-input";
+      inp.disabled = false;
+      inp.focus();
+    }
   }
 
   function check() {
-    var u = unitById(S.unitId);
     var it = S.queue[S.idx];
     if (!it) return;
+    if (isV(it)) return vCheck();
     var given = $("answer").value;
     if (!norm(given)) { $("answer").focus(); return; }
+    var ok = same(given, it.a);
+    $("answer").className = "ma-input " + (ok ? "right" : "wrong");
+    settle(ok, given);
+  }
+
+  /**
+   * 判完之后的公共收尾：记分 → 成长 → 记忆盒 → 反馈 → 锁输入 → 定时下一题。
+   *
+   * 横式和竖式**共用这一段**：两条路各写一遍的话，迟早只有一条被改到
+   * （这个仓库里已经栽过好几次了，见 docs/下一阶段方案.md 里那些"静默失效"）。
+   */
+  function settle(ok, givenText, opts) {
+    opts = opts || {};
+    var u = unitById(S.unitId);
+    var it = S.queue[S.idx];
 
     S.answered++;
     if (typeof Progress !== "undefined") Progress.emit("answer", {});
 
-    if (same(given, it.a)) {
+    if (ok) {
       S.right++; S.streak++;
       if (S.streak > S.bestStreak) S.bestStreak = S.streak;
-      $("answer").className = "ma-input right";
       $("feedback").className = "ma-feedback ok";
-      $("feedback").textContent = "✅ 对了！" + (S.streak >= 3 ? "连对 " + S.streak + " 题 🔥" : "");
+      $("feedback").innerHTML = opts.okHtml ||
+        ("✅ 对了！" + (S.streak >= 3 ? "连对 " + S.streak + " 题 🔥" : ""));
       if (typeof Progress !== "undefined") {
         Progress.emit("correct", {});
         // 专题计数（徽章用）
@@ -211,21 +245,194 @@
       }
     } else {
       S.streak = 0;
-      S.wrong.push({ q: it.q, a: it.a, gave: given, tip: it.tip });
+      S.wrong.push({ q: it.q, a: it.a, gave: givenText, tip: it.tip });
       // 做错的题进**跨学科记忆盒**：隔 1/2/4/7/15 天自己回来找你。
       // 放进去的是"题目 + 答案 + 提示"三件套，所以复习页完全不用知道
       // 数学岛的任何事 —— 这就是把记忆盒做成平台级的好处。
       if (typeof SRS !== "undefined") {
         SRS.add({ subject: "math", id: it.id, front: it.q, back: it.a, hint: it.tip });
       }
-      $("answer").className = "ma-input wrong";
       $("feedback").className = "ma-feedback no";
-      $("feedback").innerHTML = "🤔 差一点点。正确答案是 <b>" + esc(it.a) + "</b><br>" + esc(it.tip || "");
+      $("feedback").innerHTML = opts.noHtml ||
+        ("🤔 差一点点。正确答案是 <b>" + esc(it.a) + "</b><br>" + esc(it.tip || ""));
     }
-    $("answer").disabled = true;
+
+    var inp = $("answer");
+    if (inp) inp.disabled = true;
     $("btnCheck").disabled = true;
     $("btnSkip").disabled = true;
-    setTimeout(next, same(given, it.a) ? 900 : 2600);
+    setTimeout(next, ok ? 900 : (opts.delay || 2600));
+  }
+
+  // ---------------------------------------------------------------- 竖式
+  //
+  // 竖式的**位图和进位都在题库里**（tools/math/gen_problems.py 的 vspec 算好的：
+  // 每一位是几、哪一列进位、结果每一位），客户端不重算数学 —— 只负责画和比对。
+  // 这和"答案由 Python 真算"是同一条纪律：同一套算法一旦有两份实现，
+  // 迟早会有一份是错的，而页面照样能点、也能判分，只是教的是错的。
+  //
+  // 判分是**逐位**的：每一位单独标对错。只判整个结果对不对的话，孩子只知道
+  // "错了"，不知道错在哪一位 —— 而竖式的全部意义就是"从个位起一位一位来"。
+  //
+  // 进位格**不由孩子填**，判完之后自动显示出来。理由：这道题只有一个不含歧义
+  // 的正确答案（结果），再让孩子填一遍进位，会把"算对了但没写进位"判成错 ——
+  // 那是一个没有教学意义的失败。
+
+  /** 需要孩子填的列（结果里有数字的那些列） */
+  function vFillable(v) {
+    var out = [];
+    for (var i = 0; i < v.w; i++) if (v.res[i] !== "") out.push(i);
+    return out;
+  }
+
+  function vCell(col) {
+    return document.querySelector('.ma-v-in[data-col="' + col + '"]');
+  }
+
+  function vStart(it) {
+    var v = it.v, i;
+    S.vItem = it;
+    S.vVals = new Array(v.w);
+    for (i = 0; i < v.w; i++) S.vVals[i] = "";
+    S.vCursor = vFillable(v)[0];
+    S.vLocked = false;
+
+    var h = '<div class="ma-v" style="--w:' + v.w + '" role="group" ' +
+            'aria-label="竖式，共 ' + v.w + ' 列">';
+    var row = function (inner) { return '<div class="ma-v-row">' + inner + "</div>"; };
+    // 进位行（空格也占位，保证列对齐；判分后才出现数字）
+    var carryRow = '<div class="ma-v-op" aria-hidden="true"></div>';
+    for (i = 0; i < v.w; i++) {
+      // ⚠️ 进位的数字**先不写进 DOM**（写在 data-d 里）—— 直接渲染出来的话，
+      //    孩子还没算就看见"1"了，这道题就白出了。判分后再由 vRevealCarry 放出来。
+      carryRow += '<div class="ma-v-slot ma-v-carry" data-carry="' + i +
+                  '" data-d="' + esc(v.carry[i] || "") + '"></div>';
+    }
+    h += row(carryRow);
+    // 被加数 / 被乘数
+    var xRow = '<div class="ma-v-op" aria-hidden="true"></div>';
+    for (i = 0; i < v.w; i++) xRow += '<div class="ma-v-slot">' + esc(v.xs[i] || "") + "</div>";
+    h += row(xRow);
+    // 运算符 + 加数 / 乘数（运算符写在第二个数左边，和纸上一模一样）
+    var yRow = '<div class="ma-v-op">' + esc(v.op) + "</div>";
+    for (i = 0; i < v.w; i++) yRow += '<div class="ma-v-slot">' + esc(v.ys[i] || "") + "</div>";
+    h += row(yRow);
+    // 横线
+    h += '<div class="ma-v-line" aria-hidden="true"></div>';
+    // 结果：孩子填的格子
+    var rRow = '<div class="ma-v-op" aria-hidden="true"></div>';
+    for (i = 0; i < v.w; i++) {
+      if (v.res[i] === "") {
+        rRow += '<div class="ma-v-slot ma-v-blank" aria-hidden="true"></div>';
+      } else {
+        rRow += '<button type="button" class="ma-v-slot ma-v-in" data-col="' + i +
+                '" aria-label="从右数第 ' + (v.w - i) + ' 位"></button>';
+      }
+    }
+    h += row(rRow);
+    h += "</div>";
+    $("vform").innerHTML = h;
+    vSync();
+  }
+
+  function vSync() {
+    var cells = document.querySelectorAll(".ma-v-in");
+    for (var i = 0; i < cells.length; i++) {
+      var c = Number(cells[i].getAttribute("data-col"));
+      cells[i].textContent = S.vVals[c] || "";
+      cells[i].classList.toggle("active", !S.vLocked && c === S.vCursor);
+      cells[i].classList.toggle("filled", !!S.vVals[c]);
+    }
+  }
+
+  /** 上一个 / 下一个要填的列（没有就返回 -1） */
+  function vStep(col, dir) {
+    var list = vFillable(S.vItem.v), at = list.indexOf(col);
+    var n = at + dir;
+    return (n >= 0 && n < list.length) ? list[n] : -1;
+  }
+
+  function vType(ch) {
+    if (S.vLocked || !S.vItem) return;
+    if (ch === "⌫") {
+      if (S.vVals[S.vCursor]) S.vVals[S.vCursor] = "";
+      else { var p = vStep(S.vCursor, -1); if (p >= 0) { S.vVals[p] = ""; S.vCursor = p; } }
+      vSync();
+      return;
+    }
+    if (!/^[0-9]$/.test(ch)) return;
+    S.vVals[S.vCursor] = ch;
+    var n = vStep(S.vCursor, 1);
+    if (n >= 0) S.vCursor = n;
+    vSync();
+  }
+
+  function vCheck() {
+    var it = S.vItem;
+    if (!it || S.vLocked) return;
+    var v = it.v, fill = vFillable(v);
+    var empty = fill.filter(function (c) { return !S.vVals[c]; });
+    if (empty.length) {          // 还有格子空着：先不判，把光标送过去
+      S.vCursor = empty[0];
+      vSync();
+      $("feedback").className = "ma-feedback";
+      $("feedback").innerHTML = "还有 " + empty.length + " 位没填，一位一位来。";
+      return;
+    }
+    var wrongCols = fill.filter(function (c) { return S.vVals[c] !== v.res[c]; });
+    var ok = wrongCols.length === 0;
+    fill.forEach(function (c) {
+      var el = vCell(c);
+      if (el) el.classList.add(S.vVals[c] === v.res[c] ? "right" : "wrong");
+    });
+    S.vLocked = true;
+    vRevealCarry();
+    S.vCursor = -1;
+    vSync();
+
+    var noHtml = "";
+    if (!ok) {
+      // 指出**哪一位**错了。只报"答案不对"，竖式就白练了。
+      noHtml = "🤔 差一点点。从右数第 <b>" + (v.w - wrongCols[0]) + "</b> 位不对，" +
+               "正确答案是 <b>" + esc(it.a) + "</b>。<br>" + esc(it.tip || "");
+    }
+    settle(ok, vValsText(), { noHtml: noHtml, delay: 3200 });
+  }
+
+  /** 孩子写的那串数字（记进"这次没做对的"清单用） */
+  function vValsText() {
+    var v = S.vItem.v, s = "";
+    for (var i = 0; i < v.w; i++) if (v.res[i] !== "") s += (S.vVals[i] || "□");
+    return s;
+  }
+
+  /** 判完之后露出进位 / 借位（孩子不用填，但要看得见 —— 这才是竖式教的东西） */
+  function vRevealCarry() {
+    var v = S.vItem.v;
+    var nodes = document.querySelectorAll(".ma-v-carry");
+    for (var i = 0; i < nodes.length; i++) {
+      var c = Number(nodes[i].getAttribute("data-carry"));
+      if (v.carry[c]) {
+        nodes[i].textContent = v.carry[c];
+        nodes[i].classList.add("on");
+      }
+    }
+  }
+
+  /** 「不会，看答案」：把每一位直接填出来 */
+  function vReveal() {
+    var it = S.vItem;
+    if (!it) return;
+    var v = it.v;
+    vFillable(v).forEach(function (c) {
+      S.vVals[c] = v.res[c];
+      var el = vCell(c);
+      if (el) { el.textContent = v.res[c]; el.classList.add("right", "filled"); }
+    });
+    S.vLocked = true;
+    S.vCursor = -1;
+    vRevealCarry();
+    vSync();
   }
 
   /** 专题标签：给"分数/小数/应用题"这类专题徽章计数用 */
@@ -249,6 +456,7 @@
     if (typeof SRS !== "undefined") {
       SRS.add({ subject: "math", id: it.id, front: it.q, back: it.a, hint: it.tip });
     }
+    if (isV(it)) vReveal();          // 竖式：把每一位直接填出来
     $("feedback").className = "ma-feedback no";
     $("feedback").innerHTML = "答案是 <b>" + esc(it.a) + "</b><br>" + esc(it.tip || "");
     $("answer").disabled = true;
@@ -326,6 +534,7 @@
   }
 
   function tap(k) {
+    if (isV(S.queue[S.idx])) return vType(k);   // 竖式：按键落到格子里
     var inp = $("answer");
     if (inp.disabled) return;
     if (k === "⌫") inp.value = inp.value.slice(0, -1);
@@ -409,7 +618,31 @@
    *  「11 − 4 ______」而不是「11 − 4 = ______」，标题也会从"口算题卡"错成"数学练习"。 */
   function isExpr(q) { return /^[\d\s+\-−–—×÷*/().]+$/.test(String(q)); }
 
+  /**
+   * 竖式题的**打印**排布：纸面上也得是竖的。
+   * 印成横式（"26 + 65 = ____"）的话，练的就不是同一件事了 ——
+   * 家长要的正是"列竖式算"这种卷子。
+   * 进位**不印**（那是孩子要写的），答案页单独给。
+   */
+  function probHtmlV(it, n) {
+    var v = it.v, i;
+    var row = function (inner) { return '<span class="ma-vm-row">' + inner + "</span>"; };
+    var xRow = "<i></i>", yRow = "<i>" + esc(v.op) + "</i>", rRow = "<i></i>";
+    for (i = 0; i < v.w; i++) {
+      xRow += "<i>" + esc(v.xs[i] || "") + "</i>";
+      yRow += "<i>" + esc(v.ys[i] || "") + "</i>";
+      rRow += v.res[i] === "" ? '<i class="ph"></i>' : '<i class="bx"></i>';
+    }
+    return '<div class="ma-prob w25 ma-prob-v">' +
+      '<span class="ma-prob-n">' + n + "</span>" +
+      '<span class="ma-vm">' + row(xRow) + row(yRow) +
+        '<span class="ma-vm-line"></span>' + row(rRow) + "</span>" +
+      (SHEET.ans === "inline" ? '<b class="ma-prob-key">' + esc(it.a) + "</b>" : "") +
+      "</div>";
+  }
+
   function probHtml(it, n) {
+    if (it.v) return probHtmlV(it, n);
     var q = esc(it.q);
     var expr = isExpr(it.q);
     var w = widthClass(it.q);
@@ -610,8 +843,24 @@
       if (ev.key === "Escape" && $("sheetOverlay") && !$("sheetOverlay").hidden) { closeSheet(); return; }
       if ($("sheetOverlay") && !$("sheetOverlay").hidden) return;   // 题卡打开时不往答题框里塞字
       if ($("playCard").style.display === "none") return;
+      // 竖式题：数字键 → 当前格子，退格 → 删一格，回车 → 判
+      if (isV(S.queue[S.idx]) && !S.vLocked) {
+        if (/^[0-9]$/.test(ev.key)) { ev.preventDefault(); vType(ev.key); }
+        else if (ev.key === "Backspace") { ev.preventDefault(); vType("⌫"); }
+        else if (ev.key === "Enter") { ev.preventDefault(); vCheck(); }
+        return;
+      }
       if (document.activeElement === $("answer")) return;
       if (/^[0-9.]$/.test(ev.key)) { $("answer").value += ev.key; $("answer").focus(); }
+    });
+
+    // 竖式：点哪一格就把光标放哪一格（vform 每题重画，所以用事件委托）
+    if ($("vform")) $("vform").addEventListener("click", function (ev) {
+      var el = ev.target;
+      if (el && el.classList && el.classList.contains("ma-v-in") && !S.vLocked) {
+        S.vCursor = Number(el.getAttribute("data-col"));
+        vSync();
+      }
     });
 
     bindModal("btnProgress", "progressModal", refreshProgressPanel);
@@ -665,6 +914,21 @@
     }
     refreshProgressPanel();
   }
+
+  /* 给测试用的最小出口。
+     为什么值得开这个口子：竖式的位图和进位在题库里，e2e 要**按正确答案作答**
+     才测得到判分（不然只能瞎点），也才测得到"错一位要指出是哪一位"。
+     ⚠️ 测试必须调这里的真状态，不能自己对着题库重算一遍 ——
+     重算就等于把判分逻辑抄了第二份，抄的那份错了测试还是绿的。 */
+  window.MathDebug = {
+    item: function () { return S.queue[S.idx] || null; },
+    vertical: function () { return isV(S.queue[S.idx]); },
+    fillable: function () { return S.vItem ? vFillable(S.vItem.v) : []; },
+    state: function () {
+      return { idx: S.idx, right: S.right, wrong: S.wrong.length,
+               locked: S.vLocked, vals: S.vVals.slice(0), cursor: S.vCursor };
+    }
+  };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

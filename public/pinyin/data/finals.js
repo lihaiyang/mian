@@ -22,8 +22,8 @@ window.PY_FINALS = [
   {"p": "in", "c": "因", "group": "前鼻韵母", "tip": "i 加鼻音 n", "py": "yīn", "alone": false, "from": "", "count": 0},
   {"p": "un", "c": "温", "group": "前鼻韵母", "tip": "u 加鼻音 n", "py": "wēn", "alone": false, "from": "", "count": 0},
   {"p": "ün", "c": "晕", "group": "前鼻韵母", "tip": "ü 加鼻音 n", "py": "yūn", "alone": false, "from": "", "count": 0},
-  {"p": "ang", "c": "昂", "group": "后鼻韵母", "tip": "a 加鼻音 ng", "py": "ánɡ", "alone": true, "from": "ang", "count": 1},
-  {"p": "eng", "c": "风", "group": "后鼻韵母", "tip": "e 加鼻音 ng", "py": "fēnɡ", "alone": false, "from": "", "count": 0},
-  {"p": "ing", "c": "英", "group": "后鼻韵母", "tip": "i 加鼻音 ng", "py": "yīnɡ", "alone": false, "from": "", "count": 0},
-  {"p": "ong", "c": "公", "group": "后鼻韵母", "tip": "o 加鼻音 ng", "py": "ɡōnɡ", "alone": false, "from": "", "count": 0}
+  {"p": "ang", "c": "昂", "group": "后鼻韵母", "tip": "a 加鼻音 ng", "py": "áng", "alone": true, "from": "ang", "count": 1},
+  {"p": "eng", "c": "风", "group": "后鼻韵母", "tip": "e 加鼻音 ng", "py": "fēng", "alone": false, "from": "", "count": 0},
+  {"p": "ing", "c": "英", "group": "后鼻韵母", "tip": "i 加鼻音 ng", "py": "yīng", "alone": false, "from": "", "count": 0},
+  {"p": "ong", "c": "公", "group": "后鼻韵母", "tip": "o 加鼻音 ng", "py": "gōng", "alone": false, "from": "", "count": 0}
 ];

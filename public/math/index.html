@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="/shared/styles/components.css?v=15b61969">
 <link rel="stylesheet" href="/shared/styles/chrome.css?v=a70f5710">
 <!-- 本学科特有样式 -->
-<link rel="stylesheet" href="css/math.css?v=ae26c8ea">
+<link rel="stylesheet" href="css/math.css?v=7f5c450c">
 
 <style>
   /* 学科主色：只覆盖这三个变量，其余全用平台令牌 */
@@ -98,7 +98,11 @@
                aria-label="题目，用下面的数字键盘或电脑键盘输入答案"></div>
           <div class="ma-unitname" id="unitName"></div>
 
-          <div class="ma-input-row">
+          <!-- 竖式：位图和进位都在题库里算好了（tools/math/gen_problems.py），
+               这里只负责画和逐位比对。横式题时这块是 hidden 的。 -->
+          <div class="ma-vform" id="vform" hidden></div>
+
+          <div class="ma-input-row" id="inputRow">
             <input class="ma-input" id="answer" inputmode="text" autocomplete="off"
                    spellcheck="false" placeholder="在这里写答案" aria-label="你的答案">
             <button class="ma-go" id="btnCheck" type="button">确定</button>
@@ -127,7 +131,7 @@
   </main>
 
   <footer class="page-foot">
-    <p>1025 道题的答案都由程序算过一遍，不是手写的。</p>
+    <p>1100 道题的答案都由程序算过一遍，不是手写的；竖式的每一位和进位也一样。</p>
   </footer>
 </div>
 
@@ -201,12 +205,12 @@
      srs 是**跨学科记忆盒**：做错的题放进去，复习页按到期时间统一拿出来。 -->
 <script src="/shared/core/store.js?v=873bc876"></script>
 <script src="/shared/core/srs.js?v=d4b0684f"></script>
-<script src="/shared/core/progress.js?v=e6e6e1c0"></script>
+<script src="/shared/core/progress.js?v=9269c173"></script>
 <script src="/shared/core/sync.js?v=70663565"></script>
 <script src="/shared/core/registry.js?v=5065a79c"></script>
-<script src="subject.js?v=2d81d14b"></script>
-<script src="data/problems.js?v=3d3c8d09"></script>
-<script src="js/math.js?v=25ab4dfd"></script>
+<script src="subject.js?v=b96a759c"></script>
+<script src="data/problems.js?v=993bdd1d"></script>
+<script src="js/math.js?v=fef0f190"></script>
 
 <script src="/shared/core/pwa.js?v=3a9ce5f9"></script>
 </body>

@@ -159,6 +159,62 @@ if (await page.locator("#startPairs").count()) {
   await sleep(600);
 }
 
+// ---------- N. 每日任务池并进平台契约 ----------
+// 任务池与"今天挑哪三条"的**唯一**实现是 /en/subject.js 的 window.EN_DAILY
+// （英语站自己和大厅共用同一份）。这里钉两件事：
+//   ① 英语站显示的三条 == EN_DAILY 算出来的三条（没有第二份实现偷偷活着）
+//   ② EN_DAILY 的挑选算法和 UI.pick() **逐位一致**
+//      —— 分叉了不会报错，只会让孩子今天做了一半的任务突然换一批
+const dailyInfo = await page.evaluate(() => {
+  const d = window.EN_DAILY;
+  if (!d) return { missing: true };
+  let pid = "p_default";
+  try { pid = JSON.parse(localStorage.getItem("en_profile")) || "p_default"; } catch (e) {}
+  const today = UI.today();
+  const drift = [];
+  ["2026-01-01", "2026-06-15", "2026-10-31", today].forEach((date) => {
+    ["p_default", "p_xiaoming"].forEach((p) => {
+      const a = d.items(date, p).map((x) => x.id).join(",");
+      const b = UI.pick(d.pool, 3, "daily:" + date + ":" + p).map((x) => x.id).join(",");
+      if (a !== b) drift.push(date + "/" + p + "：" + a + " ≠ " + b);
+    });
+  });
+  const mine = Progress.daily().map((x) => x.id).join(",");
+  const viaApi = d.items(today, pid).map((x) => x.id).join(",");
+  return { missing: false, drift, mine, viaApi, pool: d.pool.length, today };
+});
+check("每日任务池挂在 window.EN_DAILY 上（大厅读的就是它）", !dailyInfo.missing);
+if (!dailyInfo.missing) {
+  check("任务池有 10 条、每天挑 3 条", dailyInfo.pool === 10, String(dailyInfo.pool));
+  check("英语站显示的三条 == EN_DAILY 算出的三条（没有第二份实现）",
+    dailyInfo.mine === dailyInfo.viaApi, `${dailyInfo.mine} vs ${dailyInfo.viaApi}`);
+  check("EN_DAILY 的挑选算法与 UI.pick 逐位一致（升级不会换一批任务）",
+    dailyInfo.drift.length === 0, dailyInfo.drift.slice(0, 2).join(" | ") || "4 个日期 × 2 个档案全对得上");
+  // 首页的「今日任务」卡片必须就是这三条（文案要对得上，不只是"有几个方块"）。
+  // ⚠️ 不能用 `.today-item` 全页数数 —— 首页还有别的卡片复用这个类
+  //    （复习记忆盒 / 接着学 / 读一本绘本），那会数出 6 个。按标题定位。
+  await page.goto(URL + "#/", { waitUntil: "domcontentloaded" });
+  await sleep(1200);
+  const shown = await page.evaluate(() => {
+    const t = Array.from(document.querySelectorAll(".section-title"))
+      .find((e) => /今日任务/.test(e.textContent));
+    const card = t && t.nextElementSibling;
+    return {
+      n: card ? card.querySelectorAll(".today-item").length : 0,
+      text: card ? Array.from(card.querySelectorAll(".today-item")).map((e) => e.textContent.trim()) : []
+    };
+  });
+  const expect = await page.evaluate(() => {
+    let pid = "p_default";
+    try { pid = JSON.parse(localStorage.getItem("en_profile")) || "p_default"; } catch (e) {}
+    return window.EN_DAILY.items(UI.today(), pid).map((d) => d.title);
+  });
+  check("首页「今日任务」正好三条", shown.n === 3, String(shown.n));
+  check("首页显示的标题和 EN_DAILY 一致",
+    expect.every((t, i) => (shown.text[i] || "").includes(t)),
+    shown.text.join(" / ") + "  ⟵ 期望 " + expect.join(" / "));
+}
+
 check("没有 JS 运行时报错", errors.length === 0, errors.slice(0, 3).join(" | "));
 console.log(results.join("\n"));
 console.log("\n" + (failed ? "❌ 失败 " + failed + " 项" : "✅ 全部通过") + "（共 " + results.length + " 项）");

@@ -54,7 +54,12 @@
         pinyin_correct: { xp: 3, counters: ["correct"] },
         // 做完一组（8 题）
         pinyin_round: { xp: 15, counters: ["rounds"] },
-        pinyin_perfect: { xp: 20, counters: ["perfect"], when: function (e) { return !!e.perfect; } }
+        pinyin_perfect: { xp: 20, counters: ["perfect"], when: function (e) { return !!e.perfect; } },
+        // 听音写拼音：**写**比"选"难一档，同样答对给的分更高
+        pinyin_write: { xp: 2, counters: ["written"] },
+        pinyin_write_ok: { xp: 4, counters: ["writeCorrect"] },
+        pinyin_write_round: { xp: 18, counters: ["writeRounds"] },
+        pinyin_write_perfect: { xp: 25, counters: ["writePerfect"], when: function (e) { return !!e.perfect; } }
       },
 
       badges: [
@@ -81,7 +86,15 @@
         { id: "py_1000", emoji: "🏅", title: "千次听音", cat: "习惯", desc: "累计听 1000 次发音",
           when: function (s) { return s.listens >= 1000; } },
         { id: "py_500", emoji: "🚀", title: "拼对 500 个", cat: "练习", desc: "累计拼对 500 个音节",
-          when: function (s) { return s.correct >= 500; } }
+          when: function (s) { return s.correct >= 500; } },
+        { id: "py_w1", emoji: "✍️", title: "第一次写对", cat: "入学", desc: "听音写拼音，写对第一个",
+          when: function (s) { return s.writeCorrect >= 1; } },
+        { id: "py_w20", emoji: "📝", title: "写对 20 个", cat: "练习", desc: "听音写拼音累计写对 20 个",
+          when: function (s) { return s.writeCorrect >= 20; } },
+        { id: "py_w60", emoji: "🖊️", title: "写对 60 个", cat: "练习", desc: "听音写拼音累计写对 60 个",
+          when: function (s) { return s.writeCorrect >= 60; } },
+        { id: "py_wperfect", emoji: "🌟", title: "写的一组全对", cat: "准确", desc: "听音写拼音一组全对",
+          when: function (s) { return s.writePerfect >= 1; } }
       ],
 
       medals: [
@@ -96,7 +109,9 @@
         { id: "py_md_5", emoji: "🏆", tier: "gold", title: "十组全对", hint: "听准了再选，别急",
           xp: 70, when: function (s) { return s.perfect >= 10; } },
         { id: "py_md_6", emoji: "🌟", tier: "gold", title: "听满 500 次", hint: "多听是拼音唯一的捷径",
-          xp: 60, when: function (s) { return s.listens >= 500; } }
+          xp: 60, when: function (s) { return s.listens >= 500; } },
+        { id: "py_md_7", emoji: "✒️", tier: "gold", title: "听写 200 个音节", hint: "会写，才算真的会了",
+          xp: 70, when: function (s) { return s.writeCorrect >= 200; } }
       ],
 
       // 每天从这个池子里按日期挑 3 条（同一天刷新也不会变）
@@ -106,7 +121,9 @@
         { id: "py_d_3", emoji: "📚", title: "做完 1 组拼读", key: "rounds", need: 1, xp: 15 },
         { id: "py_d_4", emoji: "💯", title: "拿到 1 次全对", key: "perfect", need: 1, xp: 18 },
         { id: "py_d_5", emoji: "🎧", title: "听 20 次发音", key: "listens", need: 20, xp: 15 },
-        { id: "py_d_6", emoji: "🔢", title: "拼对 20 个音节", key: "correct", need: 20, xp: 18 }
+        { id: "py_d_6", emoji: "🔢", title: "拼对 20 个音节", key: "correct", need: 20, xp: 18 },
+        { id: "py_d_7", emoji: "✍️", title: "听写对 5 个音节", key: "writeCorrect", need: 5, xp: 20 },
+        { id: "py_d_8", emoji: "🖊️", title: "听写对 3 个音节", key: "writeCorrect", need: 3, xp: 15 }
       ]
     });
   };

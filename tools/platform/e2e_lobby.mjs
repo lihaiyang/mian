@@ -172,24 +172,39 @@ check("每个可进入的学科都有一行",
 check("每行都能点进学科", todayRows.every((r) => r.href && /\/$/.test(r.href)),
   todayRows.map((r) => r.href).join(","));
 
-// 走平台内核的三个学科：必须能报出今天具体是哪三条
-const PLATFORM_SUBJECTS = ["typing", "math", "cn"];
-check("平台学科每行 3 条任务",
-  PLATFORM_SUBJECTS.every((id) => {
+// ⚠️ 这份名单**从学科清单推导，不写死**。
+// 以前这里写的是 ["typing","math","cn"]，拼音岛上线时没人想起改它，
+// 于是拼音岛的每日任务一次都没被这条断言覆盖过（和 check_events.mjs 是同一个坑）。
+const NO_DAILY = ["python"];   // 任务池还在自己的 js/learn.js 里，大厅不加载那个文件
+const DAILY_SUBJECTS = readyIds.filter((id) => !NO_DAILY.includes(id));
+check("除 Python 外，每个学科都能报出今天具体是哪三条",
+  DAILY_SUBJECTS.every((id) => {
     const r = todayRows.find((x) => x.id === id);
     return r && r.tasks.length === 3;
   }),
-  todayRows.filter((r) => PLATFORM_SUBJECTS.includes(r.id))
+  todayRows.filter((r) => DAILY_SUBJECTS.includes(r.id))
            .map((r) => r.id + ":" + r.tasks.length).join(" "));
+check("英语也报得出具体三条（任务池已并进平台契约 window.EN_DAILY）",
+  ((todayRows.find((r) => r.id === "en") || {}).tasks || []).length === 3,
+  JSON.stringify((todayRows.find((r) => r.id === "en") || {}).tasks || []));
+// Python 那行**故意**只有一行状态，不是三条任务：它的任务池还在自己的
+// js/learn.js 里（大厅不加载那个文件），也不该在大厅里抄一份。
+// 所以这里验的是"它没有编出三条任务"，而不是"一个方块都没有"。
+const pyRow = todayRows.find((r) => r.id === "python") || {};
+check("Python 那行只报事实、不编任务（一行状态，不是三条）",
+  pyRow.tasks.length === 1 && /今天还没开始|今天练过了/.test(pyRow.tasks[0] || ""),
+  JSON.stringify(pyRow.tasks || []));
 check("新档案的进度从 0 开始",
-  todayRows.filter((r) => PLATFORM_SUBJECTS.includes(r.id))
+  todayRows.filter((r) => DAILY_SUBJECTS.includes(r.id))
            .every((r) => r.counts.every((c) => /^0\//.test(c))),
   todayRows.map((r) => r.counts.join(",")).join(" | "));
 
 // **这条是 F5 的关键**：大厅看到的和点进去看到的必须是同一批任务。
 // 大厅是在学科**没打开过**的情况下算出来的（种子只跟日期有关），
 // 算错的话就会出现"大厅说做对 10 道题、进去变成读 4 页绘本"。
-for (const id of PLATFORM_SUBJECTS) {
+// 英语也在这条里 —— 它的池子只有一份实现（/en/subject.js），大厅和英语站共用，
+// 所以两边必须逐条对得上；对不上就说明有人又抄了一份。
+for (const id of DAILY_SUBJECTS) {
   const lobbyTasks = (todayRows.find((r) => r.id === id) || {}).tasks || [];
   await page.goto(BASE + "/" + id + "/", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => typeof Progress !== "undefined" && !!Progress.daily,

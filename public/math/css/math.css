@@ -142,6 +142,8 @@
 
 /* 输入 */
 .ma-input-row { display: flex; gap: var(--s2); margin-top: var(--s4); }
+/* 竖式题：横式输入框藏起来了，只剩"确定"，让它居中 */
+.ma-input-row.ma-solo { justify-content: center; }
 .ma-input {
   flex: 1; min-width: 0;
   min-height: 52px;
@@ -158,6 +160,74 @@
 .ma-input:focus { border-color: var(--accent); outline: none; }
 .ma-input.right { border-color: var(--ok); }
 .ma-input.wrong { border-color: var(--warn); }
+
+/* ---------------------------------------------------------------- 竖式
+   布局：一列一个格子，右对齐（个位在最右）。
+   为什么用 flex + 固定列宽、不用 grid 的 repeat()：
+   repeat() 的第一个参数必须是整数，列数是变量（--w），写不了。
+   一行一个 flex 行、每格固定宽，各行自然对齐。
+   两个硬要求：
+     ① 数字必须右对齐、等宽 —— 竖式教的就是"位要对齐"，格子宽度不一致会教错；
+     ② 每一格都要能点（触摸设备上点格子 = 把光标放过去）。 */
+.ma-vform { margin-top: var(--s4); }
+.ma-vform[hidden] { display: none; }
+
+.ma-v {
+  display: flex; flex-direction: column; align-items: center;
+  font-family: var(--font-mono);
+  font-size: 30px; line-height: 1.25;
+  --cellw: 2.4em;
+  --opw: 1.4em;
+}
+.ma-v-row { display: flex; }
+.ma-v-slot {
+  flex: 0 0 auto;
+  width: var(--cellw);
+  display: grid; place-items: center;
+  min-height: 38px;
+  color: var(--ink);
+}
+.ma-v-op {
+  flex: 0 0 auto;
+  width: var(--opw);
+  display: grid; place-items: center;
+  color: var(--accent); font-weight: 700;
+}
+/* 进位 / 借位：小字写在左边那一列的上方（判分后才出现） */
+.ma-v-carry { min-height: 22px; font-size: 16px; color: var(--accent); font-weight: 700; }
+/* 横线：宽度 = 运算符列 + 所有格子列，正好压在数字下面 */
+.ma-v-line {
+  width: calc(var(--opw) + var(--w) * var(--cellw));
+  height: 3px; margin: 4px 0;
+  background: var(--ink);
+  border-radius: 2px;
+}
+/* 结果格：孩子填的 */
+.ma-v-in {
+  min-height: 44px; padding: 0;
+  background: var(--paper-2);
+  border: 2px dashed var(--line-strong);
+  border-radius: 8px;
+  color: var(--ink);
+  font-family: inherit; font-size: 30px;
+  cursor: pointer;
+  touch-action: manipulation;
+  appearance: none;
+}
+.ma-v-in.active { border-color: var(--accent); border-style: solid; box-shadow: 0 0 0 3px var(--accent-soft); }
+.ma-v-in.filled { border-style: solid; }
+.ma-v-in.right { border-color: var(--ok); color: var(--ok); }
+.ma-v-in.wrong { border-color: var(--warn); color: var(--warn); }
+.ma-v-blank { background: transparent; }
+
+/* 打印用的迷你竖式（题卡） */
+.ma-vm { display: inline-flex; flex-direction: column; font-family: var(--font-mono); font-size: 15px; }
+.ma-vm-row { display: flex; }
+.ma-vm-row i { font-style: normal; width: 1.15em; text-align: center; }
+.ma-vm-line { display: block; height: 1.5px; background: currentColor; margin: 2px 0; }
+.ma-vm-row i.bx { border: 1px solid currentColor; border-radius: 2px; min-height: 1.2em; }
+.ma-vm-row i.ph { visibility: hidden; }
+.ma-prob-v { display: flex; align-items: flex-start; gap: 6px; }
 .ma-go {
   flex: none;
   min-height: 52px;

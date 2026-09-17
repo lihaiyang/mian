@@ -105,10 +105,13 @@ window.EN_V = "20260914a";
 <script src="js/player.js?v=d939d085"></script>
 <script src="js/speech.js?v=870a98b7"></script>
 <script src="js/srs.js?v=32f44da9"></script>
-<script src="js/progress.js?v=9bc79878"></script>
+<!-- subject.js 必须排在 progress.js 之前：它是每日任务池（window.EN_DAILY）的**唯一**实现，
+     大厅读的也是这一份。少了它，英语站的每日任务会空着，而且控制台会明说原因。 -->
+<script src="subject.js?v=0c81b537"></script>
+<script src="js/progress.js?v=85c5a1a2"></script>
 <script src="js/cloud.js?v=0e944c77"></script>
 <script src="js/games.js?v=291611f3"></script>
 <script src="js/stage.js?v=3e60e17c"></script>
-<script src="js/app.js?v=557539fa"></script>
+<script src="js/app.js?v=d2550344"></script>
 </body>
 </html>

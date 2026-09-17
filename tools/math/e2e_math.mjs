@@ -132,6 +132,174 @@ check("一组做完会出小结", await page.locator("#resultCard").isVisible())
 const stars = await page.locator(".ma-star.on").count();
 check("小结里有星级", stars >= 0, `${stars} 颗`);
 
+// ---------------------------------------------------------------- 3b. 竖式
+//
+// 竖式的**位图和进位都在题库里**（tools/math/gen_problems.py 的 vspec）：客户端只画不算。
+// 所以要钉三件事 ——
+//   ① **全量**自检：每一道竖式题的位图拼起来必须等于答案（抽几道是看不出问题的）
+//   ② 判分是**逐位**的：错一位要指出是哪一位，而不是笼统说"错了"
+//   ③ 进位行在判分前**不能剧透**（先写出来，这题就白出了）
+await page.goto(BASE + "/math/", { waitUntil: "domcontentloaded" });
+await page.waitForSelector(".ma-unit", { timeout: E2E_WAIT });
+await sleep(300);
+
+const vAll = await page.evaluate(() => {
+  const out = { total: 0, units: [], bad: [] };
+  (window.MATH_UNITS || []).forEach((u) => u.items.forEach((it) => {
+    if (!it.v) return;
+    out.total++;
+    const v = it.v;
+    if (v.res.join("") !== it.a) out.bad.push(it.id + " 位图拼出 " + (v.res.join("") || "空") + " ≠ " + it.a);
+    if ([v.xs, v.ys, v.res, v.carry].some((x) => x.length !== v.w)) out.bad.push(it.id + " 位图长度 ≠ 列数");
+    if (!v.xs[v.w - 1] || !v.ys[v.w - 1]) out.bad.push(it.id + " 个位没对齐");
+    if (v.xs.some((d) => d && !/^\d$/.test(d))) out.bad.push(it.id + " 位图里有非数字");
+  }));
+  out.units = (window.MATH_UNITS || []).filter((u) => u.items.some((i) => i.v)).map((u) => u.id);
+  return out;
+});
+check("题库里有竖式题", vAll.total >= 60, `${vAll.total} 道`);
+check("加/减/乘三个竖式单元都在", vAll.units.length === 3, vAll.units.join(","));
+check("每一道竖式的位图拼起来 = 答案（全量，不是抽样）",
+  vAll.bad.length === 0, vAll.bad.slice(0, 3).join(" | "));
+
+const fillV = async (digits) => {
+  for (const ch of String(digits)) {
+    await page.click(`.ma-key:text-is("${ch}")`);
+    await sleep(80);
+  }
+};
+const vItem = () => page.evaluate(() => MathDebug.item());
+/** 等下一道**新**题就绪。判完之后有一段展示答案的等待，
+ *  睡固定时间会偶发地在"还没换题"时就去作答（实测红过一次）——
+ *  所以按状态等，不按时间等。 */
+const vWaitFresh = async (prevId) => {
+  for (let i = 0; i < 60; i++) {
+    const st = await page.evaluate(() => {
+      const it = window.MathDebug ? MathDebug.item() : null;
+      return { id: it && it.id, locked: MathDebug.state().locked };
+    });
+    if (st.id && st.id !== prevId && !st.locked) return st.id;
+    await sleep(200);
+  }
+  return null;
+};
+
+await page.click('.ma-grade:has-text("2 年级")');
+await sleep(200);
+await page.click('.ma-unit[data-unit="g2_vadd"]');
+await page.waitForSelector(".ma-v-in", { timeout: E2E_WAIT });
+await sleep(400);
+
+const vs0 = await page.evaluate(() => ({
+  cells: document.querySelectorAll(".ma-v-in").length,
+  carriesShown: Array.from(document.querySelectorAll(".ma-v-carry")).filter((e) => e.textContent.trim()).length,
+  answerHidden: document.getElementById("answer").hidden,
+  checkClickable: !!document.getElementById("btnCheck").offsetParent,
+  vertical: MathDebug.vertical()
+}));
+check("进竖式单元会画格子（每一位一格）", vs0.cells >= 2, `${vs0.cells} 格`);
+check("判定前不剧透进位", vs0.carriesShown === 0, `${vs0.carriesShown} 个进位提前露出来了`);
+check("竖式时藏起横式输入框，但「确定」还能按",
+  vs0.answerHidden && vs0.checkClickable);
+check("这一题确实是竖式（调试出口）", vs0.vertical === true);
+
+await page.click("#btnCheck");
+await sleep(250);
+check("没填完不给判，而是提示还差几位",
+  /没填/.test(await page.textContent("#feedback")), (await page.textContent("#feedback")).trim());
+
+let vi = await vItem();
+check("竖式题带完整位图", !!(vi && vi.v && vi.v.res), vi ? vi.q : "拿不到题目");
+await fillV(vi.a);
+await page.click("#btnCheck");
+await sleep(400);
+check("填对了判对", /对了/.test(await page.textContent("#feedback")),
+  (await page.textContent("#feedback")).trim());
+const revealed = await page.$$eval(".ma-v-carry", (e) => e.map((x) => x.textContent.trim()).join("|"));
+check("判完之后进位露出来（进位才是竖式要教的）", /1/.test(revealed), `进位行「${revealed}」`);
+
+// 错一位：必须指出是哪一位
+check("判完之后会自动换下一题", !!(await vWaitFresh(vi.id)));
+vi = await vItem();
+const badDigits = (vi.a[0] === "9" ? "8" : "9") + String(vi.a).slice(1);
+await fillV(badDigits);
+await page.click("#btnCheck");
+await sleep(400);
+const vWrong = await page.evaluate(() => ({
+  fb: document.getElementById("feedback").textContent.trim(),
+  marks: Array.from(document.querySelectorAll(".ma-v-in")).map((e) =>
+    e.textContent + (e.classList.contains("right") ? "✓" : e.classList.contains("wrong") ? "✗" : "?"))
+}));
+check("错一位会指出从右数第几位不对", /从右数第 \d+ 位不对/.test(vWrong.fb), vWrong.fb);
+check("逐位标记（对的对、错的错）",
+  vWrong.marks.some((m) => m.includes("✗")) && vWrong.marks.some((m) => m.includes("✓")),
+  vWrong.marks.join(" "));
+
+// 减法：位图只有两列（最高位不留空格），借位也要标出来
+await vWaitFresh(vi.id);
+await page.click('.ma-unit[data-unit="g2_vsub"]');
+await page.waitForSelector(".ma-v-in", { timeout: E2E_WAIT });
+await sleep(300);
+const vsSub = await (async () => {
+  for (let i = 0; i < 40; i++) {
+    const it = await page.evaluate(() => {
+      const x = window.MathDebug ? MathDebug.item() : null;
+      return (x && x.v && !MathDebug.state().locked) ? x : null;
+    });
+    if (it) return it;
+    await sleep(200);
+  }
+  return null;
+})();
+// ⚠️ 别断言"最高位一定是实格"：51 − 47 = 4 这种结果只有一位，
+//    竖式里就该**右对齐**（4 写在这个位上），最高格留空才是对的。
+//    真正的不变量是"个位那一格必须能填"。
+const subStat = await page.evaluate(() => {
+  const u = (window.MATH_UNITS || []).find((x) => x.id === "g2_vsub");
+  const items = (u || {}).items || [];
+  return {
+    n: items.length,
+    w2: items.every((i) => i.v && i.v.w === 2),
+    unitsFilled: items.every((i) => i.v.res[i.v.w - 1] !== ""),
+    oneDigit: items.filter((i) => i.v.res[0] === "").length,
+    bad: items.filter((i) => i.v.res.join("") !== i.a).length
+  };
+});
+check("减法竖式都是两列，且个位那一格永远能填",
+  subStat.w2 && subStat.unitsFilled, `${subStat.n} 道，异常 ${subStat.bad} 道`);
+check("结果只有一位的减法题，最高格留空（右对齐，不是补 0）",
+  subStat.oneDigit > 0 && subStat.oneDigit < subStat.n,
+  `${subStat.oneDigit}/${subStat.n} 道是一位数结果`);
+await fillV(vsSub.a);
+await page.click("#btnCheck");
+await sleep(400);
+check("减法借位也能判对", /对了/.test(await page.textContent("#feedback")),
+  (await page.textContent("#feedback")).trim());
+
+// 手机上竖式要放得下、格子要点得着（320 是最窄的那一档）
+await page.setViewportSize({ width: 320, height: 720 });
+await sleep(400);
+const vMob = await page.evaluate(() => {
+  const vw = document.documentElement.clientWidth;
+  const over = Array.from(document.querySelectorAll("#playCard *")).filter((el) => {
+    const r = el.getBoundingClientRect();
+    return r.width && r.right > vw + 1;
+  }).length;
+  const c = document.querySelector(".ma-v-in").getBoundingClientRect();
+  const btn = document.getElementById("btnCheck").getBoundingClientRect();
+  return { vw, scroll: document.documentElement.scrollWidth, over,
+           cw: Math.round(c.width), ch: Math.round(c.height),
+           bw: Math.round(btn.width), bh: Math.round(btn.height) };
+});
+check("手机上竖式不横向溢出",
+  vMob.scroll <= vMob.vw + 1 && vMob.over === 0,
+  `vw=${vMob.vw} scroll=${vMob.scroll} 越界=${vMob.over}`);
+check("手机上结果格够大（≥40×40）", vMob.cw >= 40 && vMob.ch >= 40, `${vMob.cw}×${vMob.ch}`);
+check("手机上「确定」够大（≥44×44）", vMob.bw >= 44 && vMob.bh >= 44, `${vMob.bw}×${vMob.bh}`);
+await page.screenshot({ path: ".shots/math-vertical-mobile.png" });
+await page.setViewportSize({ width: 1280, height: 900 });
+await sleep(200);
+
 // ---------------------------------------------------------------- 4. 平台层成长
 await page.click("#btnProgress");
 await sleep(400);
@@ -328,6 +496,35 @@ await sleep(200);
 await page.click("#btnCloseSheet");
 await sleep(200);
 check("关闭后回到页面", !(await page.locator("#sheetOverlay").isVisible()));
+
+// 竖式单元的卷子：**纸面上也必须是竖的**。
+// 印成"26 + 65 = ____"的话，练的就不是同一件事了 —— 家长要的正是"列竖式算"。
+// 进位不印（那是孩子写的），所以这里还要确认没把答案漏在卷面上。
+await page.click('.ma-grade:has-text("2 年级")');
+await sleep(250);
+await page.click("#btnSheet");
+await sleep(400);
+await page.selectOption("#sheetScope", "unit:g2_vadd");
+await sleep(400);
+const sheetV = await page.evaluate(() => {
+  const probs = Array.from(document.querySelectorAll("#sheet .ma-prob"));
+  return {
+    prob: probs.length,
+    vm: document.querySelectorAll("#sheet .ma-vm").length,
+    boxes: document.querySelectorAll("#sheet .ma-vm-row i.bx").length,
+    ans: document.querySelectorAll(".ma-ans").length,
+    // 卷面上（题目区）不该出现答案数字：只有两个操作数和一个运算符
+    title: (document.querySelector("#sheet .ma-sheet-title b") || {}).textContent || ""
+  };
+});
+check("竖式单元的卷子整张都是竖式排版",
+  sheetV.vm > 0 && sheetV.vm === sheetV.prob, `${sheetV.vm}/${sheetV.prob} 道`);
+check("竖式卷子留了要填的方框", sheetV.boxes >= sheetV.vm * 2, `${sheetV.boxes} 个框`);
+check("竖式卷子的答案条数和题目一致", sheetV.ans === sheetV.prob, `${sheetV.ans} vs ${sheetV.prob}`);
+check("是算式卷（叫口算题卡，不是数学练习）", /口算题卡/.test(sheetV.title), sheetV.title);
+await page.screenshot({ path: ".shots/math-sheet-vertical.png", fullPage: false });
+await page.click("#btnCloseSheet");
+await sleep(200);
 
 // ---------------------------------------------------------------- 7. 大厅卡片
 await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });

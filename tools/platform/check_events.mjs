@@ -21,8 +21,21 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-/** 用平台内核的学科（Python 和英语各有自己的 progress.js，不在这个契约里） */
-const SUBJECTS = ["typing", "math", "cn"];
+/** 学科清单的**唯一来源**是 public/shared/subjects.js。从它推导，
+ *  而不是在这里再写一份名单 —— 拼音岛就是这么被漏掉的：
+ *  这个检查写于数学/汉字那一轮，名单是写死的 ["typing","math","cn"]，
+ *  后来加拼音岛时没人想起这里，于是它的事件一个都没被检查过。
+ *  （这正是仓库里反复记的那条教训：**测试里写死"当前有哪些学科"，
+ *    加学科时就会静默失效。**） */
+function subjectIds() {
+  const src = readFileSync(join(ROOT, "public", "shared", "subjects.js"), "utf8");
+  const out = [];
+  for (const m of src.matchAll(/["']\/([a-z0-9-]+)\/subject\.js["']/g)) out.push(m[1]);
+  return out;
+}
+
+/** 这两个老站各有自己的 progress.js，不走平台成长契约（也没法走）。 */
+const NO_PLATFORM = new Set(["python", "en"]);
 
 let fails = 0;
 let checks = 0;
@@ -65,8 +78,18 @@ function jsFiles(dir) {
 
 console.log("=== 成长事件自检（emit 的名字必须声明过）===\n");
 
-for (const id of SUBJECTS) {
+const ids = subjectIds();
+if (!ids.length) {
+  console.log("❌ 从 shared/subjects.js 里没解析出任何学科，检查清单文件的格式是不是变了");
+  process.exit(1);
+}
+
+for (const id of ids) {
   console.log(`[${id}]`);
+  if (NO_PLATFORM.has(id)) {
+    console.log("  ℹ️  自带 progress.js，不走平台成长契约，跳过\n");
+    continue;
+  }
   const dir = join(ROOT, "public", id);
   let spec;
   try {

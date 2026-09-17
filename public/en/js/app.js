@@ -450,7 +450,15 @@ const App = (() => {
                   { label: "开始小测验 →", kind: "primary", onClick: () => Stage.openReaderQuiz(r) }] });
     }
     draw();
-    Player.ready(r.id + "#p1") || Player.say(r.id + "#p1", { text: r.pages[0].en });
+    // 进入绘本先读第一页。
+    // ⚠️ 必须用 say(key)：say() 会自己探测 readers-1…4 分组。
+    //    ready() 收的是**分组名**（letters / phonics / sentences），
+    //    传 "#p1" 这种精灵键会被拼成 "assets/audio/r_mycat#p1.json" ——
+    //    URL 里 "#" 之后是锚点、根本不发给服务器，请求实际落到
+    //    assets/audio/r_mycat → 每次打开绘本都一个 404。
+    //    另外原来写的 `Player.ready(...) || Player.say(...)` 也不会生效：
+    //    ready() 返回 Promise（永远是真值），右边那句从来没执行过。
+    Player.say(r.id + "#p1", { text: r.pages[0].en });
   }
 
   /* ---------------- 游戏 ---------------- */

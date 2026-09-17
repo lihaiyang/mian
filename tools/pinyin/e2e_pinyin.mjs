@@ -6,12 +6,14 @@
  *   PLAYWRIGHT_PATH=... node tools/pinyin/e2e_pinyin.mjs [http://127.0.0.1:8788]
  *
  * 覆盖：数据完整性 → 声母/韵母/整体认读点读 → 四声示范 → 拼读练习（对/错两条路）
- *       → 发音真的出声 → 平台层成长 → 大厅卡片 → 手机不溢出 → 无 JS 报错
+ *       → 听音写拼音（不标声调 / 声调错 / 字母错 三条路）→ 发音真的出声
+ *       → 平台层成长 → 大厅卡片 → 手机不溢出 → 无 JS 报错
  *
  * **这个测试有一部分是"教材规矩"的回归测试**，不是功能测试：
  *   · 整体认读音节绝不能出现在拼读练习里（页面上写着"不要拆开拼"）
  *   · 拼读题的干扰项必须同韵母同声调（只差声母，那才是要练的）
  *   · 四声示范必须用同一个音节的四个声调（妈麻马骂）
+ *   · 听写题在判分之前不能把带调号的拼音显示在页面上（否则就是抄）
  * 这些错了页面照样"能点"，但教的是错的 —— 所以要用断言钉住。
  */
 const pwSpec = process.env.PLAYWRIGHT_PATH
@@ -95,15 +97,17 @@ check("点声母会去加载对应音频", audioReqs.includes("sm.m4a"), audioRe
 const pinged = await page.evaluate(() => document.querySelectorAll(".py-card").length > 0);
 check("点读有视觉反馈（不会点了没反应）", pinged);
 
-// 五个页签都能打开
-for (const [tab, sel, name] of [
-  ["ym", "#pyGridYm .py-card", "韵母"], ["zt", "#pyGridZt .py-card", "整体认读"],
-  ["sd", ".py-tone", "四声"], ["pd", ".py-choice", "拼读"]
+// 六个页签都能打开
+for (const [tab, sel, name, want] of [
+  ["ym", "#pyGridYm .py-card", "韵母", 24],
+  ["zt", "#pyGridZt .py-card", "整体认读", 16],
+  ["sd", ".py-tone", "四声", 4],
+  ["pd", ".py-choice", "拼读", 4],
+  ["xz", "#xzInput", "听音写拼音", 1]
 ]) {
   await page.click(`.py-tab[data-tab="${tab}"]`);
   await sleep(600);
   const n = await page.locator(sel).count();
-  const want = tab === "ym" ? 24 : tab === "zt" ? 16 : tab === "sd" ? 4 : 4;
   check(`${name}页签能打开并渲染（${want} 个）`, n === want, `${n} 个`);
 }
 
@@ -214,6 +218,120 @@ for (let i = 0; i < 12; i++) {
 check("做完 8 题会出小结", (await page.locator(".py-finish").count()) === 1);
 check("小结里有正确率", /%/.test(await page.textContent(".py-finish")));
 
+// ---------------------------------------------------------------- 3b. 听音写拼音
+//
+// 比"选"难一档：要自己写出字母 + 标对声调。
+// 这里的关键断言不是"点得动"，而是**判分把答案拆成两半**：
+//   字母对、声调错 → 必须明确告诉孩子"只差声调"，而不是笼统报错。
+// 另外要盯住"写之前不能把答案写在页面上"（否则就变成抄了）。
+await page.click(".py-tab[data-tab='xz']");
+await page.waitForSelector("#xzInput", { timeout: WAIT });
+await sleep(900);
+
+const xz0 = await page.evaluate(() => {
+  const inp = document.getElementById("xzInput");
+  const box = document.getElementById("xzBox");
+  return {
+    hasInput: !!inp,
+    tones: document.querySelectorAll(".py-tbtn").length,
+    hk: document.querySelectorAll("[data-k]").length,
+    fontSize: parseFloat(getComputedStyle(inp).fontSize),
+    // 页面上不该出现带调号的拼音（那就是答案）
+    leaked: /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/.test(box.textContent)
+  };
+});
+check("写拼音页签能打开，有输入框", xz0.hasInput);
+check("有 4 个声调键", xz0.tones === 4, String(xz0.tones));
+check("有 ü 和 ⌫ 辅助键", xz0.hk === 2, String(xz0.hk));
+check("输入框字号 ≥16px（否则 iOS 聚焦会放大整页）", xz0.fontSize >= 16, xz0.fontSize + "px");
+check("写之前页面上不泄露答案（没有带调号的拼音）", !xz0.leaked);
+
+/** 等下一道听写题就绪（判完到自动下一题之间输入框是锁着的） */
+async function xzNext() {
+  for (let i = 0; i < 40; i++) {
+    const st = await page.evaluate(() => {
+      const inp = document.getElementById("xzInput");
+      const r = window.PinyinDebug && PinyinDebug.xzRow();
+      return { ready: !!(inp && !inp.disabled && r), q: r ? { py: r.py, t: r.t, s: r.s } : null };
+    });
+    if (st.ready) return st.q;
+    if (await page.locator("#xzBox .py-finish").count()) return null;
+    await sleep(300);
+  }
+  return null;
+}
+/** 读判分结果（只读 #xzBox 里的，拼读页签的小结不能混进来） */
+const xzRead = () => page.evaluate(() => {
+  const q = (s) => (document.querySelector(s) || {}).textContent || "";
+  return {
+    cls: (document.querySelector(".py-xz-ans") || {}).className || "",
+    py: q(".py-xz-ans-py"), c: q(".py-xz-ans-c"), msg: q(".py-xz-ans-say"),
+    locked: !!(document.getElementById("xzInput") || {}).disabled,
+    warn: document.querySelectorAll("#xzToneWarn").length
+  };
+});
+
+// —— 不选声调：不能判分，要给一句人话提醒
+let xq = await xzNext();
+check("能从调试出口拿到当前听写题", !!xq && !!xq.py, xq ? xq.py : "拿不到");
+await page.fill("#xzInput", "ma");
+await page.click("#btnXzCheck");
+await sleep(300);
+const w = await xzRead();
+check("没标声调时不判分，而是提醒先选声调", w.warn === 1 && !w.locked);
+
+// —— 字母写对 + 声调标对
+await page.fill("#xzInput", xq.py);                  // 原样带调号输入，顺便验归一化
+await page.click(`.py-tbtn[data-tone="${xq.t}"]`);
+check("点声调键有高亮反馈",
+  (await page.locator(`.py-tbtn[data-tone="${xq.t}"].active`).count()) === 1);
+await page.click("#btnXzCheck");
+await sleep(500);
+const ok1 = await xzRead();
+check("写对了标绿、给出正确答案字与音",
+  /ok/.test(ok1.cls) && !!ok1.py && !!ok1.c && /全对/.test(ok1.msg), ok1.msg || ok1.cls);
+check("判完锁住输入（不能改答案刷分）", ok1.locked);
+
+// —— 字母写对、声调标错：这才是这个题型最该教的地方
+xq = await xzNext();
+check("答对后自动进入下一题", !!xq, xq ? xq.s : "没进下一题");
+if (xq) {
+  const alt = xq.t === 1 ? 2 : 1;
+  await page.fill("#xzInput", xq.py);
+  await page.click(`.py-tbtn[data-tone="${alt}"]`);
+  await page.click("#btnXzCheck");
+  await sleep(500);
+  const okt = await xzRead();
+  check("字母对、声调错 → 明确说「只差声调」，不说笼统的错",
+    /no/.test(okt.cls) && /声调/.test(okt.msg) && /应该是/.test(okt.msg), okt.msg);
+  check("声调错时把正确读音也放出来（判分后要能对上听到的）", !!okt.py && !!okt.c);
+}
+
+// —— 字母写错
+xq = await xzNext();
+if (xq) {
+  await page.fill("#xzInput", "zzz");
+  await page.click(`.py-tbtn[data-tone="${xq.t}"]`);
+  await page.click("#btnXzCheck");
+  await sleep(500);
+  const okw = await xzRead();
+  check("字母写错 → 指出写的是什么、并给正确答案",
+    /no/.test(okw.cls) && /zzz/.test(okw.msg) && !!okw.py, okw.msg);
+}
+
+// —— 做完一组出小结（只认 #xzBox 里的）
+for (let i = 0; i < 16; i++) {
+  if (await page.locator("#xzBox .py-finish").count()) break;
+  const q = await xzNext();
+  if (!q) break;
+  await page.fill("#xzInput", q.py);
+  await page.click(`.py-tbtn[data-tone="${q.t}"]`);
+  await page.click("#btnXzCheck");
+  await sleep(1600);
+}
+check("写拼音做完 8 题会出小结", (await page.locator("#xzBox .py-finish").count()) === 1);
+check("小结里有正确率", /%/.test(await page.textContent("#xzBox .py-finish")));
+
 // ---------------------------------------------------------------- 4. 平台层
 const grown = await page.evaluate(() => ({
   counters: (typeof Progress !== "undefined" && Progress.counters) ? Progress.counters() : {},
@@ -223,8 +341,13 @@ const grown = await page.evaluate(() => ({
 check("听音记了计数（愿意反复听 = 学好拼音的关键）",
   (grown.counters.listens || 0) >= 1, `listens=${grown.counters.listens || 0}`);
 check("拼读答对记了计数", (grown.counters.correct || 0) >= 1, `correct=${grown.counters.correct || 0}`);
+check("听写答对记了计数（写比选难一档，单独记）",
+  (grown.counters.writeCorrect || 0) >= 1, `writeCorrect=${grown.counters.writeCorrect || 0}`);
 check("经验在涨", grown.xp > 0, `${grown.xp} XP`);
 check("徽章已点亮", grown.badges.some((b) => b.got),
+  grown.badges.filter((b) => b.got).map((b) => b.title).join(",") || "一个都没有");
+check("写拼音的徽章也点得亮（第一次写对）",
+  grown.badges.some((b) => b.got && (b.id === "py_w1" || /写/.test(b.title))),
   grown.badges.filter((b) => b.got).map((b) => b.title).join(",") || "一个都没有");
 check("成长事件名都声明过（否则 Progress 会静默丢掉）",
   await page.evaluate(() => {
@@ -265,6 +388,29 @@ check("手机上不横向溢出", mob.scroll <= mob.vw + 1 && mob.over === 0,
 check("手机上卡片够大（≥96px 宽、≥96px 高）", mob.cardW >= 96 && mob.cardH >= 96,
   `${mob.cardW}×${mob.cardH}`);
 await page.screenshot({ path: ".shots/pinyin-mobile.png" });
+
+// 新的写拼音界面在手机上也要能用：四个声调键不能挤成一团、不能溢出
+await page.click(".py-tab[data-tab='xz']");
+await page.waitForSelector("#xzInput", { timeout: WAIT });
+await sleep(600);
+const mob2 = await page.evaluate(() => {
+  const vw = document.documentElement.clientWidth;
+  const over = Array.from(document.querySelectorAll("#pane-xz *")).filter((el) => {
+    const r = el.getBoundingClientRect();
+    return r.width && r.right > vw + 1;
+  }).map((el) => el.className);
+  const t = document.querySelector(".py-tbtn").getBoundingClientRect();
+  const inp = document.getElementById("xzInput").getBoundingClientRect();
+  return { vw, scroll: document.documentElement.scrollWidth, over: over.length,
+           toneW: Math.round(t.width), toneH: Math.round(t.height),
+           inpFont: parseFloat(getComputedStyle(document.getElementById("xzInput")).fontSize) };
+});
+check("手机上写拼音页不横向溢出", mob2.scroll <= mob2.vw + 1 && mob2.over === 0,
+  `vw=${mob2.vw} scroll=${mob2.scroll} 越界=${mob2.over}`);
+check("手机上声调键够大（宽 ≥64、高 ≥44）", mob2.toneW >= 64 && mob2.toneH >= 44,
+  `${mob2.toneW}×${mob2.toneH}`);
+check("手机上输入框字号仍 ≥16px", mob2.inpFont >= 16, mob2.inpFont + "px");
+await page.screenshot({ path: ".shots/pinyin-write-mobile.png" });
 await page.setViewportSize({ width: 1280, height: 950 });
 
 check("没有 JS 报错", errs.length === 0, errs.slice(0, 2).join(" | "));
