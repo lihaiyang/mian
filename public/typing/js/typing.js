@@ -43,7 +43,18 @@
     return ch.toLowerCase();
   }
   function needsShift(ch) {
-    return !!SHIFT_MAP[ch] || (ch !== ch.toLowerCase() && ch !== ch.toUpperCase() === false && /[A-Z]/.test(ch));
+    // ⚠️ 原来这里写的是 `ch !== ch.toLowerCase() && ch !== ch.toUpperCase() === false && /[A-Z]/`，
+    // 中间那一段恒等于 false，于是**大写字母永远不提示按 Shift**。
+    // 判断本来就一句话：要按 Shift 的标点 + 大写字母。
+    return !!SHIFT_MAP[ch] || /[A-Z]/.test(ch);
+  }
+
+  /** 按住 Shift 时这个键打出什么（SHIFT_MAP 的反查 + 字母转大写）。
+   *  屏幕键盘的粘性 Shift 靠它 —— 直接 toUpperCase() 的话，
+   *  「;」永远变不成「:」，标点关卡在手机上过不去。 */
+  function shiftedOf(k) {
+    for (var ch in SHIFT_MAP) if (SHIFT_MAP[ch] === k) return ch;
+    return k.toUpperCase();
   }
   function fingerOf(ch) {
     return FINGER[baseKey(ch)] || "";
@@ -65,7 +76,8 @@
     typedByKey: {},     // 每个键打了几次
     startedAt: 0,
     timer: null,
-    finished: false
+    finished: false,
+    touchShift: false    // 屏幕键盘的粘性 Shift（触摸设备专用）
   };
 
   function $(id) { return document.getElementById(id); }
@@ -151,12 +163,23 @@
         if (isNext) cls += " next";
         // 热力图：错得越多的键越红（只在练过之后才有意义）
         if (bad >= 1) cls += " heat-" + Math.min(3, bad);
-        html += '<span class="' + cls + '" data-k="' + esc(k) + '">' + esc(k) + "</span>";
+        // ⚠️ 这里是 <button> 不是 <span>：手机/平板上**真的能点**。
+        // 以前画的是 span + aria-hidden，孩子在平板上点它毫无反应，
+        // 也没有任何提示 —— 整个学科在触摸设备上是 0% 可用的。
+        html += '<button type="button" class="' + cls + '" data-k="' + esc(k) +
+          '" tabindex="-1">' + esc(k) + "</button>";
       });
       html += "</div>";
     });
-    html += '<div class="kbd-row"><span class="kbd-key kbd-space' +
-      (next === " " ? " next" : "") + '">空格</span></div>';
+    // 底行：Shift（粘性）/ 空格 / 退格 —— 真键盘上有的，屏幕上也得有，
+    // 否则大写字母的关卡在触摸设备上根本过不去。
+    html += '<div class="kbd-row">' +
+      '<button type="button" class="kbd-key kbd-mod' + (S.touchShift ? " on" : "") +
+        '" data-k="__shift" tabindex="-1" aria-label="Shift（按一下再按字母）">⇧</button>' +
+      '<button type="button" class="kbd-key kbd-space' + (next === " " ? " next" : "") +
+        '" data-k=" " tabindex="-1">空格</button>' +
+      '<button type="button" class="kbd-key kbd-mod" data-k="__back" tabindex="-1" aria-label="退格">⌫</button>' +
+      "</div>";
     host.innerHTML = html;
 
     var shift = next !== null && next !== undefined && needsShift(next);
@@ -226,7 +249,7 @@
     // 只处理单个可见字符 + Enter + Backspace
     if (k === "Backspace") {
       ev.preventDefault();
-      if (S.idx > 0) { S.idx--; S.state[S.idx] = null; renderText(); renderKeyboard(); renderLive(); }
+      backspace();
       return;
     }
     if (k === "Enter") {
@@ -238,6 +261,14 @@
 
     ev.preventDefault();
     typeChar(k);
+  }
+
+  function backspace() {
+    if (S.idx > 0) {
+      S.idx--;
+      S.state[S.idx] = null;
+      renderText(); renderKeyboard(); renderLive();
+    }
   }
 
   function typeChar(ch) {
@@ -511,6 +542,34 @@
 
     document.addEventListener("keydown", handleKey);
     $("typingText").addEventListener("click", function () { /* 保持焦点用 */ });
+
+    // 屏幕键盘：触摸设备上这是**唯一**的输入方式，必须真的能点。
+    // 用事件委托，键盘重绘多少次都只挂一个监听。
+    var kbdHost = $("kbd");
+    if (kbdHost) {
+      kbdHost.addEventListener("click", function (ev) {
+        var el = ev.target;
+        while (el && el !== kbdHost && !el.getAttribute("data-k")) el = el.parentNode;
+        if (!el || el === kbdHost) return;
+        var k = el.getAttribute("data-k");
+        if (k === "__shift") {          // 粘性 Shift：按一下再按字母
+          S.touchShift = !S.touchShift;
+          renderKeyboard();
+          return;
+        }
+        if (k === "__back") { backspace(); hideTouchNote(); return; }
+        var ch = S.touchShift ? shiftedOf(k) : k;
+        S.touchShift = false;
+        typeChar(ch);                   // typeChar 里会重绘键盘
+        hideTouchNote();
+      });
+    }
+
+    // 用屏幕键盘打过字了，就把"需要实体键盘"的提示收起来
+    function hideTouchNote() {
+      var n = $("touchNote");
+      if (n) n.classList.add("kb-ok");
+    }
 
     $("btnAgain").addEventListener("click", function () {
       if (S.lesson) startLesson(S.lesson.id);

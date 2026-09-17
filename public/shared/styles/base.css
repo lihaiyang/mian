@@ -73,17 +73,8 @@ button, input, select, textarea {
   flex-direction: column;
 }
 
-/* ⚠️ 已废弃：页面头部请用 chrome.css 的 .topbar。
-   这个类是全平台统一顶栏之前的旧写法，留着只会让人再多写一种头部，
-   所以它不再被任何页面引用。下一个要删的就是它。 */
-.page-head {
-  position: sticky; top: 0; z-index: 20;
-  display: flex; align-items: center; gap: var(--s3);
-  padding: var(--s3) var(--s5);
-  background: color-mix(in srgb, var(--paper) 88%, transparent);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--line);
-}
+/* 已删除：`.page-head`（统一顶栏之前的旧写法，全仓库 0 处引用）。
+   留着只会让人再多写一种头部，而且它的 backdrop-filter 还缺 -webkit- 前缀。 */
 
 .page-body {
   flex: 1;

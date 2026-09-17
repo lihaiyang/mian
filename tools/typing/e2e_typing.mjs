@@ -149,7 +149,113 @@ check("有徽章已点亮", (await page.locator("#pfBadges .ty-badge.got").count
 await page.click("#progressModal [data-close]");
 await sleep(200);
 
-// ---------------------------------------------------------------- 9. 大厅里键盘岛已可进入
+// ---------------------------------------------------------------- 9. 触摸设备（手机/平板）
+// 这一节是回归测试：键盘图原来是一堆 <span>（aria-hidden、没绑任何事件），
+// 手机上点它毫无反应也没有提示 —— 整个学科在触摸设备上是 0% 可用的。
+// 现在它是一组真按钮，所以这里用**真的触摸上下文**验一遍。
+const touchCtx = await browser.newContext({
+  viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2
+});
+const tp = await touchCtx.newPage();
+const touchErrors = [];
+tp.on("pageerror", (e) => touchErrors.push(e.message));
+await tp.goto(BASE + "/typing/", { waitUntil: "domcontentloaded" });
+await tp.waitForSelector(".ty-lesson", { timeout: 20000 });
+await sleep(400);
+
+check("触摸设备上提示怎么用（不再是「点它不会输入」）",
+  /点下面的屏幕键盘|手指/.test(await tp.textContent("#touchNote")),
+  (await tp.textContent("#touchNote")).replace(/\s+/g, " ").trim().slice(0, 46));
+
+await tp.locator(".ty-lesson").first().click();
+await sleep(500);
+
+const kb = await tp.evaluate(() => {
+  const keys = Array.from(document.querySelectorAll("#kbd .kbd-key"));
+  const rects = keys.map((e) => e.getBoundingClientRect());
+  return {
+    total: keys.length,
+    buttons: keys.filter((e) => e.tagName === "BUTTON").length,
+    ariaHidden: document.getElementById("kbd").getAttribute("aria-hidden"),
+    role: document.getElementById("kbd").getAttribute("role"),
+    left: Math.min(...rects.map((r) => r.left)),
+    right: Math.max(...rects.map((r) => r.right)),
+    height: Math.round(rects[0].height),
+    vw: document.documentElement.clientWidth,
+    scroll: document.documentElement.scrollWidth,
+    hasShift: !!document.querySelector('#kbd .kbd-key[data-k="__shift"]'),
+    hasBack: !!document.querySelector('#kbd .kbd-key[data-k="__back"]')
+  };
+});
+check("屏幕键盘是真的按钮", kb.total >= 48 && kb.buttons === kb.total, `${kb.buttons}/${kb.total} 个 button`);
+check("屏幕键盘不再对读屏隐藏", kb.ariaHidden === null && kb.role === "group");
+check("键盘整块落在屏幕里（不用横向滚动）",
+  kb.left >= 0 && kb.right <= kb.vw + 1 && kb.scroll <= kb.vw + 1,
+  `left=${Math.round(kb.left)} right=${Math.round(kb.right)} vw=${kb.vw}`);
+check("键够大（≥44px 高，手指够得着）", kb.height >= 44, `${kb.height}px`);
+check("底行有 Shift 和退格", kb.hasShift && kb.hasBack);
+
+// 真的点它 → 必须打进一个字
+const progBefore = await tp.evaluate(() => document.getElementById("progressFill").style.width);
+const touchNextKey = await tp.evaluate(() => {
+  const n = document.querySelector("#kbd .kbd-key.next");
+  return n ? n.getAttribute("data-k") : null;
+});
+if (touchNextKey) await tp.click(`#kbd .kbd-key[data-k="${touchNextKey}"]`);
+await sleep(300);
+const afterTap = await tp.evaluate(() => ({
+  prog: document.getElementById("progressFill").style.width,
+  ok: document.querySelectorAll(".ty-text .ch.ok").length,
+  note: document.getElementById("touchNote").classList.contains("kb-ok")
+}));
+check("点屏幕键盘真的能打字（进度会动）",
+  afterTap.ok >= 1 && afterTap.prog !== progBefore,
+  `进度 ${progBefore} → ${afterTap.prog}，正确 ${afterTap.ok} 字`);
+check("打过之后顶部提示自动收起", afterTap.note);
+
+// 粘性 Shift：标点关里「?」必须靠它打得出来
+const punctIdx = await tp.evaluate(() => {
+  const ls = Array.from(document.querySelectorAll(".ty-lesson"));
+  return ls.findIndex((el) => /标点/.test(el.textContent));
+});
+await tp.goto(BASE + "/typing/", { waitUntil: "domcontentloaded" });
+await tp.waitForSelector(".ty-lesson");
+await sleep(300);
+await tp.locator(".ty-lesson").nth(punctIdx >= 0 ? punctIdx : 0).click();
+await sleep(400);
+let shiftOk = false, shiftUsed = 0;
+for (let i = 0; i < 130; i++) {
+  const st = await tp.evaluate(() => {
+    const cur = document.querySelector(".ty-text .ch.cur");
+    const nx = document.querySelector("#kbd .kbd-key.next");
+    return {
+      ch: cur ? cur.textContent : null,
+      next: nx ? nx.getAttribute("data-k") : null,
+      hint: document.getElementById("shiftHint").textContent.trim()
+    };
+  });
+  if (st.ch === null || !st.next) break;
+  if (st.hint) {
+    await tp.click('#kbd .kbd-key[data-k="__shift"]');
+    shiftUsed++;
+    await sleep(50);
+    shiftOk = true;
+  }
+  await tp.click(`#kbd .kbd-key[data-k="${st.next}"]`).catch(() => {});
+  await sleep(50);
+}
+const punctRes = await tp.evaluate(() => ({
+  ok: document.querySelectorAll(".ty-text .ch.ok").length,
+  bad: document.querySelectorAll(".ty-text .ch.bad").length
+}));
+check("靠屏幕键盘 + 粘性 Shift 能打完标点关（一个都不错）",
+  shiftOk && punctRes.bad === 0 && punctRes.ok > 20,
+  `用了 ${shiftUsed} 次 Shift，正确 ${punctRes.ok} / 错 ${punctRes.bad}`);
+
+check("触摸设备上没有 JS 报错", touchErrors.length === 0, touchErrors.slice(0, 2).join(" | "));
+await touchCtx.close();
+
+// ---------------------------------------------------------------- 10. 大厅里键盘岛已可进入
 await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
 await page.waitForSelector(".subject-card", { timeout: 15000 });
 await sleep(400);
@@ -159,7 +265,7 @@ check("卡片指向 /typing/", (await ty.getAttribute("href")) === "/typing/");
 check("大厅卡片显示了我的经验", ((await ty.textContent()) || "").includes("经验"),
   (await ty.textContent() || "").trim().slice(0, 40));
 
-// ---------------------------------------------------------------- 10. 没有 JS 报错
+// ---------------------------------------------------------------- 11. 没有 JS 报错
 check("没有 JS 报错", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
 
 await browser.close();

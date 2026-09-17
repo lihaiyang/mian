@@ -20,11 +20,11 @@
   <script src="/shared/core/topbar.js?v=e382f937"></script>
   <script src="/shared/core/account-ui.js?v=74e0317f"></script>
   <link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
-  <link rel="stylesheet" href="/shared/styles/chrome.css?v=c0c00792">
+  <link rel="stylesheet" href="/shared/styles/chrome.css?v=a70f5710">
 
   <!-- 全局自定义少儿样式。它开头的 :root 已经把变量接到平台令牌上了，
        所以下面 3000 行布局不用改就换了质感。 -->
-  <link rel="stylesheet" href="css/style.css?v=bc4134b5" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
+  <link rel="stylesheet" href="css/style.css?v=a3a1c5dc" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
 <!-- 装到手机主屏（PWA）：一个站一个图标，离线也能打开 -->
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
@@ -237,9 +237,14 @@
         <button class="magic-fix-btn" id="btnStepMode" title="单步模式：一行一行运行，看清楚每一步">🐾 单步</button>
         <button class="magic-fix-btn" id="btnSnapshot" title="回到上一次成功运行时的代码">⏪ 上次成功</button>
         <div class="tool-spacer"></div>
-        <button class="icon-btn" id="btnZoomOut" title="缩小字体（Ctrl 和 - 一起按）" data-page-node-id="KCBTwDtfL5eC0xnVVPdazf">A-</button>
-        <button class="icon-btn" id="btnZoomIn" title="放大字体（Ctrl 和 = 一起按）" data-page-node-id="TjCRKKfbLb61zyC3EUfXhl">A+</button>
-        <button class="icon-btn" id="btnBigFont" title="护眼大字号模式（一键切换）">🔤</button>
+        <!-- 字号三件套包成一组：窄屏换行时它们**要么全在这一行、要么整体下去**。
+             以前是三个独立按钮，320 宽下 A- 留在上一行行尾、A+ 掉到下一行最左边，
+             中间隔着整个面板宽度 —— 孩子想调大字，找到 A- 却找不到 A+。 -->
+        <div class="tool-group">
+          <button class="icon-btn" id="btnZoomOut" title="缩小字体（Ctrl 和 - 一起按）" data-page-node-id="KCBTwDtfL5eC0xnVVPdazf">A-</button>
+          <button class="icon-btn" id="btnZoomIn" title="放大字体（Ctrl 和 = 一起按）" data-page-node-id="TjCRKKfbLb61zyC3EUfXhl">A+</button>
+          <button class="icon-btn" id="btnBigFont" title="护眼大字号模式（一键切换）">🔤</button>
+        </div>
       </div>
 
       <!-- 常用魔法积木栏（移到编辑器上方，更方便孩子点击） -->

@@ -52,9 +52,9 @@
 .ty-lesson {
   display: flex; align-items: center; gap: var(--s2);
   width: 100%;
-  min-height: 38px;
+  min-height: var(--tap-min, 44px);
   padding: 0 var(--s2);
-  margin-bottom: 2px;
+  margin-bottom: 4px;
   border: 0;
   border-radius: var(--r-btn);
   background: transparent;
@@ -161,7 +161,7 @@
   transition: width .12s linear;
 }
 
-/* 键盘图 */
+/* 键盘图 —— 现在它是**真的能点**的（触摸设备上这是唯一的输入方式） */
 .ty-kbd { margin-top: var(--s4); user-select: none; }
 .kbd-row { display: flex; justify-content: center; gap: 5px; margin-bottom: 5px; }
 .kbd-key {
@@ -175,7 +175,21 @@
   color: var(--ink-soft);
   font-family: var(--font-mono);
   font-size: 13px;
+  /* <button> 复位：不写的话浏览器会给它自己的字体和背景 */
+  cursor: pointer;
+  touch-action: manipulation;          /* 去掉双击缩放那 300ms 的等待 */
+  -webkit-tap-highlight-color: transparent;
+  appearance: none;
 }
+.kbd-key:active { transform: translateY(1px); border-bottom-width: 1px; }
+/* 粘性 Shift：按一下亮起来，再按字母就出大写 */
+.kbd-key.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+.kbd-mod { min-width: 52px; }
 .kbd-key.next {
   background: var(--accent);
   border-color: var(--accent);
@@ -201,6 +215,16 @@
   background: var(--accent); color: var(--accent-ink);
 }
 .kbd-space { min-width: 260px; }
+
+/* 触摸设备：这一行 10 个键**必须挤得进屏幕**。
+   固定 min-width: 38px 的话，390 宽的屏上 10 个键要 425px，直接溢出。
+   所以让它们等分宽度、允许缩到 min-width 以下，高度给到 44（手指够得着）。 */
+@media (hover: none), (pointer: coarse) {
+  .kbd-row { gap: 3px; }
+  .kbd-key { flex: 1 1 0; min-width: 0; height: 44px; padding: 0; font-size: 15px; }
+  .kbd-mod { flex: 1.6 1 0; font-size: 16px; }
+  .kbd-space { flex: 3 1 0; min-width: 0; }
+}
 
 .ty-kbd-hint {
   display: flex; justify-content: center; gap: var(--s4);
@@ -362,24 +386,27 @@
 @media (max-width: 720px) {
   .ty-card { padding: var(--s4); }
 
-  /* 键盘图 13 列放不进 390px：让整块横向滚动，
-     不要让它把页面撑出横向滚动条。 */
-  .ty-kbd { overflow-x: auto; padding-bottom: var(--s1); }
+  /* 键盘：以前它只是"指法示意图"，放不进就横向滚动。
+     现在它是**真的输入方式**（手机上没有别的办法打字），
+     横向滚动等于"要打的那个键在屏幕外"，所以改成一行 10 个键等分宽度、整块不滚。 */
+  .ty-kbd { overflow: visible; }
   .kbd-row {
-    justify-content: flex-start;
-    width: max-content;
+    justify-content: stretch;
+    width: auto;
     gap: 3px;
     margin-bottom: 3px;
   }
   .kbd-key {
-    min-width: 26px; height: 30px;
-    padding: 0 4px;
-    font-size: 10px;
+    flex: 1 1 0; min-width: 0;
+    height: var(--tap-min, 44px);
+    padding: 0;
+    font-size: 13px;
     border-radius: 6px;
     border-bottom-width: 2px;
   }
+  .kbd-mod { flex: 1.8 1 0; font-size: 15px; }
   .kbd-key.next { border-bottom-width: 1px; }
-  .kbd-space { min-width: 120px; }
+  .kbd-space { flex: 3.2 1 0; min-width: 0; }
 
   .ty-text {
     font-size: 18px;

@@ -10,11 +10,11 @@
 
 <!-- 平台层样式（全站唯一一份） -->
 <link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
-<link rel="stylesheet" href="/shared/styles/base.css?v=3c099506">
-<link rel="stylesheet" href="/shared/styles/components.css?v=4999769f">
-<link rel="stylesheet" href="/shared/styles/chrome.css?v=c0c00792">
+<link rel="stylesheet" href="/shared/styles/base.css?v=7c284c2b">
+<link rel="stylesheet" href="/shared/styles/components.css?v=15b61969">
+<link rel="stylesheet" href="/shared/styles/chrome.css?v=a70f5710">
 <!-- 本学科特有样式 -->
-<link rel="stylesheet" href="css/typing.css?v=3ac090f0">
+<link rel="stylesheet" href="css/typing.css?v=ded1c3e5">
 
 <style>
   /* 学科主色：只覆盖这三个变量，其余全用平台令牌 */
@@ -81,18 +81,16 @@
   <main class="page-body">
 
     <!-- 触摸设备提示。
-         打字练的是**实体键盘上的手指位置**，屏幕上画的那张键盘图是指法示意，
-         点它不会输入。以前没有这句话：孩子在平板上看到一块很像键盘的图，
-         本能去点，什么都不会发生 —— 没有报错、没有提示，只会认为页面坏了。
-
-         CSS 负责在触摸设备上显示它（不依赖 JS）；一旦真的收到物理按键
-         （说明接了蓝牙键盘），下面这段 JS 会自动把它收起来。 -->
+         以前屏幕上那张键盘图是 <span> 画的装饰，点了毫无反应，也没有任何提示 ——
+         孩子在平板上进来选一关，点什么都没动静，只会认为页面坏了。
+         现在它是一组真按钮（点一下 = 敲一下），底行还补了 ⇧ 和 ⌫；
+         这段提示只在触摸设备上出现，而且点过屏幕键盘 / 收到物理按键之后自动收起。 -->
     <div class="ty-touch-note" id="touchNote">
-      <span class="ty-touch-ico" aria-hidden="true">⌨️</span>
+      <span class="ty-touch-ico" aria-hidden="true">👆</span>
       <span class="ty-touch-text">
-        <b>打字练习需要实体键盘</b>
-        手机 / 平板请先用蓝牙接一个键盘，或者换电脑打开。
-        下面的键盘图只是指法示意，点它不会输入。
+        <b>手指也能练：点下面的屏幕键盘</b>
+        想练真正的指法，接个蓝牙键盘更好；点屏幕键盘同样能过关，只是练不到手感。
+        大写字母先点 <b>⇧</b> 再点字母。
       </span>
       <a class="btn ghost sm" href="/">换个学科</a>
     </div>
@@ -135,7 +133,9 @@
             <div class="ty-progress"><i id="progressFill"></i></div>
           </div>
 
-          <div class="ty-kbd" id="kbd" aria-hidden="true"></div>
+          <!-- 屏幕键盘：触摸设备上这是唯一的输入方式，所以**不是**装饰，
+               也**不能** aria-hidden（里头的键是真按钮）。 -->
+          <div class="ty-kbd" id="kbd" role="group" aria-label="屏幕键盘，点一下等于敲一下"></div>
           <div class="ty-kbd-hint" id="kbdHint">
             <span id="shiftHint"></span>
             <span>用 <b id="fingerHint"></b></span>
@@ -243,7 +243,7 @@
 <script src="/shared/core/registry.js?v=5065a79c"></script>
 <script src="subject.js?v=4ddfca25"></script>
 <script src="data/lessons.js?v=9af62ac6"></script>
-<script src="js/typing.js?v=37108298"></script>
+<script src="js/typing.js?v=0e090cb4"></script>
 
 <script src="/shared/core/pwa.js?v=3a9ce5f9"></script>
 </body>

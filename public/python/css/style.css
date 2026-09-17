@@ -123,6 +123,7 @@ body {
 .app-header {
   height: 50px;
   background: var(--panel-bg-glass);
+  -webkit-backdrop-filter: blur(12px);   /* iOS 18 以下只认带前缀的 */
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-color);
   padding: 0 14px;
@@ -1120,6 +1121,7 @@ body.dark-mode .turtle-canvas-container {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   display: none;
   align-items: center;
@@ -3160,4 +3162,86 @@ body.dark-mode .sync-btn.is-error { background: #3B1D1D; }
 @media (hover: none), (pointer: coarse) {
   .folder-head .folder-actions { display: flex; }
   .folder-head .folder-count { display: none; }
+}
+
+/* ============================================================================
+   触摸设备与 iOS 的收尾（来源：.shots/mobile-audit/REPORT.md）
+   ---------------------------------------------------------------------------
+   A-2  字号三件套在 320/360 宽下被拆到两行：A- 在上一行行尾、A+ 在下一行最左边，
+        中间隔着整个面板宽度。孩子想调大字，找到 A- 却找不到 A+。
+        → 包成 .tool-group（nowrap），要换行就整体换行。
+   B-2  这个学科**一处都没用**项目自己的触摸令牌 --tap-min: 44px：
+        .icon-btn 28×28、.snippet-chip 高 24、标签关闭 18×18、运行按钮高 35。
+        小学生手指粗，误触率很高。→ 触摸设备上统一抬到能用的大小。
+   B-3  文件行的「改名 / 删除」也是 :hover 才出现。触摸端靠浏览器给的"粘性
+        hover"能用，但点别处就消失，没有任何视觉提示。→ 触摸设备上常显。
+   C-3  iOS 在聚焦 font-size < 16px 的输入框时会把**整页**放大，
+        弹窗按钮被顶出屏幕。这个学科有 3 个这样的输入框。→ 触摸设备上给 16px。
+   C-4  body{height:100vh} + overflow:hidden：iOS 上 100vh 比可视区高 60–90px，
+        而页面级滚动被禁用，那一段永远拉不出来。→ 有 dvh 就用 dvh。
+   ========================================================================== */
+
+/* A-2 字号三件套是一个整体，永远不拆行 */
+.tool-group {
+  display: flex; align-items: center; gap: 4px;
+  flex: 0 0 auto; flex-wrap: nowrap;
+}
+
+/* C-4：iOS 15.4+ / Chrome 108+ 认 dvh（动态视口高度）。
+   不认的老浏览器继续用上面那条 100vh —— 这是渐进而非替换。 */
+@supports (height: 100dvh) {
+  body { height: 100dvh; }
+  .app-workspace { height: calc(100dvh - 50px); }
+}
+
+@media (hover: none), (pointer: coarse) {
+  /* B-2 触摸目标 */
+  .icon-btn { width: 40px; height: 40px; font-size: 16px; }
+  .editor-tool-bar .icon-btn { width: 44px; height: 36px; font-size: 15px; }
+  .file-action-btn { width: 34px; height: 34px; font-size: 15px; }
+  .tab-action-btn { min-width: 34px; min-height: 34px; }
+  .snippet-chip { min-height: 34px; font-size: 12px; padding: 0 10px; }
+  .editor-tab-close { width: 26px; height: 26px; font-size: 14px; }
+  #btnRunCode { min-height: 44px; }
+  #snippetsToggle { min-width: 34px; min-height: 30px; }
+  .modal-btn, #btnConfirmOk, #btnConfirmCancel { min-height: 40px; }
+
+  /* B-3 文件动作按钮常显（和文件夹那三个一致） */
+  .file-item .file-actions { display: flex; }
+
+  /* C-3 输入框字号 ≥16px，否则 iOS 聚焦时会把整页放大 */
+  input, textarea, select { font-size: 16px; }
+  #terminalInput, #fileModalInput, #profileNameInput { font-size: 16px; }
+}
+
+/* B-2 补漏：这两处的小尺寸是**更高优先级的选择器**写的，上面那条
+   `.file-action-btn` 盖不住它们，得用同样的选择器在触摸设备上再写一次。 */
+@media (hover: none), (pointer: coarse) {
+  .folder-head .file-action-btn { width: 32px; height: 32px; font-size: 14px; }
+  .header-btn.learn-top-btn { min-width: 40px; min-height: 40px; }
+}
+
+/* ============================================================================
+   C-1 补：Python 的顶栏自己也吃安全区
+   ---------------------------------------------------------------------------
+   平台页用的是 chrome.css 的 .topbar（它已经算了 env(safe-area-inset-top)），
+   Python 的顶栏是**自己写的** .app-header —— 原来没有这一条，
+   在刘海屏上「← 大厅」的 top 是 3px，整个按钮压在状态栏/灵动岛底下。
+   实测（CDP 注入 iPhone 安全区 top=47）：修复前 top=3，修复后 top=55。
+
+   写法注意：padding 简写会覆盖掉这里，所以高度改用 min-height，
+   并在窄屏那条 `padding: 0 var(--s2)` 里把安全区再算一次。 */
+.app-header {
+  height: auto;
+  min-height: calc(50px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.app-workspace {
+  /* 顶栏变高了，工作区要跟着让位，否则底部会被顶出屏幕 */
+  height: calc(100vh - 50px - env(safe-area-inset-top, 0px));
+}
+@supports (height: 100dvh) {
+  .app-workspace {
+    height: calc(100dvh - 50px - env(safe-area-inset-top, 0px));
+  }
 }

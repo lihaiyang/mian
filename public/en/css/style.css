@@ -733,3 +733,10 @@ p, .card-sub, .island-desc, .panda-text, .modal-body, .bp-zh, .setting-hint,
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* 触摸设备：顶栏头像按钮在 ≤360 宽下只有 38×40（差 2px 到下限）。
+   下面是手机/平板的兜底，桌面不受影响。 */
+@media (hover: none), (pointer: coarse) {
+  .topbar .hud-profile { min-width: 44px; justify-content: center; }
+  .tabbar .tab { min-height: 44px; }
+}

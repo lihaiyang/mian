@@ -244,7 +244,20 @@
   /* 大厅只有品牌 + 一个按钮，放得下，所以保留名字 */
   .topbar--keep-name .topbar-brand .tb-name { display: inline; }
   .topbar-back .tb-back-label { display: none; }
-  .topbar-back { padding: 0 10px; }
+  /* ⚠️ 文字藏掉之后「←」只剩 37px 宽 —— 比触摸目标下限还小，
+     而它是全站**唯一**的回大厅入口。补一个 min-width 把它撑到 44。 */
+  .topbar-back { padding: 0 10px; min-width: 44px; justify-content: center; }
+}
+
+/* ---------------------------------------------------------------- 触摸设备
+   手指比鼠标粗得多。项目自己的令牌是 --tap-min: 44px，
+   桌面保持紧凑，触摸设备上把偏小的控件抬到能用的大小。 */
+
+@media (hover: none), (pointer: coarse) {
+  .topbar-back { min-height: 44px; min-width: 44px; justify-content: center; }
+  .topbar-actions .btn,
+  .status-pill { min-height: 40px; }
+  .topbar-gear { width: 40px; height: 40px; }
 }
 
 /* ---------------------------------------------------------------- 账号与同步面板 */
