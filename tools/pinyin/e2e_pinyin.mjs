@@ -131,20 +131,28 @@ check("声母和韵母能单独点读（拆开听）",
 check("拼读题有 4 个选项", q1.choices.length === 4);
 check("进度显示第几题", /第 1 \/ 8 题/.test(q1.progress), q1.progress);
 
-// 干扰项必须同韵母同声调（只差声母）
-const distractorOk = await page.evaluate(() => {
-  const all = window.PY_SYLLABLES;
+// 干扰项：至少同韵母（练声母辨析），且**绝不能同音**（同音等于两个正确答案）。
+// 这条以前是"必须同韵母同声调"，但实测 352 个音节里有 22 个凑不出 3 个，
+// 会静默退化成"随便挑" —— 所以改成逐级判据，并把级次报出来。
+const dstat = await page.evaluate(() => {
   const bySyl = {};
-  all.forEach((x) => { bySyl[x.s] = x; });
-  const shown = Array.from(document.querySelectorAll(".py-choice")).map((e) => bySyl[e.getAttribute("data-syl")]).filter(Boolean);
+  window.PY_SYLLABLES.forEach((x) => { bySyl[x.s] = x; });
+  const shown = Array.from(document.querySelectorAll(".py-choice"))
+    .map((e) => bySyl[e.getAttribute("data-syl")]).filter(Boolean);
   if (shown.length < 4) return { ok: false, why: "选项不足 4 个" };
-  const correct = shown.find((x) => x.sp);
+  const correct = shown.find((x) => x.sp && x.s === document.querySelector(".py-part-all").getAttribute("data-key").slice(2));
+  if (!correct) return { ok: false, why: "选项里找不到正确项" };
   const others = shown.filter((x) => x !== correct);
-  const same = others.filter((x) => x.f === correct.f && x.t === correct.t);
-  return { ok: same.length === others.length, why: `${same.length}/${others.length} 个干扰项同韵母同声调` };
+  const homophone = others.filter((x) => x.py === correct.py);
+  const sameFinal = others.filter((x) => x.f === correct.f);
+  const exact = others.filter((x) => x.f === correct.f && x.t === correct.t && x.i !== correct.i);
+  return {
+    ok: homophone.length === 0 && sameFinal.length >= 1,
+    why: `同音 ${homophone.length} 个；同韵母 ${sameFinal.length}/3；同韵母同声调 ${exact.length}/3`
+  };
 });
-check("干扰项同韵母同声调（练的是声母辨析，不是瞎猜）",
-  distractorOk.ok, distractorOk.why);
+check("干扰项不含同音字（同音 = 两个正确答案）", dstat.ok && !/同音 [1-9]/.test(dstat.why), dstat.why);
+check("干扰项优先同韵母（练的是声母辨析）", /同韵母 [123]\/3/.test(dstat.why), dstat.why);
 
 // 答对
 const correctSyl = await page.evaluate(() => {

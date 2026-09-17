@@ -159,16 +159,40 @@
     var row = S.pdOrder.pop();
     if (!row) { S.pdOrder = []; return newPd(false); }
     S.pd = row;
-    // 干扰项：**同韵母 + 同声调**、只差声母的 3 个。
-    // 这样考的是"听声母"（b/p、n/l、zh/z 这些正是孩子最容易混的），
-    // 而不是靠声调或韵母的不同去猜。
-    var same = pdPool().filter(function (r) {
-      return r.s !== row.s && r.f === row.f && r.t === row.t && r.i !== row.i;
-    });
-    var pool = same.length >= 3 ? same
-      : pdPool().filter(function (r) { return r.s !== row.s && r.i !== row.i; });
-    S.pdChoices = shuffled([row].concat(shuffled(pool, row.s).slice(0, 3)), row.s + ":pick");
+    S.pdChoices = shuffled([row].concat(pickDistractors(row)), row.s + ":pick");
     renderPd();
+  }
+
+  /**
+   * 选 3 个干扰项。**这是这个学科最需要想清楚的地方**：
+   * 干扰项决定孩子到底在练什么。
+   *
+   * 逐级降级（越靠前越好，因为越接近"只差一个音素"）：
+   *   ① 同韵母 + 同声调、不同声母 —— 只差声母，练的正是 b/p、n/l、zh/z 这些最容易混的
+   *   ② 同韵母、不同声母（声调可以不同）—— 还是练声母，但多了声调线索
+   *   ③ 同韵母（允许同声母，但**必须不同声调**，否则就是同音字）
+   *   ④ 实在没有同韵母的（实测 352 个里只有 6 个），退到声母相同、韵母不同
+   *
+   * ⚠️ 两条硬约束：
+   *   · 绝不能出现**读音完全相同**的干扰项 —— 那等于两个正确答案，孩子选哪个都对/都错
+   *   · 同一个字也不能重复出现
+   */
+  function pickDistractors(row) {
+    var pool = pdPool().filter(function (r) {
+      return r.s !== row.s && r.c !== row.c && r.py !== row.py;
+    });
+    var tiers = [
+      function (r) { return r.f === row.f && r.t === row.t && r.i !== row.i; },
+      function (r) { return r.f === row.f && r.i !== row.i; },
+      function (r) { return r.f === row.f && r.t !== row.t; },
+      function (r) { return r.i === row.i && r.f !== row.f; }
+    ];
+    for (var i = 0; i < tiers.length; i++) {
+      var hit = pool.filter(tiers[i]);
+      if (hit.length >= 3) return shuffled(hit, row.s + ":" + i).slice(0, 3);
+    }
+    // 最后兜底：任何读音不同的音节（不让练习空着）
+    return shuffled(pool, row.s + ":x").slice(0, 3);
   }
 
   function renderPd() {
@@ -393,4 +417,16 @@
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
+
+  /* 给测试用的最小出口。
+     为什么值得开这个口子：干扰项的挑选规则（pickDistractors）是这个学科
+     最需要盯住的地方，而它只在"点进来的某一道题"上体现 ——
+     352 个音节里抽样测几道是看不出问题的（实测有 22 个音节凑不出同韵母干扰项，
+     抽样测试完全没发现，是压测才抓到的）。
+     tools/pinyin/check_choices.mjs 会拿这个出口在**全部音节**上跑一遍。
+     ⚠️ 测试必须调这里的真函数，不能抄一份实现 —— 抄了迟早跟实现漂移。 */
+  window.PinyinDebug = {
+    pickDistractors: typeof pickDistractors === "function" ? pickDistractors : null,
+    pdPool: pdPool
+  };
 })();
