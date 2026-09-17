@@ -96,6 +96,7 @@
         S.grade = g;
         renderGrades();
         renderUnits();
+        renderSheetScope(true);   // 范围跟着年级走
       });
       host.appendChild(b);
     });
@@ -204,7 +205,7 @@
       if (typeof Progress !== "undefined") {
         Progress.emit("correct", {});
         // 专题计数（徽章用）
-        var tag = topicTag(u);
+        var tag = topicTag(u, it);
         if (tag) Progress.emit("correct_" + tag, {});
         Progress.recordBest("bestStreak", S.bestStreak);
       }
@@ -228,11 +229,13 @@
   }
 
   /** 专题标签：给"分数/小数/应用题"这类专题徽章计数用 */
-  function topicTag(u) {
+  function topicTag(u, it) {
     if (!u) return "";
     if (/分数/.test(u.unit) || /分数/.test(u.title)) return "frac";
     if (/小数/.test(u.unit) || /小数/.test(u.title)) return "dec";
-    if (/问题解决/.test(u.unit) || /应用/.test(u.title)) return "word";
+    if (/问题/.test(u.unit) || /应用/.test(u.title)) return "word";
+    // 单元名里没写"问题"的也照样是应用题：题干是一句话，不是一个算式
+    if (it && !isExpr(it.q) && /[？?]/.test(it.q)) return "word";
     return "";
   }
 
@@ -330,6 +333,191 @@
     inp.focus();
   }
 
+  // ---------------------------------------------------------------- 题卡（打印）
+  //
+  // 给家长/老师用的一条独立通道：**不答题，直接出纸**。
+  // 范围（本年级 / 某个单元 / 全年级混合）、题量、答案要不要打、
+  // 换一批 —— 直到满意为止，然后交给浏览器打印。
+  //
+  // 抽题是「按单元轮流拿」再打乱：直接随机抽的话，60 道题可能一半来自同一个单元。
+
+  var SHEET = {
+    scope: "",        // "grade:3" / "unit:g3_mul1" / "all"
+    count: 30,
+    ans: "last",      // none 不打 / last 单独一页 / inline 每题后面
+    seed: 1,          // 「换一批」就是把它 +1
+    items: []
+  };
+
+  function defaultScope() { return "grade:" + S.grade; }
+
+  /** 把范围选择器里的值翻译成 {label, items} */
+  function sheetPool() {
+    var v = SHEET.scope || defaultScope();
+    var out = { label: "", items: [] };
+    if (v.indexOf("unit:") === 0) {
+      var u = unitById(v.slice(5));
+      if (u) { out.label = u.title; out.items = u.items.slice(); }
+    } else if (v === "all") {
+      out.label = "1-6 年级混合";
+      UNITS.forEach(function (u) { out.items = out.items.concat(u.items); });
+    } else {
+      var g = Number(v.slice(6)) || S.grade;
+      var list = unitsOfGrade(g);
+      out.label = g + " 年级 · " + list.length + " 个单元";
+      list.forEach(function (u) { out.items = out.items.concat(u.items); });
+    }
+    if (!out.items.length) { out.label = "本年级"; out.items = UNITS[0] ? UNITS[0].items.slice() : []; }
+    return out;
+  }
+
+  /** 按单元轮流抽 n 道，再整体打乱 —— 一张卷子不该偏科 */
+  function pickSpread(items, n, seed) {
+    var groups = {}, order = [];
+    items.forEach(function (it) {
+      var k = String(it.id).replace(/_\d+$/, "");
+      if (!groups[k]) { groups[k] = []; order.push(k); }
+      groups[k].push(it);
+    });
+    var bags = shuffled(order, "u" + seed).map(function (k) {
+      return shuffled(groups[k], k + ":" + seed);
+    });
+    var out = [], guard = 0;
+    while (out.length < n && guard < 500) {
+      var moved = false;
+      for (var j = 0; j < bags.length && out.length < n; j++) {
+        if (bags[j].length) { out.push(bags[j].shift()); moved = true; }
+      }
+      if (!moved) break;
+      guard++;
+    }
+    return shuffled(out, "o" + seed);
+  }
+
+  /** 每道题占多宽：短算式一行挤 4 道，应用题自己占一整行 */
+  function widthClass(q) {
+    var n = String(q).length;
+    if (n <= 7) return "w25";
+    if (n <= 12) return "w33";
+    if (n <= 20) return "w50";
+    return "w100";
+  }
+
+  /** 纯算式（可以写 "… ="）还是个问句（要写 "答："） */
+  function isExpr(q) { return /^[\d\s+\-×÷*/()]+$/.test(String(q)); }
+
+  function probHtml(it, n) {
+    var q = esc(it.q);
+    var expr = isExpr(it.q);
+    var w = widthClass(it.q);
+    // 一句话的题（问句）整行铺开，答案写在下面的"答："
+    var long = !expr && String(it.q).length > 20;
+    var inline = SHEET.ans === "inline";
+    var num = '<span class="ma-prob-n">' + n + "</span>";
+
+    if (long) {
+      return '<div class="ma-prob long ' + w + '">' + num +
+        '<span class="ma-prob-q">' + q + "</span>" +
+        '<span class="ma-prob-ans"><span class="ma-prob-lead">答：</span>' +
+        '<span class="ma-prob-blank"></span>' +
+        (inline ? '<b class="ma-prob-key">' + esc(it.a) + "</b>" : "") +
+        "</span></div>";
+    }
+    return '<div class="ma-prob ' + w + '">' + num +
+      '<span class="ma-prob-q">' + q + (expr ? " =" : "") + "</span>" +
+      (inline ? '<b class="ma-prob-key">' + esc(it.a) + "</b>"
+              : '<span class="ma-prob-blank"></span>') +
+      "</div>";
+  }
+
+  function sheetDate() {
+    var d = new Date();
+    return d.getFullYear() + " 年 " + (d.getMonth() + 1) + " 月 " + d.getDate() + " 日";
+  }
+
+  /** 卷子叫什么：看**范围**（不是这一批题）—— 否则点一次「换一批」标题就变了 */
+  function sheetName(items) {
+    var n = 0;
+    items.forEach(function (it) { if (isExpr(it.q)) n++; });
+    return n * 2 >= items.length ? "口算题卡" : "数学练习";
+  }
+
+  /** 出这张卷子。reshuffle=true 时换一批题（seed+1） */
+  function renderSheet(reshuffle) {
+    var host = $("sheet");
+    if (!host) return;
+    if (reshuffle) SHEET.seed++;
+
+    var pool = sheetPool();
+    var n = Math.min(SHEET.count, pool.items.length);
+    SHEET.items = pickSpread(pool.items, n, pool.label + "|" + SHEET.seed);
+
+    var grid = SHEET.items.map(function (it, i) { return probHtml(it, i + 1); }).join("");
+
+    var html =
+      '<div class="ma-sheet-title">' +
+        "<b>" + sheetName(pool.items) + " · 萌学园数学岛</b>" +
+        "<span>" + esc(pool.label) + "　·　" + esc(sheetDate()) + "</span>" +
+      "</div>" +
+      '<div class="ma-flow">' + grid + "</div>" +
+      '<div class="ma-sheet-foot">' +
+        "<span>姓名：________________</span>" +
+        "<span>用时：________ 分</span>" +
+        "<span>得分：________</span>" +
+        "<span>共 " + SHEET.items.length + " 题</span>" +
+      "</div>";
+
+    if (SHEET.ans === "last") {
+      html += '<div class="ma-sheet-answers">' +
+        '<div class="ma-sheet-title"><b>答案 · 家长/老师用</b><span>共 ' +
+          SHEET.items.length + " 题</span></div>" +
+        '<div class="ma-ans-grid">' +
+        SHEET.items.map(function (it, i) {
+          return '<div class="ma-ans"><b>' + (i + 1) + "</b><span>" + esc(it.a) + "</span></div>";
+        }).join("") +
+        "</div></div>";
+    }
+
+    host.innerHTML = html;
+    if ($("sheetInfo")) {
+      // 「从 25 道里抽 25 道」本身就是那句解释：不是只能出 25，是这个范围只有 25
+      $("sheetInfo").textContent = "从 " + pool.items.length + " 道里抽 " +
+        SHEET.items.length + " 道 · 第 " + SHEET.seed + " 批";
+    }
+  }
+
+  function openSheet() {
+    renderSheetScope(true);
+    renderSheet(false);
+    $("sheetOverlay").hidden = false;
+    document.body.style.overflow = "hidden";
+    if (typeof Progress !== "undefined") Progress.emit("sheet", {});
+  }
+
+  function closeSheet() {
+    $("sheetOverlay").hidden = true;
+    document.body.style.overflow = "";
+  }
+
+  /** 范围下拉：本年级 / 各单元 / 全年级混合 */
+  function renderSheetScope(resetSel) {
+    var sel = $("sheetScope");
+    if (!sel) return;
+    var prev = resetSel ? "" : (SHEET.scope || sel.value);
+    var list = unitsOfGrade(S.grade);
+    var opts = ['<option value="grade:' + S.grade + '">' + S.grade + " 年级 · 全部单元</option>"];
+    list.forEach(function (u) {
+      opts.push('<option value="unit:' + esc(u.id) + '">' + esc(u.title) + "</option>");
+    });
+    opts.push('<option value="all">1-6 年级混合</option>');
+    sel.innerHTML = opts.join("");
+
+    var ok = false;
+    for (var i = 0; i < sel.options.length; i++) if (sel.options[i].value === prev) ok = true;
+    sel.value = ok ? prev : "grade:" + S.grade;
+    SHEET.scope = sel.value;
+  }
+
   // ---------------------------------------------------------------- 进度面板
 
   function bindModal(btnId, modalId, onOpen) {
@@ -394,6 +582,7 @@
     renderGrades();
     renderUnits();
     renderKeypad();
+    renderSheetScope(true);
 
     $("btnCheck").addEventListener("click", check);
     $("btnSkip").addEventListener("click", skip);
@@ -413,12 +602,29 @@
     });
     // 物理键盘直接输数字也顺手（孩子接了键盘就能用）
     document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape" && $("sheetOverlay") && !$("sheetOverlay").hidden) { closeSheet(); return; }
+      if ($("sheetOverlay") && !$("sheetOverlay").hidden) return;   // 题卡打开时不往答题框里塞字
       if ($("playCard").style.display === "none") return;
       if (document.activeElement === $("answer")) return;
       if (/^[0-9.]$/.test(ev.key)) { $("answer").value += ev.key; $("answer").focus(); }
     });
 
     bindModal("btnProgress", "progressModal", refreshProgressPanel);
+
+    // 题卡：不答题，直接出纸
+    if ($("btnSheet")) $("btnSheet").addEventListener("click", openSheet);
+    if ($("btnPrint")) $("btnPrint").addEventListener("click", function () { window.print(); });
+    if ($("btnCloseSheet")) $("btnCloseSheet").addEventListener("click", closeSheet);
+    if ($("btnReshuffle")) $("btnReshuffle").addEventListener("click", function () { renderSheet(true); });
+    if ($("sheetScope")) $("sheetScope").addEventListener("change", function (ev) {
+      SHEET.scope = ev.target.value; SHEET.seed = 1; renderSheet(false);
+    });
+    if ($("sheetCount")) $("sheetCount").addEventListener("change", function (ev) {
+      SHEET.count = Number(ev.target.value) || 30; renderSheet(false);
+    });
+    if ($("sheetAns")) $("sheetAns").addEventListener("change", function (ev) {
+      SHEET.ans = ev.target.value; renderSheet(false);
+    });
 
     if (typeof Progress !== "undefined") {
       Progress.init();

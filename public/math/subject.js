@@ -57,7 +57,16 @@
       // 做满一组（默认 10 题）
       round: { xp: 15, counters: ["rounds"] },
       // 一组全对
-      perfect: { xp: 20, counters: ["perfect"], when: function (e) { return !!e.perfect; } }
+      perfect: { xp: 20, counters: ["perfect"], when: function (e) { return !!e.perfect; } },
+      // 生成一张可打印的题卡（家长/老师用，和做题是两条通道）
+      sheet: { xp: 4, counters: ["sheets"] },
+      // 专题计数：数学岛在答对时会 emit "correct_frac" / "correct_dec" / "correct_word"。
+      // ⚠️ 事件名必须在这里声明，否则 Progress.emit 会**静默丢掉**（只打一句 console.warn），
+      // 于是"分数小能手""小数小能手""应用题达人"三个徽章和"做对 3 道应用题"这个每日任务
+      // 永远拿不到计数、永远解锁不了。
+      correct_frac: { xp: 1, counters: ["frac_correct"] },
+      correct_dec: { xp: 1, counters: ["dec_correct"] },
+      correct_word: { xp: 1, counters: ["word_correct"] }
     };
     // 每个年级一条"通关"事件，徽章能精确到年级
     GRADES.forEach(function (g) {
@@ -106,6 +115,10 @@
           when: function (s) { return (s.dec_correct || 0) >= 30; } },
         { id: "ma_word", emoji: "🧩", title: "应用题达人", cat: "专题", desc: "应用题做对 30 题",
           when: function (s) { return (s.word_correct || 0) >= 30; } },
+        { id: "ma_sheet1", emoji: "🖨️", title: "第一张题卡", cat: "打印", desc: "生成第一张可打印的题卡",
+          when: function (s) { return (s.sheets || 0) >= 1; } },
+        { id: "ma_sheet10", emoji: "📄", title: "十张题卡", cat: "打印", desc: "累计生成 10 张题卡",
+          when: function (s) { return (s.sheets || 0) >= 10; } },
         { id: "ma_allgrade", emoji: "👑", title: "六个年级都摸过", cat: "坚持", desc: "每个年级都做过题",
           when: function (s) {
             return GRADES.every(function (g) { return (s["clear_g" + g] || 0) >= 1; });
@@ -138,7 +151,8 @@
         { id: "ma_d_3", emoji: "💯", title: "拿到 1 次全对", key: "perfect", need: 1, xp: 18 },
         { id: "ma_d_4", emoji: "✏️", title: "做满 20 道题", key: "answered", need: 20, xp: 15 },
         { id: "ma_d_5", emoji: "🔥", title: "连对 8 题", key: "bestStreakToday", need: 8, xp: 20 },
-        { id: "ma_d_6", emoji: "🧩", title: "做对 3 道应用题", key: "word_correct", need: 3, xp: 18 }
+        { id: "ma_d_6", emoji: "🧩", title: "做对 3 道应用题", key: "word_correct", need: 3, xp: 18 },
+        { id: "ma_d_7", emoji: "🖨️", title: "打印 1 张题卡", key: "sheets", need: 1, xp: 12 }
       ]
     });
   };

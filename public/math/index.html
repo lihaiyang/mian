@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="/shared/styles/components.css?v=2264217d">
 <link rel="stylesheet" href="/shared/styles/chrome.css?v=c0c00792">
 <!-- 本学科特有样式 -->
-<link rel="stylesheet" href="css/math.css?v=9d1064d0">
+<link rel="stylesheet" href="css/math.css?v=ae26c8ea">
 
 <style>
   /* 学科主色：只覆盖这三个变量，其余全用平台令牌 */
@@ -36,7 +36,10 @@
   <script>
     Topbar.mount({
       mount: "#topbar", emoji: "🔢", name: "数学岛",
-      actions: [{ id: "btnProgress", label: "我的进度", emoji: "📊" }],
+      actions: [
+        { id: "btnSheet", label: "打印题卡", emoji: "🖨️" },
+        { id: "btnProgress", label: "我的进度", emoji: "📊" }
+      ],
       status: [{ id: "btnSync", tone: "off", emoji: "☁️", label: "云同步", title: "云同步：还没开启" }],
       settings: [{ id: "btnAccount", emoji: "☁️", label: "账号与云同步" }]
     });
@@ -125,6 +128,38 @@
   </footer>
 </div>
 
+<!-- ================= 题卡（可打印） =================
+     给家长/老师用的：选范围 → 选题量 → 「换一批」直到满意 → 打印。
+     题全部来自同一套题库（答案由 Python 算过），不是现场随机编的。 -->
+<div class="ma-sheet-overlay" id="sheetOverlay" hidden>
+  <div class="ma-sheet-bar">
+    <label class="ma-sheet-opt">范围
+      <select id="sheetScope" aria-label="题卡范围"></select>
+    </label>
+    <label class="ma-sheet-opt">题量
+      <select id="sheetCount" aria-label="题卡题量">
+        <option value="20">20 题</option>
+        <option value="30" selected>30 题</option>
+        <option value="40">40 题</option>
+        <option value="60">60 题</option>
+      </select>
+    </label>
+    <label class="ma-sheet-opt">答案
+      <select id="sheetAns" aria-label="答案打印方式">
+        <option value="none">不打印</option>
+        <option value="last" selected>单独一页</option>
+        <option value="inline">每题后面</option>
+      </select>
+    </label>
+    <button type="button" class="btn ghost sm" id="btnReshuffle">🔁 换一批</button>
+    <span style="flex:1"></span>
+    <span class="ma-sheet-info" id="sheetInfo"></span>
+    <button type="button" class="btn" id="btnPrint">🖨️ 打印</button>
+    <button type="button" class="btn ghost" id="btnCloseSheet">关闭</button>
+  </div>
+  <div class="ma-sheet" id="sheet"></div>
+</div>
+
 <!-- ================= 进度弹窗（由平台层渲染） ================= -->
 <div class="modal-overlay" id="progressModal">
   <div class="modal-card" style="max-width:560px;max-height:82vh;overflow:auto">
@@ -166,9 +201,9 @@
 <script src="/shared/core/progress.js?v=acdd9b68"></script>
 <script src="/shared/core/sync.js?v=70663565"></script>
 <script src="/shared/core/registry.js?v=0d6e477b"></script>
-<script src="subject.js?v=2818c3f1"></script>
+<script src="subject.js?v=2d81d14b"></script>
 <script src="data/problems.js?v=3d3c8d09"></script>
-<script src="js/math.js?v=04a567d7"></script>
+<script src="js/math.js?v=75ae9035"></script>
 
 </body>
 </html>

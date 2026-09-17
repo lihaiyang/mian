@@ -148,7 +148,168 @@ const wired = await page.evaluate(() => ({
 check("Progress 已挂载", wired.progress);
 check("Sync 已挂载（云同步不用学科自己写）", wired.sync);
 
-// ---------------------------------------------------------------- 6. 大厅卡片
+// ---------------------------------------------------------------- 6. 打印题卡
+// 家长通道：不答题，直接出纸。这里要盯死两件事 ——
+//   ① 卷子上的题和答案必须一一对应（错位比难看严重得多）
+//   ② 题全部来自同一套题库，不是现场随机编的
+await page.goto(BASE + "/math/", { waitUntil: "domcontentloaded" });
+await page.waitForSelector(".ma-unit", { timeout: 20000 });
+await sleep(400);
+
+check("顶栏有「打印题卡」按钮", (await page.locator("#btnSheet").count()) === 1);
+await page.click("#btnSheet");
+await sleep(400);
+check("题卡覆盖层打开", await page.locator("#sheetOverlay").isVisible());
+check("默认出 30 道题", (await page.locator("#sheet .ma-prob").count()) === 30,
+      `${await page.locator("#sheet .ma-prob").count()} 道`);
+check("默认带一页答案", (await page.locator(".ma-sheet-answers").count()) === 1);
+check("答案条数和题目一致",
+      (await page.locator(".ma-ans").count()) === (await page.locator("#sheet .ma-prob").count()),
+      `${await page.locator(".ma-ans").count()} 条`);
+check("卷头有姓名/得分栏", /姓名/.test(await page.textContent(".ma-sheet-foot")));
+check("有打印按钮", await page.locator("#btnPrint").isVisible());
+
+/** 把卷子上的题目抠出来（去掉行尾的 " ="） */
+const sheetQs = () => page.evaluate(() =>
+  Array.from(document.querySelectorAll("#sheet .ma-prob")).map((el) => {
+    const q = el.querySelector(".ma-prob-q").textContent.trim();
+    return q.endsWith("=") ? q.slice(0, -1).trim() : q;
+  }));
+
+/** 题目 → 题库里所有可能的答案 */
+const answersInBank = (qs) => page.evaluate((list) => {
+  const byQ = {};
+  (window.MATH_UNITS || []).forEach((u) => u.items.forEach((i) => {
+    (byQ[i.q] = byQ[i.q] || []).push(i.a);
+  }));
+  return list.map((q) => byQ[q] || null);
+}, qs);
+
+// ① 每一道题都在题库里能找到
+let qs = await sheetQs();
+const found = await answersInBank(qs);
+check("卷子上的题全部来自题库", found.every((x) => x !== null),
+      `${found.filter((x) => x === null).length} 道对不上`);
+
+// ② 答案和题目一一对应（错位是致命伤）
+const printed = await page.evaluate(() =>
+  Array.from(document.querySelectorAll(".ma-ans")).map((el) => el.querySelector("span").textContent));
+const mismatch = [];
+for (let i = 0; i < qs.length; i++) {
+  if (!found[i]) continue;
+  if (!found[i].includes(printed[i])) mismatch.push(`${i + 1}. ${qs[i]} → ${printed[i]} ≠ ${found[i][0]}`);
+}
+check("答案和题号一一对应", mismatch.length === 0, mismatch.slice(0, 3).join(" | "));
+
+// ③ 纯算式的答案另外独立算一遍（不查题库，直接算数）
+const calcBad = await page.evaluate(({ list, ans }) => {
+  const bad = [];
+  const toNum = (s) => {
+    s = String(s).trim();
+    const f = s.match(/^(-?\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+    if (f) return Number(f[1]) / Number(f[2]);
+    const n = Number(s);
+    return isNaN(n) ? null : n;
+  };
+  list.forEach((q, i) => {
+    if (!/^[\d\s+\-×÷*/()]+$/.test(q)) return;
+    const expr = q.replace(/×/g, "*").replace(/÷/g, "/");
+    let v;
+    try { v = Function('"use strict";return (' + expr + ")")(); } catch (e) { return; }
+    const a = toNum(ans[i]);
+    if (a === null || Math.abs(v - a) > 1e-9) bad.push(`${q} = ${ans[i]}（算出来 ${v}）`);
+  });
+  return bad;
+}, { list: qs, ans: printed });
+check("算式题的答案算一遍都对", calcBad.length === 0, calcBad.slice(0, 3).join(" | "));
+
+// 范围：切到某个单元后，题目必须全部来自那个单元
+await page.selectOption("#sheetScope", "unit:g1_add10");
+await sleep(300);
+qs = await sheetQs();
+const inUnit = await page.evaluate((list) => {
+  const u = window.MATH_UNITS.find((x) => x.id === "g1_add10");
+  const set = new Set(u.items.map((i) => i.q));
+  return list.every((q) => set.has(q));
+}, qs);
+check("选「某个单元」后只出这个单元的题", inUnit, `${qs.length} 道`);
+
+// 「换一批」要真的换
+const before = (await sheetQs()).join("|");
+await page.click("#btnReshuffle");
+await sleep(300);
+const after = (await sheetQs()).join("|");
+check("「换一批」换掉了题目", before !== after);
+// 这个单元只有 25 道题，要 30 道就只能给 25 道 —— 而且要说清楚为什么
+check("题量超过范围存量时按存量出", (await page.locator("#sheet .ma-prob").count()) === 25,
+      `${await page.locator("#sheet .ma-prob").count()} 道`);
+check("信息栏写着从多少道里抽多少道、第几批", /从 25 道里抽 25 道 · 第 2 批/.test(await page.textContent("#sheetInfo")),
+      await page.textContent("#sheetInfo"));
+
+// 答案的三种模式
+const nUnit = await page.locator("#sheet .ma-prob").count();
+await page.selectOption("#sheetAns", "none");
+await sleep(200);
+check("「不打印答案」时没有答案页", (await page.locator(".ma-sheet-answers").count()) === 0);
+check("「不打印答案」时题目还在", (await page.locator("#sheet .ma-prob").count()) === nUnit);
+await page.selectOption("#sheetAns", "inline");
+await sleep(200);
+const inline = await page.locator(".ma-prob-key").count();
+check("「每题后面」时每道题都带答案", inline === nUnit, `${inline} 个`);
+
+// 题量
+await page.selectOption("#sheetAns", "last");
+await page.selectOption("#sheetCount", "20");
+await sleep(300);
+check("题量改成 20 生效", (await page.locator("#sheet .ma-prob").count()) === 20);
+
+// 1-6 年级混合：应该出现不止一个年级的题
+await page.selectOption("#sheetScope", "all");
+await sleep(300);
+const gradeSpread = await page.evaluate(() => {
+  const gs = new Set();
+  const idx = {};
+  (window.MATH_UNITS || []).forEach((u) => u.items.forEach((i) => { idx[i.q] = u.grade; }));
+  document.querySelectorAll("#sheet .ma-prob-q").forEach((el) => {
+    const q = el.textContent.trim().replace(/\s*=$/, "");
+    if (idx[q]) gs.add(idx[q]);
+  });
+  return gs.size;
+});
+check("「1-6 年级混合」真的混了年级", gradeSpread >= 3, `${gradeSpread} 个年级`);
+
+// 成长：出卷子也算一件事（但和做题是两条通道）
+const sheetXp = await page.evaluate(() => {
+  const c = (typeof Progress !== "undefined" && Progress.counters) ? Progress.counters() : {};
+  const b = (typeof Progress !== "undefined" && Progress.badges) ? Progress.badges() : [];
+  return { sheets: c.sheets || 0, badge: b.some((x) => x.id === "ma_sheet1" && x.got) };
+});
+check("出题卡记了 sheets 计数", sheetXp.sheets >= 1, `${sheetXp.sheets} 次`);
+check("「第一张题卡」徽章点亮", sheetXp.badge);
+
+// 手机上不能横向溢出（题卡的列数在窄屏是靠 CSS 收的）
+await page.setViewportSize({ width: 390, height: 844 });
+await sleep(400);
+const overflow = await page.evaluate(() => {
+  const vw = document.documentElement.clientWidth;
+  const bad = [];
+  document.querySelectorAll("#sheetOverlay *").forEach((el) => {
+    const r = el.getBoundingClientRect();
+    if (r.width && r.right > vw + 1) bad.push((el.className || el.tagName) + " right=" + Math.round(r.right));
+  });
+  return { vw, bad, doc: document.documentElement.scrollWidth };
+});
+check("手机上题卡不横向溢出", overflow.bad.length === 0 && overflow.doc <= overflow.vw + 1,
+      `vw=${overflow.vw} scroll=${overflow.doc} ${overflow.bad.slice(0, 2).join(" | ")}`);
+await page.screenshot({ path: ".shots/math-sheet-mobile.png", fullPage: false });
+await page.setViewportSize({ width: 1280, height: 900 });
+await sleep(200);
+
+await page.click("#btnCloseSheet");
+await sleep(200);
+check("关闭后回到页面", !(await page.locator("#sheetOverlay").isVisible()));
+
+// ---------------------------------------------------------------- 7. 大厅卡片
 await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
 await page.waitForSelector(".subject-card", { timeout: 15000 });
 await sleep(500);

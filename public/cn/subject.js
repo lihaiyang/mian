@@ -40,11 +40,17 @@
     Progress.define("cn", {
       // 这个学科是工具，不是练习册 —— 事件只统计"用了多少"，
       // 不做"每天必须来"的打卡压力。
-      events: {
-        lookup:   { xp: 1, counters: ["lookups"] },
-        sheet:    { xp: 5, counters: ["sheets"] },
-        browse:   { xp: 1, counters: ["browses"], when: function (e) { return (e.n || 0) >= 12; } }
-      },
+      events: (function () {
+        var ev = {
+          lookup:   { xp: 1, counters: ["lookups"] },
+          sheet:    { xp: 5, counters: ["sheets"] }
+        };
+        // 六个级别各一条"看过"事件：徽章 cn_alllevel 判的是 s.lv1…s.lv6，
+        // ⚠️ 事件名不在这里声明的话，Progress.emit("lv3") 会被**静默丢掉**
+        // （只打一句 console.warn），"六级都看过"这个徽章就永远解不开。
+        for (var i = 1; i <= 6; i++) ev["lv" + i] = { xp: 1, counters: ["lv" + i] };
+        return ev;
+      })(),
 
       badges: [
         { id: "cn_first", emoji: "🔍", title: "第一次查字", cat: "入门", desc: "查了第一个字",
