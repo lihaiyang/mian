@@ -231,20 +231,27 @@ await sleep(900);
 const xz0 = await page.evaluate(() => {
   const inp = document.getElementById("xzInput");
   const box = document.getElementById("xzBox");
+  const r = window.PinyinDebug.xzRow();
+  // 页面上不能出现**这一题的答案**（完整的带调号拼音）。
+  // ⚠️ 不能笼统地查"有没有带调号的字母"：声调键上写着 ā á ǎ à（那是样例，
+  //    一年级孩子光看调号认不出形状），所以要把那排键排除掉再查。
+  const clone = box.cloneNode(true);
+  const pick = clone.querySelector(".py-tone-pick");
+  if (pick) pick.remove();
   return {
     hasInput: !!inp,
     tones: document.querySelectorAll(".py-tbtn").length,
     hk: document.querySelectorAll("[data-k]").length,
     fontSize: parseFloat(getComputedStyle(inp).fontSize),
-    // 页面上不该出现带调号的拼音（那就是答案）
-    leaked: /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/.test(box.textContent)
+    leaked: r ? clone.textContent.indexOf(r.py) >= 0 : false,
+    answer: r ? r.py : ""
   };
 });
 check("写拼音页签能打开，有输入框", xz0.hasInput);
 check("有 4 个声调键", xz0.tones === 4, String(xz0.tones));
 check("有 ü 和 ⌫ 辅助键", xz0.hk === 2, String(xz0.hk));
 check("输入框字号 ≥16px（否则 iOS 聚焦会放大整页）", xz0.fontSize >= 16, xz0.fontSize + "px");
-check("写之前页面上不泄露答案（没有带调号的拼音）", !xz0.leaked);
+check("写之前页面上不泄露答案（本题答案没被写出来）", !xz0.leaked, `本题答案 ${xz0.answer}`);
 
 /** 等下一道听写题就绪（判完到自动下一题之间输入框是锁着的） */
 async function xzNext() {

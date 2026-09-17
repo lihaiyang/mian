@@ -48,7 +48,9 @@
   var XZ_ROUND = 8;     // 写拼音一组 8 题
 
   var TONE_NAME = { 1: "第一声", 2: "第二声", 3: "第三声", 4: "第四声" };
-  var TONE_SIGN = { 1: "ˉ", 2: "ˊ", 3: "ˇ", 4: "ˋ" };
+  // 声调键上写什么：**带字母的样例**（ā á ǎ à），不是光秃秃的调号 ˉ ˊ ˇ ˋ ——
+  // 调号离开字母就没有形状，一年级孩子认不出来（实测截图里就是四个小符号）。
+  var TONE_SIGN = { 1: "ā", 2: "á", 3: "ǎ", 4: "à" };
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
