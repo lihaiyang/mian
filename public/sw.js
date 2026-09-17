@@ -85,7 +85,7 @@ self.addEventListener("activate", (e) => {
  * 这一步让"没去过的学科"离线也能用（数学题库 132K、汉字表 820K）。
  * Python 的 pyodide 十几 MB 刻意不碰：那属于"用到才下载"。
  * -------------------------------------------------------------------------- */
-const PREFETCH_PAGES = ["/", "/python/", "/typing/", "/math/", "/cn/", "/review/", "/parent/"];
+const PREFETCH_PAGES = ["/", "/python/", "/typing/", "/math/", "/cn/", "/pinyin/", "/review/", "/parent/"];
 const ASSET_RE = /(?:src|href)="([^"#]+?\.(?:js|css)(?:\?[^"]*)?)"/g;
 
 /* Python 特殊对待：它的运行时（pyodide）在 /vendor 下有十几 MB，

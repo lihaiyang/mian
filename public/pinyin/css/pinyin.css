@@ -1,0 +1,313 @@
+/* ============================================================================
+ * 拼音岛 · 学科样式
+ *
+ * 只用平台令牌（tokens.css），本学科只覆盖 --accent 三个变量（见 index.html）。
+ * 拼音的排版有两个硬要求：
+ *   ① 拼音字母要**大**。一年级孩子正在建立"字形↔读音"的对应，字小了看不清声调符号。
+ *   ② 声调符号必须看得见（āáǎà 的调号在上面），所以行高和上边距不能省。
+ * ========================================================================== */
+
+/* ---------------------------------------------------------------- 头部 */
+
+.py-hero { margin-bottom: var(--s5); }
+.py-hero h1 { font-size: var(--fs-h1); margin-bottom: var(--s2); }
+.py-hero p { color: var(--ink-soft); max-width: 62ch; }
+
+.py-note { color: var(--muted); font-size: var(--fs-sm); }
+
+/* ---------------------------------------------------------------- 页签 */
+
+.py-tabs {
+  display: flex; flex-wrap: wrap; gap: var(--s2);
+  margin-bottom: var(--s5);
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--line);
+}
+.py-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: var(--tap-min, 44px);
+  padding: 0 var(--s4);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-chip);
+  color: var(--ink-soft);
+  font-family: inherit; font-size: var(--fs-sm); font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.py-tab b { color: var(--muted); font-weight: 700; font-size: var(--fs-xs); }
+.py-tab:hover { border-color: var(--accent); }
+.py-tab.active {
+  background: var(--accent); border-color: var(--accent); color: var(--accent-ink);
+}
+.py-tab.active b { color: var(--accent-ink); opacity: .8; }
+
+.py-pane[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- 卡片网格 */
+
+.py-grid {
+  display: grid;
+  gap: var(--s3);
+}
+.py-grid-4 { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.py-grid-6 { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+
+.py-group { margin-bottom: var(--s5); }
+.py-group-name {
+  display: block; margin-bottom: var(--s3);
+  color: var(--muted); font-size: var(--fs-sm); font-weight: 700;
+}
+
+.py-card {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-height: 108px;
+  padding: var(--s3) var(--s2);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-1);
+  color: var(--ink);
+  font-family: inherit;
+  cursor: pointer;
+  transition: translate var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
+              border-color var(--dur) var(--ease);
+}
+.py-card:hover { translate: 0 -2px; box-shadow: var(--sh-2); border-color: var(--accent); }
+.py-card:active { translate: 0 0; scale: var(--press); }
+
+/* 拼音字母：要看得清声调符号，所以字号大、行高松 */
+.py-card-p {
+  font-family: var(--font-mono);
+  font-size: 26px; line-height: 1.35;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: .5px;
+}
+.py-card-c { font-size: 20px; font-weight: 700; line-height: 1.2; }
+.py-card-py { color: var(--muted); font-size: var(--fs-xs); }
+.py-card-tip {
+  margin-top: 2px; color: var(--muted);
+  font-size: 11px; line-height: 1.35; text-align: center;
+}
+.py-card-play {
+  position: absolute; right: 6px; top: 6px;
+  font-size: 12px; opacity: .5;
+}
+/* 点下去的一瞬间给个反馈，否则点了不知道有没有生效 */
+.py-ping { border-color: var(--accent) !important; background: var(--accent-soft) !important; }
+
+/* ---------------------------------------------------------------- 四声 */
+
+.py-tone-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: var(--s3);
+  margin-bottom: var(--s4);
+  padding: var(--s3) var(--s4);
+  background: var(--accent-soft);
+  border-radius: var(--r-card);
+  font-size: var(--fs-sm);
+}
+.py-tones {
+  display: grid; gap: var(--s3);
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+.py-tone {
+  padding: var(--s4);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  text-align: center;
+  box-shadow: var(--sh-1);
+}
+/* 三声最难（先降再升），标出来提醒多听两遍 */
+.py-tone-hard { border-color: var(--accent); }
+.py-tone-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: var(--s2);
+}
+.py-tone-n { font-size: var(--fs-sm); font-weight: 700; }
+.py-tone-mark {
+  font-family: var(--font-mono); font-size: 22px; color: var(--accent); font-weight: 700;
+}
+.py-tone-big {
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+  width: 100%; min-height: 96px;
+  padding: var(--s2);
+  background: transparent; border: 1px dashed var(--line-strong);
+  border-radius: var(--r-btn);
+  color: var(--ink);
+  font-family: inherit;
+  cursor: pointer;
+}
+.py-tone-big:hover { border-color: var(--accent); background: var(--accent-soft); }
+.py-tone-py {
+  font-family: var(--font-mono); font-size: 30px; line-height: 1.4;
+  font-weight: 700; color: var(--accent);
+}
+.py-tone-c { font-size: 24px; font-weight: 700; }
+.py-tone-tip {
+  margin-top: var(--s2); color: var(--muted);
+  font-size: var(--fs-xs); line-height: 1.4;
+}
+.py-tone-name { margin-top: var(--s2); }
+
+/* ---------------------------------------------------------------- 拼读练习 */
+
+.py-pd-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: var(--s4);
+  color: var(--muted); font-size: var(--fs-sm);
+}
+.py-pd-score { font-variant-numeric: tabular-nums; }
+
+/* 三步拼读：声母 ＋ 韵母 ＝ 音节 */
+.py-pd-split {
+  display: flex; align-items: center; justify-content: center;
+  flex-wrap: wrap; gap: var(--s2);
+  margin-bottom: var(--s4);
+}
+.py-part {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-width: 96px; min-height: 88px;
+  padding: var(--s3);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  color: var(--ink);
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: var(--sh-1);
+}
+.py-part:hover { border-color: var(--accent); }
+.py-part-p {
+  font-family: var(--font-mono); font-size: 30px; line-height: 1.3;
+  font-weight: 700; color: var(--accent);
+}
+.py-part-l { color: var(--muted); font-size: var(--fs-xs); }
+.py-plus, .py-eq { font-size: 24px; color: var(--muted); font-weight: 700; }
+.py-part-all { border-style: dashed; border-color: var(--accent); }
+.py-part-all .py-part-p { color: var(--muted); }
+
+.py-ask {
+  margin-bottom: var(--s3);
+  text-align: center; font-weight: 700;
+}
+.py-choices {
+  display: grid; gap: var(--s3);
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+}
+.py-choice {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-height: 104px;
+  padding: var(--s3);
+  background: var(--paper-2);
+  border: 2px solid var(--line);
+  border-radius: var(--r-card);
+  color: var(--ink);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease), translate var(--dur) var(--ease);
+}
+.py-choice:hover { translate: 0 -2px; border-color: var(--accent); }
+.py-choice-py {
+  font-family: var(--font-mono); font-size: 24px; line-height: 1.35;
+  font-weight: 700; color: var(--accent);
+}
+.py-choice-c { font-size: 22px; font-weight: 700; }
+.py-choice.right { border-color: var(--ok); background: var(--ok-soft); }
+.py-choice.wrong { border-color: var(--bad); background: var(--bad-soft); }
+.py-choice:disabled { cursor: default; }
+
+.py-pd-actions {
+  display: flex; gap: var(--s3); justify-content: center;
+  margin-top: var(--s5);
+}
+
+.py-finish { text-align: center; padding: var(--s5) 0; }
+.py-finish h2 { margin-bottom: var(--s4); }
+.py-finish-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: var(--s3); margin-bottom: var(--s5);
+}
+.py-finish-grid > div {
+  padding: var(--s3);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+.py-finish-grid b { display: block; font-size: 24px; color: var(--accent); }
+.py-finish-grid span { color: var(--muted); font-size: var(--fs-sm); }
+
+.py-foot-note {
+  margin-top: var(--s6); padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+  color: var(--muted); font-size: var(--fs-xs);
+}
+
+/* ---------------------------------------------------------------- 进度弹窗 */
+
+.py-pf-level {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: var(--s3); margin-bottom: var(--s3);
+  background: var(--paper-2); border-radius: var(--r-card);
+}
+.py-pf-level b { font-size: 20px; }
+.py-pf-bar {
+  flex: 1; height: 8px; background: var(--line);
+  border-radius: 999px; overflow: hidden;
+}
+.py-pf-bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 999px; }
+.py-sec-title {
+  margin: var(--s4) 0 var(--s2);
+  font-weight: 700; font-size: var(--fs-sm);
+}
+.py-daily {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px var(--s3); margin-bottom: 4px;
+  background: var(--paper-2); border-radius: var(--r-btn);
+  font-size: var(--fs-sm);
+}
+.py-daily.got { opacity: .6; text-decoration: line-through; }
+.py-daily b { font-variant-numeric: tabular-nums; }
+.py-badges, .py-medals {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  gap: var(--s2);
+}
+.py-badge, .py-medal {
+  padding: var(--s2) 4px; text-align: center;
+  background: var(--paper-3); border: 1px solid transparent;
+  border-radius: var(--r-btn);
+  font-size: 11px; color: var(--muted); opacity: .55;
+}
+.py-badge.got, .py-medal.got {
+  opacity: 1; background: var(--paper-2); border-color: var(--line); color: var(--ink);
+}
+.py-badge.got .py-badge-e, .py-medal.got .py-medal-e { font-size: 22px; }
+.py-badge-e, .py-medal-e { display: block; font-size: 20px; filter: grayscale(1); }
+.py-badge.got .py-badge-e, .py-medal.got .py-medal-e { filter: none; }
+.py-badge-t, .py-medal-t { display: block; margin-top: 2px; }
+
+/* ---------------------------------------------------------------- 窄屏与触摸 */
+
+@media (max-width: 620px) {
+  .py-grid-4 { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+  .py-grid-6 { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+  .py-card { min-height: 96px; padding: var(--s2) 6px; }
+  .py-card-p { font-size: 23px; }
+  .py-card-c { font-size: 18px; }
+  .py-card-tip { display: none; }       /* 手机上先保证看的清字母 */
+  .py-part { min-width: 78px; min-height: 78px; padding: var(--s2); }
+  .py-part-p { font-size: 26px; }
+  .py-choice { min-height: 92px; }
+  .py-choice-py { font-size: 21px; }
+  .py-tone-py { font-size: 26px; }
+  .py-choices { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* 触摸设备：去掉 hover 依赖，目标够大 */
+@media (hover: none), (pointer: coarse) {
+  .py-card:hover, .py-choice:hover, .py-part:hover { translate: 0 0; }
+  .py-card, .py-choice { min-height: 104px; }
+}

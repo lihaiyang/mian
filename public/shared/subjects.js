@@ -16,15 +16,10 @@ window.MIAN_SUBJECTS = {
     "/en/subject.js",
     "/typing/subject.js",
     "/math/subject.js",
-    "/cn/subject.js"
+    "/cn/subject.js",
+    "/pinyin/subject.js"
   ],
 
-  planned: [
-    {
-      id: "pinyin", name: "拼音岛", emoji: "🅰️",
-      tagline: "声母韵母、四声、拼读 —— 听准了才读得对",
-      accent: "#E8735A", accentSoft: "#FCE8E3",
-      grades: [1, 2]
-    }
-  ]
+  // 目前没有"敬请期待"的学科了 —— 五个学科全部上线
+  planned: []
 };

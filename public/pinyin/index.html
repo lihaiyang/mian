@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拼音岛 · 声母韵母与拼读 · 萌学园</title>
+<meta name="description" content="给一年级孩子的拼音点读：23 个声母、24 个韵母、四个声调、16 个整体认读音节，还有一步一步的拼读练习，点一下就发音。">
+<meta name="theme-color" content="#F8F5F1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%85%B0%EF%B8%8F%3C/text%3E%3C/svg%3E">
+
+<!-- 平台层样式（和其余学科同一套） -->
+<link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
+<link rel="stylesheet" href="/shared/styles/base.css?v=7c284c2b">
+<link rel="stylesheet" href="/shared/styles/components.css?v=15b61969">
+<link rel="stylesheet" href="/shared/styles/chrome.css?v=a70f5710">
+<!-- 本学科特有样式 -->
+<link rel="stylesheet" href="css/pinyin.css?v=75520adc">
+
+<style>
+  /* 学科主色：只覆盖这三个变量，其余全用平台令牌 */
+  :root { --accent: #E8735A; --accent-soft: #FCE8E3; --accent-ink: #FFFFFF; }
+</style>
+<!-- 装到手机主屏（PWA）：一个站一个图标，离线也能打开 -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+</head>
+<body>
+
+<a class="skip-link" href="#pyGrid">跳到拼音表</a>
+
+<div class="page">
+
+  <header id="topbar">
+    <!-- 脚本没跑起来时的兜底：回大厅的链接必须一直在 -->
+    <a class="topbar-back" href="/">← 大厅</a>
+  </header>
+  <script src="/shared/core/topbar.js?v=e382f937"></script>
+  <script src="/shared/core/account-ui.js?v=74e0317f"></script>
+  <script>
+    Topbar.mount({
+      mount: "#topbar", emoji: "🅰️", name: "拼音岛",
+      actions: [{ id: "btnProgress", label: "我的进度", emoji: "📊" }],
+      status: [{ id: "btnSync", tone: "off", emoji: "☁️", label: "云同步", title: "云同步：还没开启" }],
+      settings: [{ id: "btnAccount", emoji: "☁️", label: "账号与云同步" }]
+    });
+    if (window.AccountUI) {
+      var ab = document.getElementById("btnAccount");
+      if (ab) ab.addEventListener("click", function () { AccountUI.open(); });
+      var pill = document.getElementById("btnSync");
+      if (pill) {
+        pill.dataset.accBound = "1";
+        pill.addEventListener("click", function () { AccountUI.open(); });
+        var st = AccountUI.status();
+        Topbar.setStatus("btnSync", st.loggedIn
+          ? { tone: "ok", label: "已登录", title: "已登录（" + st.code + "）" }
+          : { tone: "off", label: "云同步", title: "还没开启云同步，点我开启" });
+      }
+      window.addEventListener("mian:account-changed", function (ev) {
+        var s = (ev.detail) || AccountUI.status();
+        Topbar.setStatus("btnSync", s.loggedIn
+          ? { tone: "ok", label: "已登录", title: "已登录（" + s.code + "）" }
+          : { tone: "off", label: "云同步", title: "还没开启云同步" });
+      });
+    }
+  </script>
+
+  <main class="page-body">
+
+    <section class="py-hero">
+      <h1>拼音：先听准，再读对</h1>
+      <p>点任意一张卡片就会发音。声母、韵母、四个声调都能单独听，也可以一步一步练拼读。</p>
+    </section>
+
+    <!-- 五个页签：前四个是"表"（点读），最后一个是"练"（做题） -->
+    <div class="py-tabs" role="tablist" aria-label="拼音分区">
+      <button type="button" class="py-tab active" data-tab="sm" role="tab" aria-selected="true">声母 <b>23</b></button>
+      <button type="button" class="py-tab" data-tab="ym" role="tab" aria-selected="false">韵母 <b>24</b></button>
+      <button type="button" class="py-tab" data-tab="sd" role="tab" aria-selected="false">四个声调</button>
+      <button type="button" class="py-tab" data-tab="zt" role="tab" aria-selected="false">整体认读 <b>16</b></button>
+      <button type="button" class="py-tab" data-tab="pd" role="tab" aria-selected="false">拼读练习</button>
+    </div>
+
+    <!-- 声母 / 韵母 / 整体认读：同一块网格，按页签重绘 -->
+    <section class="py-pane" id="pane-sm">
+      <div id="pyGrid"><div class="py-note">正在加载拼音表…</div></div>
+    </section>
+    <section class="py-pane" id="pane-ym" hidden><div id="pyGridYm"></div></section>
+    <section class="py-pane" id="pane-zt" hidden><div id="pyGridZt"></div></section>
+
+    <!-- 四个声调：妈麻马骂 -->
+    <section class="py-pane" id="pane-sd" hidden>
+      <div id="sdBox"><div class="py-note">正在加载…</div></div>
+    </section>
+
+    <!-- 拼读练习 -->
+    <section class="py-pane" id="pane-pd" hidden>
+      <div id="pdBox"><div class="py-note">正在准备…</div></div>
+    </section>
+
+    <p class="py-foot-note">
+      发音用 macOS 的标准普通话语音合成，共 454 条，逐条自检过（不是录音，也不联网）。
+    </p>
+
+  </main>
+
+  <footer class="page-foot">
+    <p>声母韵母按教材顺序排列；音节表从 3500 常用字里生成，不手写，所以不会造出不存在的音。</p>
+  </footer>
+</div>
+
+<!-- ================= 进度弹窗（由平台层渲染） ================= -->
+<div class="modal-overlay" id="progressModal">
+  <div class="modal-card" style="max-width:520px;max-height:82vh;overflow:auto">
+    <div class="modal-title"><span>📊 我的进度</span></div>
+    <div class="py-pf-level">
+      <div><b id="pfLevel">Lv.1</b><div class="py-note" id="pfTitle">初来乍到</div></div>
+      <div class="py-pf-bar"><i id="pfBar"></i></div>
+      <div class="py-note" style="font-size:12px"><span id="pfXp"></span> XP</div>
+    </div>
+    <div class="py-note" style="margin-top:10px;font-size:13px">连续打卡 <b id="pfStreak">0</b> 天</div>
+    <div class="py-sec-title">📋 今日任务</div>
+    <div id="pfDaily"></div>
+    <div class="py-sec-title">🎖️ 徽章 <span class="py-note" id="pfBadgeCount"></span></div>
+    <div class="py-badges" id="pfBadges"></div>
+    <div class="py-sec-title">🏅 奖牌 <span class="py-note" id="pfMedalCount"></span></div>
+    <div class="py-medals" id="pfMedals"></div>
+    <div class="modal-footer"><button class="btn ghost" data-close type="button">关闭</button></div>
+  </div>
+</div>
+
+<!-- ================= 平台层 → 学科 =================
+     顺序：store → progress → sync → 注册表 → 学科声明 → 数据 → 发音 → 学科逻辑 -->
+<script src="/shared/core/store.js?v=873bc876"></script>
+<script src="/shared/core/progress.js?v=e6e6e1c0"></script>
+<script src="/shared/core/sync.js?v=70663565"></script>
+<script src="/shared/core/registry.js?v=5065a79c"></script>
+<script src="subject.js?v=7c080c11"></script>
+<script src="data/initials.js?v=bf93156e"></script>
+<script src="data/finals.js?v=d3f32d51"></script>
+<script src="data/tones.js?v=7bae9e84"></script>
+<script src="data/whole.js?v=de088895"></script>
+<script src="data/syllables.js?v=52479e62"></script>
+<script src="js/voice.js?v=164f4baa"></script>
+<script src="js/pinyin.js?v=8ff65784"></script>
+<script src="/shared/core/pwa.js?v=3a9ce5f9"></script>
+</body>
+</html>
