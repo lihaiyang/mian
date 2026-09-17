@@ -39,6 +39,11 @@ const withTimeout = (page, fn, ms) => page.evaluate(
 const browser = await chromium.launch(
   process.env.CHROME_BIN ? { executablePath: process.env.CHROME_BIN } : {}
 );
+
+// 默认超时：本地 20s 够用，线上要放大 —— 这个站本来就是为"国内到 Cloudflare 不稳"做离线的，
+// 拿 20s 卡线上测出来的是网络抖动，不是产品问题。超时放大不拖慢通过的运行。
+const E2E_WAIT = Number(process.env.E2E_WAIT_MS || (/^https?:\/\/(127\.|localhost)/.test(BASE) ? 20000 : 60000));
+if (browser && browser.setDefaultTimeout) browser.setDefaultTimeout(E2E_WAIT);
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const page = await ctx.newPage();
 const errs = [];

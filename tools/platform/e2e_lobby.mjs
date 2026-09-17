@@ -33,6 +33,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let browser;
 try {
   browser = await chromium.launch({ channel: process.env.PW_CHANNEL || "chrome" });
+
+// 默认超时：本地 20s 够用，线上要放大 —— 这个站本来就是为"国内到 Cloudflare 不稳"做离线的，
+// 拿 20s 卡线上测出来的是网络抖动，不是产品问题。超时放大不拖慢通过的运行。
+const E2E_WAIT = Number(process.env.E2E_WAIT_MS || (/^https?:\/\/(127\.|localhost)/.test(BASE) ? 20000 : 60000));
+if (browser && browser.setDefaultTimeout) browser.setDefaultTimeout(E2E_WAIT);
 } catch (e) {
   browser = await chromium.launch();
 }

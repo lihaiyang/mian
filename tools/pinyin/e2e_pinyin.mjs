@@ -20,6 +20,11 @@ const pwSpec = process.env.PLAYWRIGHT_PATH
 const { chromium } = await import(pwSpec);
 
 const BASE = process.argv[2] || process.env.BASE || "http://127.0.0.1:8788";
+// 等元素出现的上限。本地 20s 绰绰有余，但**线上要放大**：
+// 这个站点本来就是为了"国内到 Cloudflare 不稳"而做离线的，
+// 拿 20s 去卡线上，测出来的是网络抖动，不是产品问题（实测 5 次里有 2 次假红）。
+// 超时放大不会拖慢通过的运行 —— 元素一出现就返回。
+const WAIT = Number(process.env.E2E_WAIT_MS || (/^https?:\/\/(127\.|localhost)/.test(BASE) ? 20000 : 60000));
 const out = [];
 let failed = 0;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -38,7 +43,7 @@ page.on("pageerror", (e) => errs.push(e.message));
 page.on("response", (r) => { if (r.status() >= 400) bad.push(r.status() + " " + r.url()); });
 
 await page.goto(BASE + "/pinyin/", { waitUntil: "domcontentloaded" });
-await page.waitForSelector(".py-card", { timeout: 20000 });
+await page.waitForSelector(".py-card", { timeout: WAIT });
 await sleep(700);
 
 // ---------------------------------------------------------------- 1. 数据
@@ -229,7 +234,7 @@ check("成长事件名都声明过（否则 Progress 会静默丢掉）",
 
 // ---------------------------------------------------------------- 5. 大厅
 await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
-await page.waitForSelector(".subject-card", { timeout: 20000 });
+await page.waitForSelector(".subject-card", { timeout: WAIT });
 await sleep(600);
 const card = page.locator('a.subject-card[data-subject="pinyin"]');
 check("大厅里拼音岛是可进入的卡片", (await card.count()) === 1);
@@ -243,7 +248,7 @@ check("没有学科还在「敬请期待」（五个都上线了）",
 // ---------------------------------------------------------------- 6. 手机
 await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(BASE + "/pinyin/", { waitUntil: "domcontentloaded" });
-await page.waitForSelector(".py-card", { timeout: 20000 });
+await page.waitForSelector(".py-card", { timeout: WAIT });
 await sleep(700);
 const mob = await page.evaluate(() => {
   const vw = document.documentElement.clientWidth;
