@@ -44,7 +44,8 @@
   var DAILY_COUNT = 3;        // 每天几条任务
   var HISTORY_DAYS = 400;     // days 最多保留多少天，防止无限增长
 
-  var def = null;             // 学科声明
+  var def = null;             // 学科声明（当前学科）
+  var specs = {};             // 所有 define 过的学科声明（大厅跨学科读用）
   var ns = null;              // 存储命名空间
   var cache = null;           // 当前档案的 stats 缓存
   var cacheKey = null;
@@ -544,11 +545,121 @@
     emitChange();
   }
 
+  // ---------------------------------------------------------------- 跨学科只读（大厅用）
+
+  /** 某个学科当前用哪个档案（没建过就是默认档案） */
+  function profileOf(subjectId) {
+    var n = Store.ns(subjectId);
+    var cur = n.get("profile", null);
+    return cur || "p_default";
+  }
+
+  /**
+   * **只读地**看别的学科：今天的三条任务 + 经验/等级/打卡。
+   *
+   * 为什么不能直接 daily()：def / ns / cache 都是单份的，大厅里五个学科
+   * 依次 define() 之后只剩下最后一个。所以这里按学科各读各的存储，
+   * 而且**绝不写**（不 rollDaily、不补默认值）—— 大厅不该因为"看了一眼"
+   * 就改动别的学科的数据。
+   *
+   * 关键一点：学科**没打开过**的时候，这里用同一套 seededPick(今天)
+   * 算出它今天会是哪三条任务 —— 种子只跟日期有关，所以大厅显示的和
+   * 孩子点进去看到的**是同一批任务**，不会"大厅说做对 10 题、进去变成读 4 页绘本"。
+   */
+  function peek(subjectId) {
+    var spec = specs[subjectId];
+    var pool = (spec && spec.daily) || [];
+    var n = Store.ns(subjectId);
+    var s = normalize(n.get("stats__" + profileOf(subjectId), null));
+    var t = today();
+
+    // 今天的三条任务：学科自己已经选过就用它的，否则按同一套种子算
+    var ids = (s.daily && s.daily.date === t && Array.isArray(s.daily.items) && s.daily.items.length)
+      ? s.daily.items
+      : seededPick(pool, Math.min(DAILY_COUNT, pool.length), t).map(function (d) { return d.id; });
+
+    var tasks = ids.map(function (id) {
+      var item = pool.filter(function (x) { return x.id === id; })[0];
+      if (!item) return null;
+      var cur = Math.min(item.need, dailyProgress(item, s));
+      var done = !!(s.daily && s.daily.done && s.daily.done[item.id]) || cur >= item.need;
+      return {
+        id: item.id, emoji: item.emoji, title: item.title,
+        cur: done ? item.need : cur, need: item.need, xp: item.xp, done: done
+      };
+    }).filter(Boolean);
+
+    var info = levelInfo(s.xp);
+    return {
+      subject: subjectId,
+      hasDaily: pool.length > 0,
+      xp: s.xp,
+      level: info.level,
+      streak: s.streak.cur,
+      visitedToday: !!s.days[t],
+      daily: tasks,
+      dailyDone: tasks.filter(function (x) { return x.done; }).length,
+      dailyTotal: tasks.length
+    };
+  }
+
+  /** 只读地看**别的体系**（Python / 英语各有自己的 progress.js）今天来过没有。
+   *  它们的每日任务池在自己的模块里，大厅拿不到也不该抄一份（会各自漂移），
+   *  所以这里只回答一个确定的事实：今天有没有练过。
+   *
+   *  ⚠️ 这两个学科**不用 Store.ns()**，键是历史遗留的（老站还在用同一份数据）：
+   *     Python  codepanda_stats_v1_p_default
+   *     英语    en_stats__p_default
+   *  和 tools/parent 的读取器是同一套键，改这里要一起改。 */
+  var LEGACY_KEY = {
+    python: function (pid) { return "codepanda_stats_v1_" + pid; },
+    en: function (pid) { return "en_stats__" + pid; }
+  };
+
+  function readRaw(key) {
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return null;
+      var v = JSON.parse(raw);
+      return (v && typeof v === "object") ? v : null;
+    } catch (e) { return null; }
+  }
+
+  function peekLegacy(subjectId) {
+    var out = { subject: subjectId, hasDaily: false, visitedToday: false,
+                xp: 0, level: 1, streak: 0, daily: [], dailyDone: 0, dailyTotal: 0 };
+    var mk = LEGACY_KEY[subjectId];
+    if (!mk) return out;
+    var s = readRaw(mk(profileOf(subjectId)));
+    if (!s) return out;
+    var t = today();
+    out.xp = Math.max(0, Number(s.xp) || 0);
+    // Python / 英语的等级曲线和平台不一样（80 + 20/级），这里只报个大概，
+    // 大厅卡片上的 Lv. 是学科自己 summary() 报的，那才是准的。
+    out.level = levelInfo(out.xp).level;
+    var st = s.streak;
+    out.streak = Math.max(0, Number(typeof st === "number" ? st : (st && st.cur)) || 0);
+    if (Array.isArray(s.days)) out.visitedToday = s.days.map(String).indexOf(t) >= 0;
+    else if (s.days && typeof s.days === "object") out.visitedToday = !!s.days[t];
+    if (!out.visitedToday && s.today && s.today.date === t) out.visitedToday = true;
+    if (!out.visitedToday && s.daily && s.daily.date === t) out.visitedToday = true;
+    // Python 的 daily 是 {date, progress:{}, done:[]} —— 有多少条做完了是能读出来的
+    if (s.daily && s.daily.date === t && Array.isArray(s.daily.done)) {
+      out.dailyTotal = DAILY_COUNT;
+      out.dailyDone = s.daily.done.length;
+    }
+    return out;
+  }
+
   // ---------------------------------------------------------------- 定义与初始化
 
   function define(subjectId, spec) {
     def = Object.assign({ events: {}, badges: [], medals: [], missions: [], daily: [] }, spec || {});
     ns = Store.ns(subjectId);
+    // 每个学科的声明都留一份。**不是为了自己用** —— def 是单份的，
+    // 大厅里五个学科都会 define()，最后一个会把前面的覆盖掉。
+    // 大厅的「今天各学科做什么」靠 specs 才能跨学科读出各自的每日任务。
+    specs[subjectId] = def;
     return Progress;
   }
 
@@ -594,6 +705,11 @@
     badges: viewBadges,
     medals: viewMedals,
     days: viewDays,
+
+    // 跨学科只读（大厅的「今天各学科做什么」）
+    peek: peek,
+    peekLegacy: peekLegacy,
+    specOf: function (id) { return specs[id] || null; },
 
     // 同步 / 生命周期
     exportRow: exportRow,

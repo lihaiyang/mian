@@ -122,6 +122,72 @@
 .resume .resume-name { font-size: var(--fs-h2); font-weight: 700; }
 .resume .resume-go { color: var(--accent); font-weight: 700; font-size: var(--fs-sm); }
 
+/* ---------------------------------------------------------------- 今天各学科做什么（F5）
+   五个学科的每日任务并排放到一屏。刻意做得比学科卡片**轻**：
+   卡片是"进去玩"，这里是"今天可以做什么"，不该抢主行动。 */
+
+.today-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--s4);
+}
+
+.today-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  padding: var(--s4);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-1);
+  transition: translate var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.today-row:hover { translate: 0 -2px; box-shadow: var(--sh-2); text-decoration: none; }
+.today-row:active { translate: 0 0; scale: var(--press); }
+
+.today-head { grid-column: 1; display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+.today-emoji { font-size: 22px; line-height: 1; }
+.today-name { font-weight: 700; }
+.today-count {
+  margin-left: auto;
+  padding: 1px 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.today-tasks { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; }
+.today-task {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+  min-width: 0;
+}
+.today-task .tt-e { flex: 0 0 auto; width: 1.2em; text-align: center; }
+.today-task .tt-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.today-task .tt-n {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.today-task.done { color: var(--muted); }
+.today-task.done .tt-t { text-decoration: line-through; text-decoration-color: var(--line); }
+
+.today-meta {
+  grid-column: 1;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.today-meta .tm-fire { color: inherit; }
+
+.today-go { grid-column: 2; color: var(--accent); font-size: var(--fs-xs); font-weight: 700; white-space: nowrap; }
+
 /* ---------------------------------------------------------------- 学科网格 */
 
 .subject-grid {

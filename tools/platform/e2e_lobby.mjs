@@ -144,9 +144,64 @@ for (const live of liveNames) {
 check("已去掉的学科不在占位区（C++）", !soonText.includes("C++"));
 
 // ---------------------------------------------------------------- 4. 没访问过时不该有「继续上次」
+// ⚠️ 这条必须在下面「今天各学科做什么」之前 —— 那一段会真的进学科页，
+// 进去之后「继续上次」就该出现了。
 check("首次访问不显示「继续上次」", (await page.locator(".resume[data-subject]").count()) === 0);
 
-// ---------------------------------------------------------------- 5. 进入学科 + 继续上次
+// ---------------------------------------------------------------- 5. 今天各学科做什么（F5）
+const todayRows = await page.evaluate(() =>
+  Array.from(document.querySelectorAll(".today-row")).map((r) => ({
+    id: r.dataset.subject,
+    href: r.getAttribute("href"),
+    tasks: Array.from(r.querySelectorAll(".today-task .tt-t")).map((t) => t.textContent.trim()),
+    counts: Array.from(r.querySelectorAll(".today-task .tt-n")).map((t) => t.textContent.trim())
+  }))
+);
+const readyIds = await page.evaluate(() =>
+  (window.MIAN_SUBJECTS.manifests || []).map((p) => String(p).split("/")[1]));
+
+check("大厅有「今天各学科做什么」", await page.locator("#today").isVisible());
+check("每个可进入的学科都有一行",
+  todayRows.length === readyIds.length && readyIds.every((id) => todayRows.some((r) => r.id === id)),
+  todayRows.map((r) => r.id).join(","));
+check("每行都能点进学科", todayRows.every((r) => r.href && /\/$/.test(r.href)),
+  todayRows.map((r) => r.href).join(","));
+
+// 走平台内核的三个学科：必须能报出今天具体是哪三条
+const PLATFORM_SUBJECTS = ["typing", "math", "cn"];
+check("平台学科每行 3 条任务",
+  PLATFORM_SUBJECTS.every((id) => {
+    const r = todayRows.find((x) => x.id === id);
+    return r && r.tasks.length === 3;
+  }),
+  todayRows.filter((r) => PLATFORM_SUBJECTS.includes(r.id))
+           .map((r) => r.id + ":" + r.tasks.length).join(" "));
+check("新档案的进度从 0 开始",
+  todayRows.filter((r) => PLATFORM_SUBJECTS.includes(r.id))
+           .every((r) => r.counts.every((c) => /^0\//.test(c))),
+  todayRows.map((r) => r.counts.join(",")).join(" | "));
+
+// **这条是 F5 的关键**：大厅看到的和点进去看到的必须是同一批任务。
+// 大厅是在学科**没打开过**的情况下算出来的（种子只跟日期有关），
+// 算错的话就会出现"大厅说做对 10 道题、进去变成读 4 页绘本"。
+for (const id of PLATFORM_SUBJECTS) {
+  const lobbyTasks = (todayRows.find((r) => r.id === id) || {}).tasks || [];
+  await page.goto(BASE + "/" + id + "/", { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => typeof Progress !== "undefined" && !!Progress.daily,
+    null, { timeout: 15000 }).catch(() => {});
+  await sleep(300);
+  const onPage = await page.evaluate(() =>
+    (window.Progress && Progress.daily ? Progress.daily() : []).map((d) => d.title));
+  check(`大厅与 ${id} 页的今日任务一致`,
+    lobbyTasks.join("|") === onPage.join("|"),
+    `大厅「${lobbyTasks.join(" / ")}」 页面「${onPage.join(" / ")}」`);
+}
+// 回到大厅继续后面的用例
+await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
+await page.waitForSelector(".subject-card", { timeout: 15000 });
+await sleep(400);
+
+// ---------------------------------------------------------------- 6. 进入学科 + 继续上次
 await page.locator('a.subject-card[data-subject="typing"]').click();
 await page.waitForLoadState("domcontentloaded");
 await sleep(1200);
@@ -166,7 +221,7 @@ if (await page.locator(".resume[data-subject]").count()) {
   check("「继续上次」指向打字", (await page.locator(".resume[data-subject]").getAttribute("href")) === "/typing/");
 }
 
-// ---------------------------------------------------------------- 6. 无障碍与错误
+// ---------------------------------------------------------------- 8. 无障碍与错误
 check("有跳过导航链接", (await page.locator("a.skip-link").count()) === 1);
 
 await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });

@@ -12,7 +12,7 @@
 <!-- 平台层样式：全站唯一一份，学科只覆盖 --accent 三个变量 -->
 <link rel="stylesheet" href="/shared/styles/tokens.css?v=f0d21dc8">
 <link rel="stylesheet" href="/shared/styles/base.css?v=3c099506">
-<link rel="stylesheet" href="/shared/styles/components.css?v=2264217d">
+<link rel="stylesheet" href="/shared/styles/components.css?v=4999769f">
 <link rel="stylesheet" href="/shared/styles/chrome.css?v=c0c00792">
 </head>
 <body>
@@ -74,6 +74,10 @@
       <div class="note">正在加载学科…</div>
     </div>
 
+    <!-- 今天各学科做什么（F5）：五个学科的每日任务并排放到一屏。
+         由下面的脚本在学科 manifest 都加载完之后渲染 —— 任务池是学科声明里的。 -->
+    <section id="today" hidden></section>
+
     <noscript>
       <div class="note" style="margin-top:24px">
         <strong>这个页面需要 JavaScript。</strong>
@@ -97,6 +101,7 @@
      codepanda_* / en_*，不走 Store，那是历史包袱，见 docs 的多学科设计。） -->
 <script src="/shared/core/store.js?v=873bc876"></script>
 <script src="/shared/core/srs.js?v=d4b0684f"></script>
+<script src="/shared/core/progress.js?v=e6e6e1c0"></script>
 <script src="/shared/core/topbar.js?v=e382f937"></script>
 <script src="/shared/core/account-ui.js?v=74e0317f"></script>
 <script src="/shared/core/registry.js?v=0d6e477b"></script>
@@ -104,6 +109,12 @@
 <script>
 (function () {
   "use strict";
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
 
   // ---- 设置菜单 + 账号与云同步 ----
   // 账号面板是全平台共用的一份（AccountUI）：一次登录，Python / 英语 / 打字
@@ -142,13 +153,77 @@
   // 家长中心已经做好了（F2）：各科进度、连续打卡、需要多练的、可打印周报。
   // 这里不再拦点击 —— 之前那个「还在建设中」的 alert 已经过时了。
 
+  // ---- 今天各学科做什么（F5）----
+  // 五个学科的每日任务由各自声明，这里只把它们**并排放到一屏**。
+  //   · 打字 / 数学 / 汉字：走平台内核，能读到今天具体是哪三条
+  //   · Python / 英语：各有自己的 progress.js，任务池在自己的文件里，
+  //     大厅再抄一份迟早会漂移 —— 所以只报"今天来过没有"，不编任务。
+  function renderToday() {
+    var host = document.getElementById("today");
+    if (!host || typeof Progress === "undefined" || !Progress.peek) return;
+    var list = (window.Platform && Platform.all) ? Platform.all() : [];
+    var rows = [], doneAll = 0, totalAll = 0;
+
+    list.forEach(function (m) {
+      if (!m.ready) return;
+      var legacy = (m.id === "python" || m.id === "en");
+      var p = legacy ? Progress.peekLegacy(m.id) : Progress.peek(m.id);
+      if (!p) return;
+
+      var inner;
+      if (p.daily && p.daily.length) {
+        doneAll += p.dailyDone; totalAll += p.dailyTotal;
+        inner = p.daily.map(function (t) {
+          return '<span class="today-task' + (t.done ? " done" : "") + '">' +
+            '<span class="tt-e" aria-hidden="true">' + (t.done ? "✅" : (t.emoji || "•")) + "</span>" +
+            '<span class="tt-t">' + esc(t.title) + "</span>" +
+            '<b class="tt-n">' + t.cur + "/" + t.need + "</b></span>";
+        }).join("");
+      } else if (p.dailyTotal) {           // Python：能读到今天完成了几条
+        doneAll += p.dailyDone; totalAll += p.dailyTotal;
+        inner = '<span class="today-task' + (p.visitedToday ? " done" : "") + '">' +
+          '<span class="tt-e" aria-hidden="true">' + (p.visitedToday ? "✅" : "•") + "</span>" +
+          '<span class="tt-t">今天练过了</span>' +
+          '<b class="tt-n">' + p.dailyDone + "/" + p.dailyTotal + "</b></span>";
+      } else {                              // 英语：只知道今天来没来过
+        inner = '<span class="today-task' + (p.visitedToday ? " done" : "") + '">' +
+          '<span class="tt-e" aria-hidden="true">' + (p.visitedToday ? "✅" : "•") + "</span>" +
+          '<span class="tt-t">' + (p.visitedToday ? "今天练过了" : "今天还没开始") + "</span></span>";
+      }
+
+      rows.push('<a class="today-row" href="' + esc(m.url) + '" data-subject="' + esc(m.id) +
+        '" style="--accent:' + esc(m.accent) + '">' +
+        '<span class="today-head">' +
+          '<span class="today-emoji" aria-hidden="true">' + esc(m.emoji) + "</span>" +
+          '<span class="today-name">' + esc(m.name) + "</span>" +
+          (p.dailyTotal ? '<span class="today-count">' + p.dailyDone + "/" + p.dailyTotal + "</span>" : "") +
+        "</span>" +
+        '<span class="today-tasks">' + inner + "</span>" +
+        ((p.xp > 0 || p.streak > 0)
+          ? '<span class="today-meta">Lv.' + p.level +
+            (p.streak > 0 ? ' · <span class="tm-fire">🔥 ' + p.streak + " 天</span>" : "") + "</span>"
+          : "") +
+        '<span class="today-go" aria-hidden="true">进去 →</span>' +
+        "</a>");
+    });
+
+    if (!rows.length) return;
+    host.innerHTML =
+      '<h2 class="section-title">今天各学科做什么' +
+        '<span class="st-sub">' +
+        (totalAll ? "已完成 " + doneAll + " / " + totalAll + " 条 · " : "") +
+        "每天自动换</span></h2>" +
+      '<div class="today-list">' + rows.join("") + "</div>";
+    host.hidden = false;
+  }
+
   if (typeof Platform === "undefined" || !Platform.boot) {
     document.getElementById("lobby").innerHTML =
       '<div class="note">平台脚本没加载出来。请刷新页面，或直接进入 <a href="/python/">萌码 Python</a> / <a href="/en/">萌语岛</a>。</div>';
     return;
   }
 
-  Platform.boot(window.MIAN_SUBJECTS || {}, "lobby");
+  Platform.boot(window.MIAN_SUBJECTS || {}, "lobby").then(renderToday, renderToday);
 })();
 </script>
 
