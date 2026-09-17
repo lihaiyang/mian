@@ -167,6 +167,8 @@ check("答案条数和题目一致",
       (await page.locator(".ma-ans").count()) === (await page.locator("#sheet .ma-prob").count()),
       `${await page.locator(".ma-ans").count()} 条`);
 check("卷头有姓名/得分栏", /姓名/.test(await page.textContent(".ma-sheet-foot")));
+check("一年级默认叫「口算题卡」", /口算题卡/.test(await page.textContent("#sheet .ma-sheet-title b")),
+      await page.textContent("#sheet .ma-sheet-title b"));
 check("有打印按钮", await page.locator("#btnPrint").isVisible());
 
 /** 把卷子上的题目抠出来（去掉行尾的 " ="） */
@@ -212,8 +214,9 @@ const calcBad = await page.evaluate(({ list, ans }) => {
     return isNaN(n) ? null : n;
   };
   list.forEach((q, i) => {
-    if (!/^[\d\s+\-×÷*/()]+$/.test(q)) return;
-    const expr = q.replace(/×/g, "*").replace(/÷/g, "/");
+    // ⚠️ 减号是 U+2212，不是 ASCII 的 "-"
+    if (!/^[\d\s+\-−–—×÷*/()]+$/.test(q)) return;
+    const expr = q.replace(/[−–—]/g, "-").replace(/×/g, "*").replace(/÷/g, "/");
     let v;
     try { v = Function('"use strict";return (' + expr + ")")(); } catch (e) { return; }
     const a = toNum(ans[i]);
@@ -222,6 +225,18 @@ const calcBad = await page.evaluate(({ list, ans }) => {
   return bad;
 }, { list: qs, ans: printed });
 check("算式题的答案算一遍都对", calcBad.length === 0, calcBad.slice(0, 3).join(" | "));
+
+// ④ 算式题后面必须跟等号 —— 减号是 U+2212，只认 ASCII 减号的话
+//    所有减法题都会被判成"问句"，印出来就是「11 − 4 ______」（少了等号）
+const noEq = await page.evaluate(() => {
+  const bad = [];
+  document.querySelectorAll("#sheet .ma-prob:not(.long) .ma-prob-q").forEach((el) => {
+    const t = el.textContent.trim();
+    if (/^[\d\s+\-−–—×÷*/().]+$/.test(t) && !/=$/.test(t)) bad.push(t);
+  });
+  return bad;
+});
+check("算式题都带等号（含 U+2212 减号）", noEq.length === 0, noEq.slice(0, 3).join(" | "));
 
 // 范围：切到某个单元后，题目必须全部来自那个单元
 await page.selectOption("#sheetScope", "unit:g1_add10");

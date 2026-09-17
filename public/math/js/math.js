@@ -403,8 +403,11 @@
     return "w100";
   }
 
-  /** 纯算式（可以写 "… ="）还是个问句（要写 "答："） */
-  function isExpr(q) { return /^[\d\s+\-×÷*/()]+$/.test(String(q)); }
+  /** 纯算式（可以写 "… ="）还是个问句（要写 "答："）
+   *  ⚠️ 减号在题库里是 U+2212「−」，不是键盘上的 ASCII「-」。
+   *  只认 ASCII 的话，所有减法题都会被当成"问句"：卷子上印成
+   *  「11 − 4 ______」而不是「11 − 4 = ______」，标题也会从"口算题卡"错成"数学练习"。 */
+  function isExpr(q) { return /^[\d\s+\-−–—×÷*/().]+$/.test(String(q)); }
 
   function probHtml(it, n) {
     var q = esc(it.q);
@@ -414,6 +417,8 @@
     var long = !expr && String(it.q).length > 20;
     var inline = SHEET.ans === "inline";
     var num = '<span class="ma-prob-n">' + n + "</span>";
+    // 题面自己带等号的（"46 − 35 ="）就不要再补一个
+    var eq = expr && !/[=＝]\s*$/.test(String(it.q).trim()) ? " =" : "";
 
     if (long) {
       return '<div class="ma-prob long ' + w + '">' + num +
@@ -424,7 +429,7 @@
         "</span></div>";
     }
     return '<div class="ma-prob ' + w + '">' + num +
-      '<span class="ma-prob-q">' + q + (expr ? " =" : "") + "</span>" +
+      '<span class="ma-prob-q">' + q + eq + "</span>" +
       (inline ? '<b class="ma-prob-key">' + esc(it.a) + "</b>"
               : '<span class="ma-prob-blank"></span>') +
       "</div>";
