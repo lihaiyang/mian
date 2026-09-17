@@ -54,7 +54,15 @@
 
   // ---------------------------------------------------------------- 数据
 
+  /** 字表全局变量。离线又没下载过时它整个是 undefined ——
+   *  直接写 window.CN_GRADE[1] 会抛 "Cannot read properties of undefined"（踩过）。 */
+  function grades() { return window.CN_GRADE || {}; }
+
   function loadGrades() {
+    // 这几份是**运行时才注入**的（HTML 里没有 <script src>），
+    // 所以离线缓存要主动跟平台层报一声，否则后台预热扫不到它们。
+    var want = GRADES.map(function (g) { return "data/chars-g" + g + ".js"; });
+    if (window.Pwa && Pwa.want) Pwa.want(want);
     return Promise.all(GRADES.map(function (g) {
       return new Promise(function (res) {
         var el = document.createElement("script");
@@ -69,7 +77,7 @@
   function flatten() {
     var out = [];
     GRADES.forEach(function (g) {
-      (window.CN_GRADE[g] || []).forEach(function (it) {
+      (grades()[g] || []).forEach(function (it) {
         out.push(Object.assign({ g: g }, it));
       });
     });
@@ -119,7 +127,7 @@
     lv.innerHTML = "";
     lv.appendChild(chip("全部", S.level === "all", function () { S.level = "all"; reset(); }));
     GRADES.forEach(function (g) {
-      var n = (window.CN_GRADE[g] || []).length;
+      var n = (grades()[g] || []).length;
       lv.appendChild(chip(g + " 级 (" + n + ")", S.level === g, function () {
         S.level = g; reset();
         if (typeof Progress !== "undefined") Progress.emit("lv" + g, {});
@@ -402,6 +410,14 @@
     loadGrades().then(function () {
       S.all = flatten();
       S.level = 1;
+      // 离线且这份字表还没下载到本地：说清楚原因，别给一个空页面
+      if (!S.all.length) {
+        $("count").textContent = "字表没加载出来";
+        $("grid").innerHTML = '<div class="cn-muted" style="padding:24px 0">' +
+          "字表没加载出来。如果是<b>没网</b>，连上网刷新一次就好 —— " +
+          "之后这个学科就能离线用了。</div>";
+        return;
+      }
       reset();
       refreshProgressPanel();
     });

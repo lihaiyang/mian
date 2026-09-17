@@ -18,6 +18,9 @@
   /* 家长中心是给大人看的，用一个沉一点的主色 */
   :root { --accent: #4A5568; --accent-soft: #EDEFF3; --accent-ink: #FFFFFF; }
 </style>
+<!-- 装到手机主屏（PWA）：一个站一个图标，离线也能打开 -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 </head>
 <body>
 
@@ -119,5 +122,6 @@
 <script src="/shared/subjects.js?v=ea8cf8c8"></script>
 <script src="js/parent.js?v=c8b4f076"></script>
 
+<script src="/shared/core/pwa.js?v=3a9ce5f9"></script>
 </body>
 </html>

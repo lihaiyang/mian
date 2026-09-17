@@ -41,7 +41,13 @@ self.addEventListener("install", e => {
 self.addEventListener("activate", e => {
   e.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k)));
+    // ⚠️ 只清**自己前缀**（en-）的旧版本。
+    // 原来写的是"清掉所有不等于自己的缓存"，现在平台层有了一份根 SW
+    // （mian-shell-v1 / mian-assets-v1），那样会顺手删掉别的学科的离线缓存，
+    // 反过来它也会删我们 —— 两个 SW 互相拆台，离线就永远不可靠。
+    await Promise.all(keys
+      .filter(k => /^en-/.test(k) && k !== VERSION)
+      .map(k => caches.delete(k)));
     await self.clients.claim();
   })());
 });

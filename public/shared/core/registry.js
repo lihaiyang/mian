@@ -250,6 +250,12 @@
     // 萌语岛会时不时跑到萌码 Python 前面（截图才发现）。
     // 每个 manifest 只有几百字节，串行的代价可以忽略。
     var list = cfg.manifests || [];
+
+    // 离线：manifest 是**运行时注入**的（HTML 里没有 <script src>），
+    // Service Worker 的后台预热扫不到它们。报一声，它才会缓存，
+    // 否则没网打开大厅只剩"敬请期待"那几张占位卡。
+    if (window.Pwa && Pwa.want) Pwa.want(list);
+
     var chain = Promise.resolve();
     list.forEach(function (src, i) {
       chain = chain.then(function () {

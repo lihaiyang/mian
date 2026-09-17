@@ -25,6 +25,9 @@
   <!-- 全局自定义少儿样式。它开头的 :root 已经把变量接到平台令牌上了，
        所以下面 3000 行布局不用改就换了质感。 -->
   <link rel="stylesheet" href="css/style.css?v=bc4134b5" data-page-node-id="dwcbWo0wM3BjzporyYjKDb">
+<!-- 装到手机主屏（PWA）：一个站一个图标，离线也能打开 -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 </head>
 <body data-page-node-id="MABBDhhrP5uEOfEzmMJlsw">
 
@@ -534,5 +537,6 @@
   <script src="js/learn.js?v=dff1cd57"></script>
   <script src="js/app.js?v=1eccd42b"></script>
 
+<script src="/shared/core/pwa.js?v=3a9ce5f9"></script>
 </body>
 </html>

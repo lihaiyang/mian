@@ -18,6 +18,9 @@
   /* 复习页是平台页面，不属于任何学科 —— 用一个中性偏暖的主色 */
   :root { --accent: #6A4C93; --accent-soft: #EDE4F5; --accent-ink: #FFFFFF; }
 </style>
+<!-- 装到手机主屏（PWA）：一个站一个图标，离线也能打开 -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 </head>
 <body>
 
@@ -113,8 +116,9 @@
 <script src="/shared/core/progress.js?v=e6e6e1c0"></script>
 <script src="/shared/core/srs.js?v=d4b0684f"></script>
 <script src="/shared/core/sync.js?v=70663565"></script>
-<script src="/shared/core/registry.js?v=0d6e477b"></script>
+<script src="/shared/core/registry.js?v=5065a79c"></script>
 <script src="js/review.js?v=851be267"></script>
 
+<script src="/shared/core/pwa.js?v=3a9ce5f9"></script>
 </body>
 </html>

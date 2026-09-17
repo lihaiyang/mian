@@ -14,6 +14,9 @@
 <link rel="stylesheet" href="/shared/styles/base.css?v=3c099506">
 <link rel="stylesheet" href="/shared/styles/components.css?v=4999769f">
 <link rel="stylesheet" href="/shared/styles/chrome.css?v=c0c00792">
+<!-- 装到手机主屏（PWA）：一个站一个图标，离线也能打开 -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 </head>
 <body>
 
@@ -104,7 +107,7 @@
 <script src="/shared/core/progress.js?v=e6e6e1c0"></script>
 <script src="/shared/core/topbar.js?v=e382f937"></script>
 <script src="/shared/core/account-ui.js?v=74e0317f"></script>
-<script src="/shared/core/registry.js?v=0d6e477b"></script>
+<script src="/shared/core/registry.js?v=5065a79c"></script>
 <script src="/shared/subjects.js?v=ea8cf8c8"></script>
 <script>
 (function () {
@@ -227,5 +230,6 @@
 })();
 </script>
 
+<script src="/shared/core/pwa.js?v=3a9ce5f9"></script>
 </body>
 </html>

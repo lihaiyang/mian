@@ -19,6 +19,9 @@
 <style>
   :root { --accent: #C4562F; --accent-soft: #F9E7DE; --accent-ink: #FFFFFF; }
 </style>
+<!-- 装到手机主屏（PWA）：一个站一个图标，离线也能打开 -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 </head>
 <body>
 
@@ -166,10 +169,11 @@
 <script src="/shared/core/store.js?v=873bc876"></script>
 <script src="/shared/core/progress.js?v=e6e6e1c0"></script>
 <script src="/shared/core/sync.js?v=70663565"></script>
-<script src="/shared/core/registry.js?v=0d6e477b"></script>
+<script src="/shared/core/registry.js?v=5065a79c"></script>
 <script src="subject.js?v=c4499b9d"></script>
 <script src="data/index.js?v=dedee97b"></script>
-<script src="js/cn.js?v=dd191c15"></script>
+<script src="js/cn.js?v=119ef02d"></script>
 
+<script src="/shared/core/pwa.js?v=3a9ce5f9"></script>
 </body>
 </html>
